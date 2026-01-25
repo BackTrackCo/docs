@@ -1,43 +1,72 @@
-# Mintlify Starter Kit
+# x402r Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+Documentation for the x402r refundable payments protocol, built with [Mintlify](https://mintlify.com).
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
-
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
-
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+**Live site:** [docs.x402r.org](https://docs.x402r.org)
 
 ## Development
 
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
+### Prerequisites
 
-```
-npm i -g mint
-```
+- Node.js >= 20
+- npm or pnpm
 
-Run the following command at the root of your documentation, where your `docs.json` is located:
+### Local Preview
 
-```
-mint dev
+```bash
+# Install Mintlify CLI (if needed)
+npm i -g mintlify
+
+# Start local dev server
+npx mint dev
 ```
 
 View your local preview at `http://localhost:3000`.
 
-## Publishing changes
+### Using Claude Code
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+This repo includes Claude Code configuration for documentation development:
 
-## Need help?
+```bash
+# Start Claude Code in the docs folder
+cd docs && claude
 
-### Troubleshooting
+# Available skills:
+# /docs-new-page   - Create a new documentation page
+# /docs-review     - Review a page for quality issues
+# /docs-update     - Update existing documentation
+```
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+See `CLAUDE.md` for writing standards and guidelines.
 
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+## Project Structure
+
+```
+docs/
+├── .claude/commands/     # Claude Code skills
+├── api-reference/        # API documentation
+├── essentials/           # Core documentation guides
+├── images/               # Documentation images
+├── logo/                 # Brand logos
+├── snippets/             # Reusable MDX snippets
+├── .mintignore           # Files excluded from Mintlify
+├── CLAUDE.md             # Claude Code configuration
+├── docs.json             # Mintlify configuration
+└── index.mdx             # Homepage
+```
+
+## Publishing
+
+Changes pushed to the default branch are automatically deployed via Mintlify's GitHub integration.
+
+## Troubleshooting
+
+- **Dev server not starting:** Run `mint update` to get the latest CLI version
+- **404 on a page:** Ensure the page is listed in `docs.json` navigation
+- **Build errors:** Check MDX syntax and frontmatter format
+
+## Resources
+
+- [Mintlify Documentation](https://mintlify.com/docs)
+- [x402r Protocol](https://x402r.org)
+- [x402r App](https://app.x402r.org)

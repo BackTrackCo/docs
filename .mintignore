@@ -1,0 +1,5 @@
+# Claude Code configuration (not documentation)
+.claude/
+
+# Project files
+CLAUDE.md
