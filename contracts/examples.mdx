@@ -390,12 +390,17 @@ const operator = await operatorFactory.deploy(
 );
 ```
 
+<Tip>
+**Authorization Expiry for Subscriptions:** When authorizing, set `authorizationExpiry` to limit how long the service provider can charge. For example, a 12-month subscription would set expiry to `block.timestamp + 365 days`. After expiry, the payer can reclaim any unused funds by calling `void()`.
+</Tip>
+
 ### Payment Flow
 
 ```
-Month 1: User authorizes 1200 USDC (12 months)
+Day 0: User authorizes 1200 USDC for 12 months
+│      (sets authorizationExpiry = block.timestamp + 365 days)
 │
-├─ Service provider charges 100 USDC
+Month 1: Service provider charges 100 USDC
 │
 Month 2: Service provider charges 100 USDC
 │
@@ -404,7 +409,11 @@ Month 2: Service provider charges 100 USDC
 Month 6: User disputes charge
 │
 ├─ Arbiter investigates
-└─ Arbiter refunds if warranted
+├─ Arbiter refunds if warranted
+│
+Month 12: Authorization expires
+│
+└─ User can reclaim any unused funds via void()
 ```
 
 ---

@@ -77,6 +77,10 @@ function authorize(
 
 **Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
 
+<Tip>
+**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
+</Tip>
+
 #### release()
 
 Releases funds from escrow to receiver.
