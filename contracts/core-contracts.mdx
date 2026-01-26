@@ -1,26 +1,27 @@
 ---
 title: "Core Contracts"
-description: "Detailed explanation of ArbitrationOperator, RefundRequest, and AuthCaptureEscrow"
+description: "Detailed explanation of PaymentOperator, RefundRequest, and AuthCaptureEscrow"
 icon: "file-contract"
 ---
 
-## ArbitrationOperator
+## PaymentOperator
 
 The main payment operator contract with pluggable conditions for flexible authorization logic.
 
 ### Overview
 
-- **Type:** Operator instance (one per arbiter)
-- **Deployment:** Via ArbitrationOperatorFactory
+- **Type:** Operator instance (one per fee recipient + configuration)
+- **Deployment:** Via PaymentOperatorFactory
 - **Immutability:** Cannot be paused or upgraded
 - **Configuration:** 10 slots for conditions and recorders
+- **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
 ### Immutable Fields
 
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
-address public immutable ARBITER;             // Designated arbiter
-address public immutable PROTOCOL_FEE_RECIPIENT; // Fee recipient
+address public immutable FEE_RECIPIENT;       // Operator fee recipient
+address public immutable PROTOCOL_FEE_RECIPIENT; // Protocol fee recipient
 ```
 
 ### Mutable Fields

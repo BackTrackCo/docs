@@ -117,25 +117,47 @@ function check(PaymentInfo calldata payment, address caller)
 - Charge: Let receiver charge partial amounts
 - Refund: Let receiver voluntarily refund
 
-### ArbiterCondition
+### StaticAddressCondition
 
-Only the designated arbiter can call the action.
+Only a designated address can call the action.
 
-**Address (Base Sepolia):** `0x32471D31910a009273A812dE0894d9f0ADef4834`
+**Deployment:** Deploy per use case (not a singleton)
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
-    external view returns (bool)
-{
-    return caller == operator.ARBITER();
+contract StaticAddressCondition is ICondition {
+    address public immutable DESIGNATED_ADDRESS;
+
+    constructor(address _designatedAddress) {
+        DESIGNATED_ADDRESS = _designatedAddress;
+    }
+
+    function check(PaymentInfo calldata payment, address caller)
+        external view returns (bool)
+    {
+        return caller == DESIGNATED_ADDRESS;
+    }
 }
 ```
 
 **Use cases:**
-- Refund: Let arbiter resolve disputes
-- Release: Let arbiter force release if needed
-- Custom: Arbiter-controlled flows
+- **Arbiter:** Deploy with arbiter address for dispute resolution
+- **Service Provider:** Deploy with provider address for subscriptions
+- **DAO Treasury:** Deploy with multisig address for governance
+- **Compliance Officer:** Deploy with compliance address for approvals
+- **Platform:** Deploy with platform address for controlled releases
+
+**Example:**
+```typescript
+// For marketplace arbiter
+const arbiterCondition = new StaticAddressCondition(arbiterAddress);
+
+// For subscription service provider
+const providerCondition = new StaticAddressCondition(serviceProviderAddress);
+
+// For DAO governance
+const daoCondition = new StaticAddressCondition(daoMultisigAddress);
+```
 
 ### AlwaysTrueCondition
 
