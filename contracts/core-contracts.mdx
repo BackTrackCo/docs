@@ -98,7 +98,13 @@ function release(bytes32 paymentId) external nonReentrant
 5. Call `RELEASE_RECORDER`
 6. Emit `PaymentReleased`
 
-**Access:** Controlled by `RELEASE_CONDITION` (typically receiver OR arbiter + escrow passed)
+**Access:** Controlled by `RELEASE_CONDITION`
+
+<Note>
+**Marketplace example:** Receiver OR StaticAddressCondition(arbiter) + escrow passed
+**Subscription example:** StaticAddressCondition(serviceProvider)
+**DAO example:** StaticAddressCondition(daoMultisig)
+</Note>
 
 #### refundInEscrow()
 
@@ -110,12 +116,19 @@ function refundInEscrow(bytes32 paymentId) external nonReentrant
 
 **Flow:**
 1. Check payment is in escrow
-2. Check `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+2. Check `REFUND_IN_ESCROW_CONDITION` (configurable per operator)
 3. Call `escrow.void()` to return funds to payer
 4. Call `REFUND_IN_ESCROW_RECORDER`
 5. Emit `PaymentRefunded`
 
-**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION`
+
+<Note>
+**Marketplace example:** StaticAddressCondition(arbiter) - disputes
+**Return policy example:** Receiver OR StaticAddressCondition(arbiter)
+**DAO example:** StaticAddressCondition(daoMultisig)
+**Subscription example:** address(0) - no refunds
+</Note>
 
 #### refundPostEscrow()
 
@@ -127,13 +140,19 @@ function refundPostEscrow(bytes32 paymentId) external nonReentrant
 
 **Flow:**
 1. Check payment has been released
-2. Check `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+2. Check `REFUND_POST_ESCROW_CONDITION` (configurable per operator)
 3. Call `escrow.reclaim()` to take back funds from receiver
 4. Transfer to payer
 5. Call `REFUND_POST_ESCROW_RECORDER`
 6. Emit `PaymentRefunded`
 
-**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`
+
+<Note>
+**Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
+**Return policy example:** Receiver - voluntary returns
+**Most configurations:** address(0) - no post-escrow refunds
+</Note>
 
 ### Fee Configuration
 
@@ -143,7 +162,8 @@ Fees can be enabled/disabled and configured by the owner.
 
 ```solidity
 uint16 public maxTotalFeeRate;        // e.g., 5 = 0.05% = 5 basis points
-uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to arbiter
+uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to fee recipient
+address public immutable FEE_RECIPIENT; // Who receives operator share of fees
 ```
 
 **Example Fee Calculation:**
@@ -154,10 +174,16 @@ Protocol %: 25%
 
 Total Fee = 1000 * 0.05% = 0.5 USDC
 ├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
-└─ Arbiter Fee = 0.5 * 75% = 0.375 USDC → arbiter
+└─ Operator Fee = 0.5 * 75% = 0.375 USDC → FEE_RECIPIENT
 
 Receiver Gets = 1000 - 0.5 = 999.5 USDC
 ```
+
+**FEE_RECIPIENT examples:**
+- Arbiter (marketplace with disputes)
+- Service Provider (subscriptions)
+- Platform Treasury (platform-controlled)
+- DAO Multisig (governance-controlled)
 
 #### Updating Fees (24-hour Timelock)
 

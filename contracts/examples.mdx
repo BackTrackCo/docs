@@ -438,17 +438,172 @@ Month 12: Authorization expires
 
 ---
 
+## Example 8: DAO Treasury Controlled
+
+**Use Case:** DAO manages grant releases via multisig governance. No arbiter needed - DAO is the authority.
+
+### Configuration
+
+```typescript
+// Deploy condition for DAO multisig
+const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
+
+const config = {
+  feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
+  authorizeCondition: daoCondition.address,   // DAO authorizes grants
+  authorizeRecorder: address(0),
+  chargeCondition: address(0),
+  chargeRecorder: address(0),
+  releaseCondition: daoCondition.address,     // DAO must approve releases
+  releaseRecorder: address(0),
+  refundInEscrowCondition: daoCondition.address,  // DAO can refund if needed
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: address(0),      // No post-escrow refunds
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deployOperator(config);
+```
+
+### Payment Flow
+
+```
+DAO authorizes 50,000 USDC grant
+│
+├─ Grantee works on milestone
+│
+Month 3: Grantee completes milestone
+│
+├─ DAO reviews work
+├─ DAO multisig votes to approve release
+└─ DAO calls release() → Grantee receives funds
+```
+
+**Benefits:**
+- Governance-controlled releases
+- No third-party arbiter needed
+- DAO earns fees back to treasury
+- On-chain transparent decision making
+
+---
+
+## Example 9: Platform-Controlled Streaming Payments
+
+**Use Case:** Platform manages time-proportional streaming payments. Users can cancel anytime.
+
+### Configuration
+
+```typescript
+// Deploy condition for platform address
+const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
+
+// Time-proportional charge condition (custom)
+const timeProportionalCondition = await new TimeProportionalCondition();
+
+const config = {
+  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  authorizeCondition: PAYER_CONDITION,        // Payer authorizes stream
+  authorizeRecorder: address(0),
+  chargeCondition: new AndCondition([
+    RECEIVER_CONDITION,
+    timeProportionalCondition                 // Can only charge proportional to time
+  ]),
+  chargeRecorder: address(0),
+  releaseCondition: RECEIVER_CONDITION,       // Receiver releases remaining
+  releaseRecorder: address(0),
+  refundInEscrowCondition: PAYER_CONDITION,   // Payer can cancel stream
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: address(0),      // No refunds after charged
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deployOperator(config);
+```
+
+### Payment Flow
+
+```
+User authorizes 10,000 USDC for 100 days streaming
+│
+Day 10: Receiver charges for 10 days (1,000 USDC)
+│
+Day 20: Receiver charges for 10 days (1,000 USDC)
+│
+Day 30: User cancels stream
+│
+└─ User calls void() → Receives remaining 7,000 USDC back
+```
+
+**Benefits:**
+- Time-based fairness (can't charge ahead of time)
+- User can cancel anytime
+- No arbiter needed
+- Platform controls no disputes
+
+---
+
+## Example 10: Self-Service Invoice Payment (No Arbiter)
+
+**Use Case:** B2B invoice payments with no disputes. Companies trust each other directly.
+
+### Configuration
+
+```typescript
+// No arbiter - receiver controls release, platform earns fees
+const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
+
+const config = {
+  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  authorizeCondition: PAYER_CONDITION,        // Payer creates invoice payment
+  authorizeRecorder: address(0),
+  chargeCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
+  chargeRecorder: address(0),
+  releaseCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
+  releaseRecorder: address(0),
+  refundInEscrowCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: address(0),      // No post-delivery refunds
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deployOperator(config);
+```
+
+### Payment Flow
+
+```
+Company A authorizes 100,000 USDC for Invoice #1234
+│
+├─ Company B ships goods
+│
+Day 30: Payment terms met (Net 30)
+│
+├─ Company B calls release()
+└─ Company B receives 99,900 USDC (100K - 0.1% platform fee)
+```
+
+**Benefits:**
+- Trusted B2B relationship (no arbiter overhead)
+- Standard payment terms enforced on-chain
+- Receiver can self-correct invoice errors
+- Platform monetizes via fees only
+
+---
+
 ## Fee Configuration Comparison
 
-| Use Case | Max Fee (bps) | Protocol % | Arbiter % | Total on 1000 USDC |
-|----------|---------------|------------|-----------|-------------------|
-| Standard E-Commerce | 5 (0.05%) | 25% | 75% | 0.50 USDC |
-| Instant Payment | 10 (0.1%) | 50% | 50% | 1.00 USDC |
-| Physical Goods | 3 (0.03%) | 20% | 80% | 0.30 USDC |
-| Service/Milestone | 8 (0.08%) | 30% | 70% | 0.80 USDC |
-| Managed Escrow | 20 (0.2%) | 0% | 100% | 2.00 USDC |
-| Receiver Refunds | 5 (0.05%) | 25% | 75% | 0.50 USDC |
-| Subscription | 15 (0.15%) | 40% | 60% | 1.50 USDC |
+| Use Case | Max Fee (bps) | Protocol % | Operator % | Fee Recipient | Total on 1000 USDC |
+|----------|---------------|------------|------------|---------------|-------------------|
+| E-Commerce (Arbiter) | 5 (0.05%) | 25% | 75% | Arbiter | 0.50 USDC |
+| Instant Payment (Arbiter) | 10 (0.1%) | 50% | 50% | Arbiter | 1.00 USDC |
+| Physical Goods (Arbiter) | 3 (0.03%) | 20% | 80% | Arbiter | 0.30 USDC |
+| Service/Milestone (Arbiter) | 8 (0.08%) | 30% | 70% | Arbiter | 0.80 USDC |
+| Managed Escrow (Arbiter) | 20 (0.2%) | 0% | 100% | Arbiter | 2.00 USDC |
+| Receiver Refunds (Arbiter) | 5 (0.05%) | 25% | 75% | Arbiter | 0.50 USDC |
+| Subscription (Provider) | 15 (0.15%) | 40% | 60% | Service Provider | 1.50 USDC |
+| DAO Grants (DAO) | 5 (0.05%) | 20% | 80% | DAO Treasury | 0.50 USDC |
+| Streaming (Platform) | 10 (0.1%) | 30% | 70% | Platform | 1.00 USDC |
+| B2B Invoice (Platform) | 10 (0.1%) | 50% | 50% | Platform | 1.00 USDC |
 
 ---
 
