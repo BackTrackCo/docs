@@ -1,0 +1,235 @@
+---
+title: "Batch Operations"
+description: "Process multiple cases efficiently with the Arbiter SDK"
+icon: "layer-group"
+---
+
+The Arbiter SDK provides batch operations for efficiently processing multiple refund requests at once.
+
+## Batch Approve
+
+Approve multiple refund requests in one operation:
+
+```typescript
+const paymentInfos = [paymentInfo1, paymentInfo2, paymentInfo3];
+
+const results = await arbiter.batchApprove(paymentInfos);
+
+for (const { txHash } of results) {
+  console.log('Approved:', txHash);
+}
+```
+
+## Batch Deny
+
+Deny multiple refund requests:
+
+```typescript
+const paymentInfos = [paymentInfo1, paymentInfo2];
+
+const results = await arbiter.batchDeny(paymentInfos);
+
+for (const { txHash } of results) {
+  console.log('Denied:', txHash);
+}
+```
+
+## Empty Batch Handling
+
+Batch operations safely handle empty arrays:
+
+```typescript
+const results = await arbiter.batchApprove([]);
+console.log(results.length); // 0
+```
+
+## Example: Process All Pending Cases
+
+```typescript
+import { X402rArbiter } from '@x402r/arbiter';
+import { PaymentState, RequestStatus } from '@x402r/core';
+
+interface CaseDecision {
+  paymentInfo: PaymentInfo;
+  decision: 'approve' | 'deny';
+  reason?: string;
+}
+
+async function processPendingCases(
+  arbiter: X402rArbiter,
+  evaluator: (paymentInfo: PaymentInfo) => Promise<CaseDecision>
+) {
+  // Get all pending cases
+  const pendingHashes = await arbiter.getPendingCases();
+  console.log(`Processing ${pendingHashes.length} cases`);
+
+  const toApprove: PaymentInfo[] = [];
+  const toDeny: PaymentInfo[] = [];
+
+  // Evaluate each case
+  for (const hash of pendingHashes) {
+    const details = await arbiter.getPaymentDetails(hash);
+    const decision = await evaluator(details);
+
+    if (decision.decision === 'approve') {
+      toApprove.push(decision.paymentInfo);
+    } else {
+      toDeny.push(decision.paymentInfo);
+    }
+  }
+
+  // Process in batches
+  const approveResults = await arbiter.batchApprove(toApprove);
+  const denyResults = await arbiter.batchDeny(toDeny);
+
+  console.log(`Approved: ${approveResults.length}`);
+  console.log(`Denied: ${denyResults.length}`);
+
+  return {
+    approved: approveResults,
+    denied: denyResults,
+  };
+}
+```
+
+## Example: Batch with Execution
+
+Approve and execute refunds in batch:
+
+```typescript
+async function batchApproveAndExecute(
+  arbiter: X402rArbiter,
+  paymentInfos: PaymentInfo[]
+) {
+  // First, batch approve
+  const approveResults = await arbiter.batchApprove(paymentInfos);
+  console.log(`Approved ${approveResults.length} refunds`);
+
+  // Then execute each one
+  const executeResults: { txHash: `0x${string}` }[] = [];
+
+  for (const paymentInfo of paymentInfos) {
+    const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
+    executeResults.push({ txHash });
+    console.log('Executed refund:', txHash);
+  }
+
+  return {
+    approved: approveResults,
+    executed: executeResults,
+  };
+}
+```
+
+## Example: Scheduled Batch Processing
+
+Run batch processing on a schedule:
+
+```typescript
+import { X402rArbiter } from '@x402r/arbiter';
+
+class BatchProcessor {
+  private arbiter: X402rArbiter;
+  private intervalId?: NodeJS.Timeout;
+
+  constructor(arbiter: X402rArbiter) {
+    this.arbiter = arbiter;
+  }
+
+  start(intervalMs: number = 60000) {
+    this.intervalId = setInterval(
+      () => this.processBatch(),
+      intervalMs
+    );
+    console.log(`Batch processor started (interval: ${intervalMs}ms)`);
+  }
+
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+      console.log('Batch processor stopped');
+    }
+  }
+
+  private async processBatch() {
+    try {
+      const pending = await this.arbiter.getPendingCases();
+
+      if (pending.length === 0) {
+        return;
+      }
+
+      console.log(`Processing ${pending.length} pending cases`);
+
+      // Get details for all pending cases
+      const details = await Promise.all(
+        pending.map(hash => this.arbiter.getPaymentDetails(hash))
+      );
+
+      // Apply your decision logic
+      const toApprove = details.filter(d => this.shouldApprove(d));
+      const toDeny = details.filter(d => !this.shouldApprove(d));
+
+      if (toApprove.length > 0) {
+        await this.arbiter.batchApprove(toApprove);
+        console.log(`Batch approved: ${toApprove.length}`);
+      }
+
+      if (toDeny.length > 0) {
+        await this.arbiter.batchDeny(toDeny);
+        console.log(`Batch denied: ${toDeny.length}`);
+      }
+
+    } catch (error) {
+      console.error('Batch processing error:', error);
+    }
+  }
+
+  private shouldApprove(paymentInfo: PaymentInfo): boolean {
+    // Your approval logic here
+    return paymentInfo.maxAmount < BigInt('10000000'); // Auto-approve < 10 USDC
+  }
+}
+
+// Usage
+const processor = new BatchProcessor(arbiter);
+processor.start(60000); // Process every minute
+
+// On shutdown
+process.on('SIGINT', () => {
+  processor.stop();
+  process.exit();
+});
+```
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="Transaction ordering" icon="list-ol">
+    Batch operations process transactions sequentially. Each transaction must complete before the next begins.
+  </Accordion>
+
+  <Accordion title="Gas costs" icon="gas-pump">
+    While batch operations are processed sequentially, they save on overhead compared to individual calls. Consider batching similar operations together.
+  </Accordion>
+
+  <Accordion title="Error handling" icon="triangle-exclamation">
+    If one transaction in a batch fails, the remaining transactions will still be attempted. Handle partial failures appropriately.
+  </Accordion>
+
+  <Accordion title="Rate limiting" icon="gauge">
+    Be mindful of RPC rate limits when processing large batches. Consider adding delays between transactions if needed.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
+    Automate decisions with AI.
+  </Card>
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
+    Watch for new cases in real-time.
+  </Card>
+</CardGroup>

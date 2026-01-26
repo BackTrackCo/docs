@@ -1,0 +1,205 @@
+---
+title: "Arbiter Quickstart"
+description: "Get started with the X402r Arbiter SDK for dispute resolution"
+icon: "rocket"
+---
+
+The `@x402r/arbiter` package provides everything arbiters need to resolve disputes: reviewing cases, making decisions, and integrating AI for automated resolution.
+
+## Prerequisites
+
+<Note>
+Before starting, ensure you have:
+- Node.js 18+
+- A funded wallet on Base Sepolia designated as an arbiter
+- Understanding of the X402r refund lifecycle
+</Note>
+
+## Installation
+
+```bash
+npm install @x402r/arbiter @x402r/core viem
+```
+
+## Setup
+
+Create the X402rArbiter instance:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rArbiter } from '@x402r/arbiter';
+import { getNetworkConfig } from '@x402r/core';
+
+// Setup viem clients
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`);
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// Get network configuration
+const config = getNetworkConfig(84532);
+
+// Create X402rArbiter
+const arbiter = new X402rArbiter({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...', // PaymentOperator address
+  refundRequestAddress: config.refundRequest,
+});
+```
+
+## Review Pending Cases
+
+Get all cases awaiting your decision:
+
+```typescript
+const pendingCases = await arbiter.getPendingCases();
+console.log(`${pendingCases.length} cases to review`);
+
+for (const hash of pendingCases) {
+  const status = await arbiter.getRefundStatus(paymentInfo);
+  console.log(`Case ${hash}: ${RequestStatus[status]}`);
+}
+```
+
+## Make a Decision
+
+Approve or deny refund requests:
+
+```typescript
+// Approve a refund
+const { txHash: approveTx } = await arbiter.approveRefund(paymentInfo);
+console.log('Approved:', approveTx);
+
+// Deny a refund
+const { txHash: denyTx } = await arbiter.denyRefund(paymentInfo);
+console.log('Denied:', denyTx);
+```
+
+## Execute Approved Refunds
+
+After approving, execute the refund to transfer funds:
+
+```typescript
+// Approve the request
+await arbiter.approveRefund(paymentInfo);
+
+// Execute the refund
+const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
+console.log('Refund executed:', txHash);
+```
+
+## Batch Operations
+
+Process multiple cases efficiently:
+
+```typescript
+// Approve multiple refunds at once
+const results = await arbiter.batchApprove([
+  paymentInfo1,
+  paymentInfo2,
+  paymentInfo3,
+]);
+
+console.log(`Approved ${results.length} refunds`);
+```
+
+## AI Integration
+
+Automate decisions with AI hooks:
+
+```typescript
+import { createWebhookHandler, type CaseEvaluationContext } from '@x402r/arbiter';
+
+const handler = createWebhookHandler({
+  arbiter,
+  evaluationHook: async (context: CaseEvaluationContext) => {
+    // Your AI logic here
+    const shouldApprove = await evaluateWithAI(context);
+
+    return {
+      decision: shouldApprove ? 'approve' : 'deny',
+      reasoning: 'AI evaluation based on payment history',
+      confidence: 0.95,
+    };
+  },
+  autoExecute: true, // Automatically execute approved refunds
+});
+
+// Use with your event system
+arbiter.watchNewCases(handler);
+```
+
+## Complete Example
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rArbiter } from '@x402r/arbiter';
+import { RequestStatus, getNetworkConfig } from '@x402r/core';
+
+async function main() {
+  // Setup
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const account = privateKeyToAccount(process.env.ARBITER_KEY as `0x${string}`);
+  const walletClient = createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const config = getNetworkConfig(84532);
+  const arbiter = new X402rArbiter({
+    publicClient,
+    walletClient,
+    operatorAddress: '0x...',
+    refundRequestAddress: config.refundRequest,
+  });
+
+  // Get pending cases
+  const cases = await arbiter.getPendingCases();
+  console.log(`Reviewing ${cases.length} cases`);
+
+  // Watch for new cases
+  const { unsubscribe } = arbiter.watchNewCases(async (event) => {
+    console.log('New case to review:', event);
+
+    // Process the new case...
+  });
+
+  console.log('Arbiter is now watching for new cases...');
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
+    Learn all decision methods.
+  </Card>
+  <Card title="Batch Operations" icon="layer-group" href="/sdk/arbiter/batch-operations">
+    Process multiple cases efficiently.
+  </Card>
+  <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
+    Automate with AI hooks.
+  </Card>
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
+    Watch for new cases.
+  </Card>
+</CardGroup>

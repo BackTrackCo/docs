@@ -1,0 +1,209 @@
+---
+title: "Event Subscriptions"
+description: "Subscribe to real-time events with the Client SDK"
+icon: "bell"
+---
+
+The Client SDK provides methods to subscribe to blockchain events in real-time, enabling reactive UIs and automated workflows.
+
+## Watch Payment State
+
+Subscribe to payment state changes:
+
+```typescript
+const { unsubscribe } = client.watchPaymentState(
+  paymentInfoHash,
+  (newState) => {
+    console.log('Payment state changed to:', PaymentState[newState]);
+
+    switch (newState) {
+      case PaymentState.Released:
+        console.log('Payment was released to merchant');
+        break;
+      case PaymentState.Settled:
+        console.log('Payment was refunded');
+        break;
+    }
+  }
+);
+
+// Later: stop watching
+unsubscribe();
+```
+
+## Watch Refund Requests
+
+Subscribe to refund request events:
+
+```typescript
+const { unsubscribe } = client.watchRefundRequests((event) => {
+  console.log('Refund request event:', event);
+  console.log('Payment hash:', event.paymentInfoHash);
+  console.log('New status:', RequestStatus[event.status]);
+});
+
+// Stop watching when done
+unsubscribe();
+```
+
+## Watch My Payments
+
+Subscribe to all payment events for your address:
+
+```typescript
+const { unsubscribe } = client.watchMyPayments((event) => {
+  console.log('New payment event:', event);
+  console.log('Event type:', event.eventName);
+  console.log('Payment hash:', event.args.paymentInfoHash);
+});
+```
+
+## Watch Freeze Events
+
+Subscribe to freeze/unfreeze events:
+
+```typescript
+const { unsubscribe } = client.watchFreezeEvents(
+  recorderAddress,
+  (event) => {
+    if (event.eventName === 'PaymentFrozen') {
+      console.log('Payment frozen:', event.args.paymentInfoHash);
+    } else if (event.eventName === 'PaymentUnfrozen') {
+      console.log('Payment unfrozen:', event.args.paymentInfoHash);
+    }
+  }
+);
+```
+
+## Example: Real-time Payment Monitor
+
+```typescript
+import { X402rClient } from '@x402r/client';
+import { PaymentState, RequestStatus } from '@x402r/core';
+
+class PaymentMonitor {
+  private unsubscribers: (() => void)[] = [];
+
+  constructor(
+    private client: X402rClient,
+    private recorderAddress: `0x${string}`
+  ) {}
+
+  start() {
+    // Watch all my payments
+    const { unsubscribe: unwatchPayments } = this.client.watchMyPayments(
+      (event) => this.handlePaymentEvent(event)
+    );
+    this.unsubscribers.push(unwatchPayments);
+
+    // Watch refund request status updates
+    const { unsubscribe: unwatchRefunds } = this.client.watchRefundRequests(
+      (event) => this.handleRefundEvent(event)
+    );
+    this.unsubscribers.push(unwatchRefunds);
+
+    // Watch freeze events
+    const { unsubscribe: unwatchFreezes } = this.client.watchFreezeEvents(
+      this.recorderAddress,
+      (event) => this.handleFreezeEvent(event)
+    );
+    this.unsubscribers.push(unwatchFreezes);
+
+    console.log('Payment monitor started');
+  }
+
+  stop() {
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+    console.log('Payment monitor stopped');
+  }
+
+  private handlePaymentEvent(event: unknown) {
+    console.log('[Payment]', event);
+  }
+
+  private handleRefundEvent(event: unknown) {
+    console.log('[Refund]', event);
+  }
+
+  private handleFreezeEvent(event: unknown) {
+    console.log('[Freeze]', event);
+  }
+}
+
+// Usage
+const monitor = new PaymentMonitor(client, recorderAddress);
+monitor.start();
+
+// Later
+monitor.stop();
+```
+
+## Event Types Reference
+
+| Method | Events | Use Case |
+|--------|--------|----------|
+| `watchPaymentState` | State changes | Track single payment |
+| `watchRefundRequests` | Request created/updated | Refund workflow |
+| `watchMyPayments` | All payment events | Dashboard |
+| `watchFreezeEvents` | Freeze/Unfreeze | Dispute tracking |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always unsubscribe" icon="circle-xmark">
+    Store the unsubscribe function and call it when you're done watching to avoid memory leaks:
+
+    ```typescript
+    const { unsubscribe } = client.watchPaymentState(hash, callback);
+
+    // In cleanup:
+    unsubscribe();
+    ```
+  </Accordion>
+
+  <Accordion title="Handle reconnection" icon="arrows-rotate">
+    Event subscriptions use WebSocket connections that may disconnect. Consider implementing reconnection logic:
+
+    ```typescript
+    function watchWithReconnect(hash: string, callback: Function) {
+      let unsubscribe: () => void;
+
+      function connect() {
+        const sub = client.watchPaymentState(hash, (state) => {
+          callback(state);
+        });
+        unsubscribe = sub.unsubscribe;
+      }
+
+      connect();
+      return { unsubscribe: () => unsubscribe?.() };
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Debounce rapid events" icon="gauge">
+    Multiple events can fire rapidly. Consider debouncing your handlers:
+
+    ```typescript
+    import { debounce } from 'lodash';
+
+    const debouncedHandler = debounce((event) => {
+      console.log('Processing event:', event);
+    }, 500);
+
+    client.watchMyPayments(debouncedHandler);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
+    Review the complete client setup.
+  </Card>
+  <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
+    Learn about the merchant side.
+  </Card>
+</CardGroup>

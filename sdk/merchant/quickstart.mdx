@@ -1,0 +1,207 @@
+---
+title: "Merchant Quickstart"
+description: "Get started with the X402r Merchant SDK for server integrations"
+icon: "rocket"
+---
+
+The `@x402r/merchant` package provides everything merchants need to handle X402r payments: releasing funds, processing refunds, and integrating with existing x402 servers.
+
+## Prerequisites
+
+<Note>
+Before starting, ensure you have:
+- Node.js 18+
+- A funded wallet on Base Sepolia
+- An existing x402 server setup (optional, for server helpers)
+</Note>
+
+## Installation
+
+```bash
+npm install @x402r/merchant @x402r/core viem
+```
+
+## Setup
+
+Create the X402rMerchant instance:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rMerchant } from '@x402r/merchant';
+import { getNetworkConfig } from '@x402r/core';
+
+// Setup viem clients
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+const account = privateKeyToAccount(process.env.MERCHANT_PRIVATE_KEY as `0x${string}`);
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// Get network configuration
+const config = getNetworkConfig(84532);
+
+// Create X402rMerchant
+const merchant = new X402rMerchant({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...', // Your PaymentOperator address
+  escrowAddress: config.authCaptureEscrow,
+  refundRequestAddress: config.refundRequest,
+});
+```
+
+## Release a Payment
+
+Release funds from escrow to your wallet:
+
+```typescript
+// Release full amount
+const { txHash } = await merchant.release(paymentInfo);
+console.log('Payment released:', txHash);
+
+// Release partial amount
+const { txHash } = await merchant.release(paymentInfo, BigInt('500000'));
+console.log('Partial release:', txHash);
+```
+
+## Handle Refund Requests
+
+Process incoming refund requests:
+
+```typescript
+import { RequestStatus } from '@x402r/core';
+
+// Get pending refund requests
+const pendingRequests = await merchant.getPendingRefundRequests();
+console.log(`${pendingRequests.length} pending refund requests`);
+
+// Approve a refund
+const { txHash: approveTx } = await merchant.approveRefundRequest(paymentInfo);
+console.log('Refund approved:', approveTx);
+
+// Or deny a refund
+const { txHash: denyTx } = await merchant.denyRefundRequest(paymentInfo);
+console.log('Refund denied:', denyTx);
+```
+
+## Process Refunds
+
+When you approve a refund, you need to execute it:
+
+```typescript
+// Approve the request
+await merchant.approveRefundRequest(paymentInfo);
+
+// Execute the refund (return funds to payer)
+const { txHash } = await merchant.refundInEscrow(paymentInfo);
+console.log('Refund executed:', txHash);
+```
+
+## Server Integration
+
+Use the server helpers to add refund support to existing x402 servers:
+
+```typescript
+import { refundable, withRefund } from '@x402r/merchant';
+
+// Mark a payment option as refundable
+const option = refundable(
+  { amount: '1000000', token: 'USDC' },
+  operatorAddress,
+  { escrowPeriod: 86400 } // 24 hours
+);
+
+// Or transform all routes
+const routes = withRefund(existingRoutes, operatorAddress);
+```
+
+## Watch for Events
+
+Subscribe to incoming refund requests:
+
+```typescript
+const { unsubscribe } = merchant.watchRefundRequests((event) => {
+  console.log('New refund request:', event);
+  // Handle the request...
+});
+```
+
+## Complete Example
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rMerchant } from '@x402r/merchant';
+import { PaymentState, RequestStatus, getNetworkConfig } from '@x402r/core';
+
+async function main() {
+  // Setup
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const account = privateKeyToAccount(process.env.MERCHANT_KEY as `0x${string}`);
+  const walletClient = createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const config = getNetworkConfig(84532);
+  const merchant = new X402rMerchant({
+    publicClient,
+    walletClient,
+    operatorAddress: '0x...',
+    refundRequestAddress: config.refundRequest,
+  });
+
+  // List my payments
+  const { hashes } = await merchant.getReceiverPayments();
+  console.log(`Received ${hashes.length} payments`);
+
+  // Check for pending refund requests
+  const pending = await merchant.getPendingRefundRequests();
+  console.log(`${pending.length} pending refund requests`);
+
+  // Process each pending request
+  for (const hash of pending) {
+    const details = await merchant.getPaymentDetails(hash);
+
+    // Example: auto-approve small refunds
+    if (details.maxAmount < BigInt('5000000')) { // < 5 USDC
+      await merchant.approveRefundRequest(details);
+      await merchant.refundInEscrow(details);
+      console.log('Auto-approved small refund:', hash);
+    }
+  }
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Operations" icon="coins" href="/sdk/merchant/payment-operations">
+    Deep dive into release and refund.
+  </Card>
+  <Card title="Refund Handling" icon="rotate-left" href="/sdk/merchant/refund-handling">
+    Process refund requests.
+  </Card>
+  <Card title="Server Helpers" icon="server" href="/sdk/merchant/server-helpers">
+    Integrate with x402 servers.
+  </Card>
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/merchant/subscriptions">
+    Real-time event watching.
+  </Card>
+</CardGroup>

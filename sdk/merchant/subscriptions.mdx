@@ -1,0 +1,227 @@
+---
+title: "Event Subscriptions"
+description: "Subscribe to real-time merchant events with the Merchant SDK"
+icon: "bell"
+---
+
+The Merchant SDK provides methods to subscribe to relevant blockchain events in real-time.
+
+## Watch Refund Requests
+
+Subscribe to new refund requests for your payments:
+
+```typescript
+const { unsubscribe } = merchant.watchRefundRequests((event) => {
+  console.log('New refund request received!');
+  console.log('Payment hash:', event.args.paymentInfoHash);
+  console.log('Requester:', event.args.requester);
+
+  // Handle the request
+  handleRefundRequest(event);
+});
+
+// Later: stop watching
+unsubscribe();
+```
+
+## Watch Releases
+
+Subscribe to payment release events:
+
+```typescript
+const { unsubscribe } = merchant.watchReleases((event) => {
+  console.log('Payment released!');
+  console.log('Payment hash:', event.args.paymentInfoHash);
+  console.log('Amount:', event.args.amount);
+  console.log('Receiver:', event.args.receiver);
+});
+```
+
+## Watch Freeze Events
+
+Subscribe to freeze/unfreeze events:
+
+```typescript
+const { unsubscribe } = merchant.watchFreezeEvents(
+  recorderAddress,
+  (event) => {
+    if (event.eventName === 'PaymentFrozen') {
+      console.log('Payment frozen:', event.args.paymentInfoHash);
+      // May indicate a dispute
+    } else if (event.eventName === 'PaymentUnfrozen') {
+      console.log('Payment unfrozen:', event.args.paymentInfoHash);
+    }
+  }
+);
+```
+
+## Example: Refund Request Handler
+
+```typescript
+import { X402rMerchant } from '@x402r/merchant';
+import { RequestStatus } from '@x402r/core';
+
+class RefundRequestHandler {
+  private merchant: X402rMerchant;
+  private unsubscribe?: () => void;
+
+  constructor(merchant: X402rMerchant) {
+    this.merchant = merchant;
+  }
+
+  start() {
+    const { unsubscribe } = this.merchant.watchRefundRequests(
+      async (event) => {
+        await this.handleRequest(event);
+      }
+    );
+    this.unsubscribe = unsubscribe;
+    console.log('Refund request handler started');
+  }
+
+  stop() {
+    this.unsubscribe?.();
+    console.log('Refund request handler stopped');
+  }
+
+  private async handleRequest(event: unknown) {
+    const paymentHash = event.args.paymentInfoHash;
+    console.log(`Processing refund request: ${paymentHash}`);
+
+    try {
+      const details = await this.merchant.getPaymentDetails(paymentHash);
+      const amounts = await this.merchant.getPaymentAmounts(details);
+
+      // Example policy: auto-approve small amounts
+      if (amounts.refundable < BigInt('5000000')) { // < 5 USDC
+        await this.merchant.approveRefundRequest(details);
+        await this.merchant.refundInEscrow(details);
+        console.log(`Auto-approved refund: ${paymentHash}`);
+      } else {
+        console.log(`Manual review required: ${paymentHash}`);
+        // Send notification to admin...
+      }
+    } catch (error) {
+      console.error(`Error processing refund: ${error}`);
+    }
+  }
+}
+
+// Usage
+const handler = new RefundRequestHandler(merchant);
+handler.start();
+
+// On shutdown
+process.on('SIGINT', () => {
+  handler.stop();
+  process.exit();
+});
+```
+
+## Example: Payment Dashboard Server
+
+```typescript
+import express from 'express';
+import { X402rMerchant } from '@x402r/merchant';
+import { PaymentState, RequestStatus } from '@x402r/core';
+
+const app = express();
+
+// In-memory state for demo (use a database in production)
+const dashboardState = {
+  totalReceived: 0,
+  pendingRefunds: [] as string[],
+  recentReleases: [] as { hash: string; amount: bigint; timestamp: number }[],
+  frozenPayments: new Set<string>(),
+};
+
+// Setup merchant and subscriptions
+const merchant = new X402rMerchant({
+  publicClient,
+  walletClient,
+  operatorAddress,
+  refundRequestAddress,
+});
+
+// Watch refund requests
+merchant.watchRefundRequests((event) => {
+  const hash = event.args.paymentInfoHash;
+  if (!dashboardState.pendingRefunds.includes(hash)) {
+    dashboardState.pendingRefunds.push(hash);
+  }
+});
+
+// Watch releases
+merchant.watchReleases((event) => {
+  dashboardState.recentReleases.push({
+    hash: event.args.paymentInfoHash,
+    amount: event.args.amount,
+    timestamp: Date.now(),
+  });
+
+  // Keep only last 100 releases
+  if (dashboardState.recentReleases.length > 100) {
+    dashboardState.recentReleases.shift();
+  }
+});
+
+// Watch freeze events
+merchant.watchFreezeEvents(recorderAddress, (event) => {
+  const hash = event.args.paymentInfoHash;
+  if (event.eventName === 'PaymentFrozen') {
+    dashboardState.frozenPayments.add(hash);
+  } else {
+    dashboardState.frozenPayments.delete(hash);
+  }
+});
+
+// Dashboard API
+app.get('/api/dashboard', (req, res) => {
+  res.json({
+    pendingRefunds: dashboardState.pendingRefunds.length,
+    frozenPayments: dashboardState.frozenPayments.size,
+    recentReleases: dashboardState.recentReleases.slice(-10),
+  });
+});
+
+app.listen(3000);
+```
+
+## Event Types Reference
+
+| Method | Events | Use Case |
+|--------|--------|----------|
+| `watchRefundRequests` | New refund requests | Refund handling |
+| `watchReleases` | Payment releases | Revenue tracking |
+| `watchFreezeEvents` | Freeze/Unfreeze | Dispute monitoring |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use persistent connections" icon="link">
+    Event subscriptions use WebSockets. Ensure your server maintains persistent connections and handles reconnection.
+  </Accordion>
+
+  <Accordion title="Store events durably" icon="database">
+    Don't rely solely on in-memory state. Persist events to a database to handle server restarts.
+  </Accordion>
+
+  <Accordion title="Set up alerting" icon="bell">
+    Configure alerts for important events like new refund requests or frozen payments.
+  </Accordion>
+
+  <Accordion title="Clean up subscriptions" icon="broom">
+    Always unsubscribe when shutting down to prevent memory leaks and orphaned connections.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Merchant Quickstart" icon="rocket" href="/sdk/merchant/quickstart">
+    Review the complete merchant setup.
+  </Card>
+  <Card title="Arbiter SDK" icon="scale-balanced" href="/sdk/arbiter/quickstart">
+    Learn about dispute resolution.
+  </Card>
+</CardGroup>

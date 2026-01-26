@@ -1,0 +1,256 @@
+---
+title: "Event Subscriptions"
+description: "Subscribe to dispute events with the Arbiter SDK"
+icon: "bell"
+---
+
+The Arbiter SDK provides methods to subscribe to relevant events for dispute monitoring and automated processing.
+
+## Watch New Cases
+
+Subscribe to new refund requests that need arbitration:
+
+```typescript
+const { unsubscribe } = arbiter.watchNewCases((event) => {
+  console.log('New case to review!');
+  console.log('Payment hash:', event.args.paymentInfoHash);
+  console.log('Requester:', event.args.requester);
+
+  // Process the new case
+  handleNewCase(event);
+});
+
+// Later: stop watching
+unsubscribe();
+```
+
+## Watch Decisions
+
+Subscribe to decision events (approvals/denials):
+
+```typescript
+const { unsubscribe } = arbiter.watchDecisions((event) => {
+  console.log('Decision made!');
+  console.log('Payment hash:', event.args.paymentInfoHash);
+  console.log('New status:', event.args.newStatus);
+});
+```
+
+## Watch Freeze Events
+
+Subscribe to freeze/unfreeze events:
+
+```typescript
+const { unsubscribe } = arbiter.watchFreezeEvents(
+  recorderAddress,
+  (event) => {
+    if (event.eventName === 'PaymentFrozen') {
+      console.log('Payment frozen - dispute in progress');
+      console.log('Payment hash:', event.args.paymentInfoHash);
+    } else if (event.eventName === 'PaymentUnfrozen') {
+      console.log('Payment unfrozen - dispute resolved');
+    }
+  }
+);
+```
+
+## Example: Automated Case Processor
+
+```typescript
+import { X402rArbiter, createWebhookHandler } from '@x402r/arbiter';
+import { PaymentState, RequestStatus } from '@x402r/core';
+
+class ArbiterService {
+  private arbiter: X402rArbiter;
+  private unsubscribers: (() => void)[] = [];
+
+  constructor(arbiter: X402rArbiter) {
+    this.arbiter = arbiter;
+  }
+
+  start() {
+    // Watch for new cases
+    const { unsubscribe: unwatchCases } = this.arbiter.watchNewCases(
+      (event) => this.handleNewCase(event)
+    );
+    this.unsubscribers.push(unwatchCases);
+
+    // Watch for decisions (for logging)
+    const { unsubscribe: unwatchDecisions } = this.arbiter.watchDecisions(
+      (event) => this.handleDecision(event)
+    );
+    this.unsubscribers.push(unwatchDecisions);
+
+    console.log('Arbiter service started');
+  }
+
+  stop() {
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+    console.log('Arbiter service stopped');
+  }
+
+  private async handleNewCase(event: unknown) {
+    const paymentHash = event.args.paymentInfoHash;
+    console.log(`[NEW CASE] ${paymentHash}`);
+
+    try {
+      const details = await this.arbiter.getPaymentDetails(paymentHash);
+      const state = await this.arbiter.getPaymentState(details);
+
+      if (state !== PaymentState.InEscrow) {
+        console.log(`[SKIP] Payment not in escrow`);
+        return;
+      }
+
+      // Evaluate and decide
+      const shouldApprove = await this.evaluateCase(details);
+
+      if (shouldApprove) {
+        await this.arbiter.approveRefund(details);
+        await this.arbiter.executeRefundInEscrow(details);
+        console.log(`[APPROVED] ${paymentHash}`);
+      } else {
+        await this.arbiter.denyRefund(details);
+        console.log(`[DENIED] ${paymentHash}`);
+      }
+
+    } catch (error) {
+      console.error(`[ERROR] Failed to process ${paymentHash}:`, error);
+    }
+  }
+
+  private handleDecision(event: unknown) {
+    console.log(`[DECISION] Payment: ${event.args.paymentInfoHash}`);
+    console.log(`           Status: ${RequestStatus[event.args.newStatus]}`);
+  }
+
+  private async evaluateCase(paymentInfo: PaymentInfo): Promise<boolean> {
+    // Your evaluation logic
+    return paymentInfo.maxAmount < BigInt('5000000'); // Auto-approve < 5 USDC
+  }
+}
+
+// Usage
+const service = new ArbiterService(arbiter);
+service.start();
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  service.stop();
+  process.exit();
+});
+```
+
+## Example: Dashboard with Real-time Updates
+
+```typescript
+import express from 'express';
+import { X402rArbiter } from '@x402r/arbiter';
+import { RequestStatus } from '@x402r/core';
+
+const app = express();
+
+// Dashboard state
+const state = {
+  pendingCases: [] as string[],
+  recentDecisions: [] as { hash: string; status: number; timestamp: number }[],
+  frozenPayments: new Set<string>(),
+};
+
+// Setup subscriptions
+function setupSubscriptions(arbiter: X402rArbiter, recorderAddress: string) {
+  // New cases
+  arbiter.watchNewCases((event) => {
+    state.pendingCases.push(event.args.paymentInfoHash);
+  });
+
+  // Decisions
+  arbiter.watchDecisions((event) => {
+    // Remove from pending
+    state.pendingCases = state.pendingCases.filter(
+      h => h !== event.args.paymentInfoHash
+    );
+
+    // Add to recent decisions
+    state.recentDecisions.push({
+      hash: event.args.paymentInfoHash,
+      status: event.args.newStatus,
+      timestamp: Date.now(),
+    });
+
+    // Keep only last 100
+    if (state.recentDecisions.length > 100) {
+      state.recentDecisions.shift();
+    }
+  });
+
+  // Freeze events
+  arbiter.watchFreezeEvents(recorderAddress, (event) => {
+    if (event.eventName === 'PaymentFrozen') {
+      state.frozenPayments.add(event.args.paymentInfoHash);
+    } else {
+      state.frozenPayments.delete(event.args.paymentInfoHash);
+    }
+  });
+}
+
+// API endpoints
+app.get('/api/dashboard', (req, res) => {
+  res.json({
+    pendingCount: state.pendingCases.length,
+    frozenCount: state.frozenPayments.size,
+    recentDecisions: state.recentDecisions.slice(-10).map(d => ({
+      ...d,
+      statusName: RequestStatus[d.status],
+    })),
+  });
+});
+
+app.get('/api/pending', (req, res) => {
+  res.json({ cases: state.pendingCases });
+});
+
+// Initialize
+setupSubscriptions(arbiter, recorderAddress);
+app.listen(3000);
+```
+
+## Event Types Reference
+
+| Method | Events | Use Case |
+|--------|--------|----------|
+| `watchNewCases` | RefundRequested | New case notification |
+| `watchDecisions` | RefundRequestStatusUpdated | Decision tracking |
+| `watchFreezeEvents` | PaymentFrozen/Unfrozen | Dispute monitoring |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Handle missed events" icon="clock-rotate-left">
+    Events may be missed during disconnections. Periodically poll `getPendingCases()` to catch up.
+  </Accordion>
+
+  <Accordion title="Idempotent processing" icon="repeat">
+    Design your event handlers to be idempotent - the same event processed twice should have no adverse effects.
+  </Accordion>
+
+  <Accordion title="Logging and metrics" icon="chart-line">
+    Log all events and track metrics for monitoring arbiter performance.
+  </Accordion>
+
+  <Accordion title="Graceful shutdown" icon="power-off">
+    Always unsubscribe from events during shutdown to prevent orphaned connections.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
+    Automate with AI evaluation.
+  </Card>
+  <Card title="Arbiter Quickstart" icon="rocket" href="/sdk/arbiter/quickstart">
+    Review the complete setup.
+  </Card>
+</CardGroup>

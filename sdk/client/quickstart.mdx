@@ -1,0 +1,199 @@
+---
+title: "Client Quickstart"
+description: "Get started with the X402r Client SDK for payer integrations"
+icon: "rocket"
+---
+
+The `@x402r/client` package provides everything payers need to interact with X402r payments: querying payment states, requesting refunds, and managing escrow.
+
+## Prerequisites
+
+<Note>
+Before starting, ensure you have:
+- Node.js 18+
+- A funded wallet on Base Sepolia
+- Basic understanding of [viem](https://viem.sh)
+</Note>
+
+## Installation
+
+```bash
+npm install @x402r/client @x402r/core viem
+```
+
+## Setup
+
+Create the X402rClient instance:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rClient } from '@x402r/client';
+import { getNetworkConfig } from '@x402r/core';
+
+// Setup viem clients
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// Get network configuration
+const networkConfig = getNetworkConfig(84532);
+
+// Create X402rClient
+const client = new X402rClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...', // Your PaymentOperator address
+  refundRequestAddress: networkConfig.refundRequest,
+  escrowAddress: networkConfig.authCaptureEscrow,
+});
+```
+
+## Query Payment State
+
+Check the current state of any payment:
+
+```typescript
+import { PaymentState } from '@x402r/core';
+
+const paymentInfo = {
+  operator: '0x...',
+  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+  payer: '0x...',
+  receiver: '0x...',
+  maxAmount: BigInt('1000000'), // 1 USDC
+  minAmount: BigInt('1000000'),
+  nonce: BigInt(1),
+  authorizationDeadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+  activationTimestamp: BigInt(0),
+};
+
+const state = await client.getPaymentState(paymentInfo);
+
+switch (state) {
+  case PaymentState.NonExistent:
+    console.log('Payment does not exist');
+    break;
+  case PaymentState.InEscrow:
+    console.log('Payment is in escrow - refundable');
+    break;
+  case PaymentState.Released:
+    console.log('Payment released to merchant');
+    break;
+  case PaymentState.Settled:
+    console.log('Payment fully settled');
+    break;
+  case PaymentState.Expired:
+    console.log('Payment expired');
+    break;
+}
+```
+
+## Request a Refund
+
+If a payment is in escrow, you can request a refund:
+
+```typescript
+// Request refund
+const { txHash, paymentInfoHash } = await client.requestRefund(paymentInfo);
+console.log(`Refund requested: ${txHash}`);
+
+// Check refund status
+const status = await client.getRefundStatus(paymentInfo);
+console.log(`Refund status: ${status}`);
+```
+
+## Watch for Updates
+
+Subscribe to real-time events:
+
+```typescript
+// Watch payment state changes
+const { unsubscribe } = client.watchPaymentState(
+  paymentInfoHash,
+  (newState) => {
+    console.log('Payment state changed:', PaymentState[newState]);
+  }
+);
+
+// Later: stop watching
+unsubscribe();
+```
+
+## Complete Example
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rClient } from '@x402r/client';
+import { PaymentState, RequestStatus, getNetworkConfig } from '@x402r/core';
+
+async function main() {
+  // Setup
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+  const walletClient = createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  });
+
+  const config = getNetworkConfig(84532);
+  const client = new X402rClient({
+    publicClient,
+    walletClient,
+    operatorAddress: '0x...',
+    refundRequestAddress: config.refundRequest,
+  });
+
+  // Query my payments
+  const { hashes } = await client.getMyPayments();
+  console.log(`Found ${hashes.length} payments`);
+
+  // For each payment in escrow, check if we can request a refund
+  for (const hash of hashes) {
+    const details = await client.getPaymentDetails(hash);
+    const state = await client.getPaymentState(details);
+
+    if (state === PaymentState.InEscrow) {
+      const hasRequest = await client.hasRefundRequest(details);
+      if (!hasRequest) {
+        console.log(`Payment ${hash} can request refund`);
+      }
+    }
+  }
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Queries" icon="magnifying-glass" href="/sdk/client/payment-queries">
+    Learn all payment query methods.
+  </Card>
+  <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">
+    Deep dive into refund workflows.
+  </Card>
+  <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
+    Manage freeze and escrow timing.
+  </Card>
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/client/subscriptions">
+    Real-time event watching.
+  </Card>
+</CardGroup>

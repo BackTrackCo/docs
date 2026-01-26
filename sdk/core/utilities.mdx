@@ -1,0 +1,181 @@
+---
+title: "Utilities"
+description: "Helper functions and utilities for X402r development"
+icon: "wrench"
+---
+
+The `@x402r/core` package includes utility functions for common X402r operations.
+
+## computePaymentInfoHash
+
+Compute the unique hash of a payment:
+
+```typescript
+import { computePaymentInfoHash } from '@x402r/core';
+
+const hash = computePaymentInfoHash(paymentInfo, chainId);
+console.log('Payment hash:', hash);
+// 0x...
+```
+
+<Note>
+The hash is deterministic - the same payment info always produces the same hash. This is used to identify payments on-chain.
+</Note>
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `paymentInfo` | `PaymentInfo` | The payment information struct |
+| `chainId` | `number` | Chain ID (default: 84532 for Base Sepolia) |
+
+### Returns
+
+`0x${string}` - The keccak256 hash of the payment info
+
+## getNetworkConfig
+
+Get configuration for a supported network:
+
+```typescript
+import { getNetworkConfig } from '@x402r/core';
+
+const config = getNetworkConfig(84532); // Base Sepolia
+
+console.log('RefundRequest:', config.refundRequest);
+console.log('USDC:', config.usdc);
+console.log('Escrow:', config.authCaptureEscrow);
+```
+
+### Supported Networks
+
+| Chain ID | Network |
+|----------|---------|
+| 84532 | Base Sepolia |
+
+## isSupportedNetwork
+
+Check if a chain ID is supported:
+
+```typescript
+import { isSupportedNetwork } from '@x402r/core';
+
+if (isSupportedNetwork(chainId)) {
+  const config = getNetworkConfig(chainId);
+}
+```
+
+## decodeContractError
+
+Decode contract errors into human-readable messages:
+
+```typescript
+import { decodeContractError } from '@x402r/core';
+
+try {
+  await someContractCall();
+} catch (error) {
+  const decoded = decodeContractError(error);
+
+  if (decoded) {
+    console.log('Error name:', decoded.name);
+    console.log('Error message:', decoded.message);
+    console.log('Error args:', decoded.args);
+  } else {
+    // Unknown error
+    throw error;
+  }
+}
+```
+
+### Known Error Types
+
+| Error Name | Description |
+|------------|-------------|
+| `InvalidOperator` | Invalid operator address |
+| `ConditionNotMet` | Access condition failed |
+| `NotReceiver` | Caller is not the receiver |
+| `NotPayer` | Caller is not the payer |
+| `RequestAlreadyExists` | Refund request already exists |
+| `RequestDoesNotExist` | Refund request doesn't exist |
+| `RequestNotPending` | Request is not pending |
+| `InvalidStatus` | Invalid status transition |
+| `FullyRefunded` | Payment already fully refunded |
+| `EscrowPeriodExpired` | Escrow period has passed |
+| `AlreadyFrozen` | Payment is already frozen |
+| `NotFrozen` | Payment is not frozen |
+
+## PAYMENT_INFO_TYPEHASH
+
+The EIP-712 typehash for PaymentInfo:
+
+```typescript
+import { PAYMENT_INFO_TYPEHASH } from '@x402r/core';
+
+console.log(PAYMENT_INFO_TYPEHASH);
+// keccak256("PaymentInfo(...)")
+```
+
+## Example: Error Handling
+
+```typescript
+import { X402rClient } from '@x402r/client';
+import { decodeContractError } from '@x402r/core';
+
+async function safeRequestRefund(
+  client: X402rClient,
+  paymentInfo: PaymentInfo
+) {
+  try {
+    const { txHash } = await client.requestRefund(paymentInfo);
+    return { success: true, txHash };
+  } catch (error) {
+    const decoded = decodeContractError(error);
+
+    if (decoded) {
+      switch (decoded.name) {
+        case 'RequestAlreadyExists':
+          return { success: false, error: 'You already have a pending refund request' };
+        case 'ConditionNotMet':
+          return { success: false, error: 'You are not authorized to request a refund' };
+        case 'FullyRefunded':
+          return { success: false, error: 'This payment has already been refunded' };
+        default:
+          return { success: false, error: decoded.message };
+      }
+    }
+
+    throw error; // Re-throw unknown errors
+  }
+}
+```
+
+## Example: Payment Identification
+
+```typescript
+import { computePaymentInfoHash } from '@x402r/core';
+
+// Track payments by hash
+const paymentTracking = new Map<string, PaymentInfo>();
+
+function trackPayment(paymentInfo: PaymentInfo, chainId: number) {
+  const hash = computePaymentInfoHash(paymentInfo, chainId);
+  paymentTracking.set(hash, paymentInfo);
+  return hash;
+}
+
+function getPayment(hash: string): PaymentInfo | undefined {
+  return paymentTracking.get(hash);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Conditions" icon="filter" href="/sdk/core/conditions">
+    Build complex access conditions.
+  </Card>
+  <Card title="Types" icon="code" href="/sdk/core/types">
+    Review all TypeScript types.
+  </Card>
+</CardGroup>

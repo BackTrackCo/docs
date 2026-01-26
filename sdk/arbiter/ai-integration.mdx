@@ -1,0 +1,286 @@
+---
+title: "AI Integration"
+description: "Automate dispute resolution with AI using the Arbiter SDK"
+icon: "robot"
+---
+
+The Arbiter SDK includes built-in support for AI-powered dispute resolution through evaluation hooks and webhook handlers.
+
+## Case Evaluation Context
+
+When a case needs evaluation, you receive a structured context:
+
+```typescript
+interface CaseEvaluationContext {
+  /** The payment information */
+  paymentInfo: PaymentInfo;
+
+  /** Current payment state */
+  paymentState: PaymentState;
+
+  /** Current refund request status */
+  refundStatus: number;
+
+  /** Unique hash of the payment */
+  paymentInfoHash: `0x${string}`;
+
+  /** Optional evidence/metadata */
+  evidence?: unknown;
+}
+```
+
+## Decision Result
+
+Your AI evaluation should return a decision:
+
+```typescript
+interface DecisionResult {
+  /** The decision: approve or deny */
+  decision: 'approve' | 'deny';
+
+  /** Optional reasoning for the decision */
+  reasoning?: string;
+
+  /** Optional partial refund amount */
+  refundAmount?: bigint;
+
+  /** Confidence score (0-1) */
+  confidence?: number;
+}
+```
+
+## Create Webhook Handler
+
+Use `createWebhookHandler` to create an event handler with AI evaluation:
+
+```typescript
+import { createWebhookHandler, type CaseEvaluationContext, type DecisionResult } from '@x402r/arbiter';
+
+const handler = createWebhookHandler({
+  arbiter,
+  evaluationHook: async (context: CaseEvaluationContext): Promise<DecisionResult> => {
+    // Your AI evaluation logic
+    const decision = await myAIModel.evaluate(context);
+
+    return {
+      decision: decision.shouldApprove ? 'approve' : 'deny',
+      reasoning: decision.explanation,
+      confidence: decision.confidence,
+    };
+  },
+  autoExecute: true, // Automatically execute approved refunds
+});
+```
+
+## Hook Function Signature
+
+```typescript
+type ArbiterHook = (context: CaseEvaluationContext) => Promise<DecisionResult>;
+```
+
+## Example: OpenAI Integration
+
+```typescript
+import OpenAI from 'openai';
+import { createWebhookHandler, type CaseEvaluationContext, type DecisionResult } from '@x402r/arbiter';
+
+const openai = new OpenAI();
+
+async function evaluateWithGPT(context: CaseEvaluationContext): Promise<DecisionResult> {
+  const prompt = `
+    You are a dispute resolution AI for payment refunds.
+
+    Payment Details:
+    - Amount: ${context.paymentInfo.maxAmount} (in token units)
+    - Payer: ${context.paymentInfo.payer}
+    - Receiver: ${context.paymentInfo.receiver}
+    - Payment State: ${context.paymentState}
+
+    Based on this information, should the refund be approved or denied?
+    Respond with JSON: { "decision": "approve" | "deny", "reasoning": "..." }
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  });
+
+  const result = JSON.parse(response.choices[0].message.content || '{}');
+
+  return {
+    decision: result.decision,
+    reasoning: result.reasoning,
+    confidence: 0.9,
+  };
+}
+
+// Create handler
+const handler = createWebhookHandler({
+  arbiter,
+  evaluationHook: evaluateWithGPT,
+  autoExecute: true,
+});
+
+// Watch for new cases
+arbiter.watchNewCases(handler);
+```
+
+## Example: Rule-Based AI
+
+Implement rule-based decision making:
+
+```typescript
+import { createWebhookHandler, type CaseEvaluationContext, type DecisionResult } from '@x402r/arbiter';
+import { PaymentState } from '@x402r/core';
+
+interface EvaluationRules {
+  maxAutoApproveAmount: bigint;
+  minConfidenceThreshold: number;
+  blacklistedPayers: Set<string>;
+}
+
+function createRuleBasedEvaluator(rules: EvaluationRules) {
+  return async (context: CaseEvaluationContext): Promise<DecisionResult> => {
+    // Check blacklist
+    if (rules.blacklistedPayers.has(context.paymentInfo.payer.toLowerCase())) {
+      return {
+        decision: 'deny',
+        reasoning: 'Payer is blacklisted',
+        confidence: 1.0,
+      };
+    }
+
+    // Check payment state
+    if (context.paymentState !== PaymentState.InEscrow) {
+      return {
+        decision: 'deny',
+        reasoning: 'Payment not in escrow',
+        confidence: 1.0,
+      };
+    }
+
+    // Auto-approve small amounts
+    if (context.paymentInfo.maxAmount <= rules.maxAutoApproveAmount) {
+      return {
+        decision: 'approve',
+        reasoning: 'Amount below auto-approve threshold',
+        confidence: 0.95,
+      };
+    }
+
+    // Default: require manual review
+    return {
+      decision: 'deny',
+      reasoning: 'Requires manual review - amount too large',
+      confidence: 0.5,
+    };
+  };
+}
+
+// Usage
+const rules: EvaluationRules = {
+  maxAutoApproveAmount: BigInt('10000000'), // 10 USDC
+  minConfidenceThreshold: 0.8,
+  blacklistedPayers: new Set(['0x...']),
+};
+
+const handler = createWebhookHandler({
+  arbiter,
+  evaluationHook: createRuleBasedEvaluator(rules),
+  autoExecute: true,
+});
+```
+
+## Example: Hybrid AI + Rules
+
+Combine rule-based checks with AI evaluation:
+
+```typescript
+async function hybridEvaluation(context: CaseEvaluationContext): Promise<DecisionResult> {
+  // First, apply hard rules
+  const ruleResult = applyHardRules(context);
+  if (ruleResult.confidence === 1.0) {
+    return ruleResult;
+  }
+
+  // For uncertain cases, use AI
+  const aiResult = await evaluateWithAI(context);
+
+  // Combine results
+  if (aiResult.confidence >= 0.9) {
+    return aiResult;
+  }
+
+  // Low confidence - flag for manual review
+  return {
+    decision: 'deny',
+    reasoning: `AI confidence too low (${aiResult.confidence}). Manual review required.`,
+    confidence: aiResult.confidence,
+  };
+}
+
+function applyHardRules(context: CaseEvaluationContext): DecisionResult {
+  // Instant approve: very small amounts
+  if (context.paymentInfo.maxAmount < BigInt('1000000')) { // < 1 USDC
+    return {
+      decision: 'approve',
+      reasoning: 'Micro-payment auto-approved',
+      confidence: 1.0,
+    };
+  }
+
+  // Continue to AI evaluation
+  return {
+    decision: 'deny',
+    reasoning: 'Needs AI evaluation',
+    confidence: 0.0,
+  };
+}
+```
+
+## Webhook Handler Configuration
+
+```typescript
+interface WebhookHandlerConfig {
+  /** X402rArbiter instance */
+  arbiter: X402rArbiter;
+
+  /** Your evaluation function */
+  evaluationHook: ArbiterHook;
+
+  /** Auto-execute approved refunds (default: false) */
+  autoExecute?: boolean;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Set confidence thresholds" icon="gauge">
+    Only auto-execute decisions with high confidence. Flag low-confidence cases for manual review.
+  </Accordion>
+
+  <Accordion title="Log decisions" icon="file-lines">
+    Always log AI decisions and reasoning for audit trails and model improvement.
+  </Accordion>
+
+  <Accordion title="Implement fallbacks" icon="life-ring">
+    Have a fallback mechanism if your AI service is unavailable.
+  </Accordion>
+
+  <Accordion title="Test thoroughly" icon="flask">
+    Test your AI evaluation with edge cases before deploying to production.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
+    Watch for new cases to evaluate.
+  </Card>
+  <Card title="Batch Operations" icon="layer-group" href="/sdk/arbiter/batch-operations">
+    Process AI decisions in batches.
+  </Card>
+</CardGroup>

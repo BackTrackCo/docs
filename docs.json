@@ -75,6 +75,58 @@
         ]
       },
       {
+        "tab": "SDK",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "sdk/overview",
+              "sdk/installation",
+              "sdk/concepts"
+            ]
+          },
+          {
+            "group": "Client SDK",
+            "pages": [
+              "sdk/client/quickstart",
+              "sdk/client/payment-queries",
+              "sdk/client/refund-operations",
+              "sdk/client/escrow-management",
+              "sdk/client/subscriptions"
+            ]
+          },
+          {
+            "group": "Merchant SDK",
+            "pages": [
+              "sdk/merchant/quickstart",
+              "sdk/merchant/payment-operations",
+              "sdk/merchant/refund-handling",
+              "sdk/merchant/server-helpers",
+              "sdk/merchant/subscriptions"
+            ]
+          },
+          {
+            "group": "Arbiter SDK",
+            "pages": [
+              "sdk/arbiter/quickstart",
+              "sdk/arbiter/decision-submission",
+              "sdk/arbiter/batch-operations",
+              "sdk/arbiter/ai-integration",
+              "sdk/arbiter/subscriptions"
+            ]
+          },
+          {
+            "group": "Core Package",
+            "pages": [
+              "sdk/core/types",
+              "sdk/core/abis",
+              "sdk/core/utilities",
+              "sdk/core/conditions"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {

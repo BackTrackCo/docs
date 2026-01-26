@@ -1,0 +1,205 @@
+---
+title: "Types"
+description: "Core TypeScript types for X402r payments"
+icon: "code"
+---
+
+The `@x402r/core` package exports all TypeScript types used across the X402r SDK.
+
+## PaymentInfo
+
+The fundamental struct representing a payment:
+
+```typescript
+interface PaymentInfo {
+  /** PaymentOperator contract address */
+  operator: `0x${string}`;
+
+  /** Payment token address (e.g., USDC) */
+  token: `0x${string}`;
+
+  /** Payer's wallet address */
+  payer: `0x${string}`;
+
+  /** Receiver's (merchant's) wallet address */
+  receiver: `0x${string}`;
+
+  /** Maximum payment amount (in token units) */
+  maxAmount: bigint;
+
+  /** Minimum payment amount (in token units) */
+  minAmount: bigint;
+
+  /** Unique nonce for this payment */
+  nonce: bigint;
+
+  /** Deadline timestamp for authorization */
+  authorizationDeadline: bigint;
+
+  /** Timestamp when payment becomes active */
+  activationTimestamp: bigint;
+}
+```
+
+### Usage
+
+```typescript
+import type { PaymentInfo } from '@x402r/core';
+
+const paymentInfo: PaymentInfo = {
+  operator: '0x...',
+  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
+  payer: '0x...',
+  receiver: '0x...',
+  maxAmount: BigInt('1000000'), // 1 USDC (6 decimals)
+  minAmount: BigInt('1000000'),
+  nonce: BigInt(1),
+  authorizationDeadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+  activationTimestamp: BigInt(0),
+};
+```
+
+## PaymentState
+
+Enum representing the lifecycle state of a payment:
+
+```typescript
+const PaymentState = {
+  NonExistent: 0,  // Payment doesn't exist
+  InEscrow: 1,     // Funds held in escrow
+  Released: 2,     // Funds released to merchant
+  Settled: 3,      // Payment fully settled
+  Expired: 4,      // Payment expired
+} as const;
+
+type PaymentState = typeof PaymentState[keyof typeof PaymentState];
+```
+
+### Usage
+
+```typescript
+import { PaymentState } from '@x402r/core';
+
+const state = await client.getPaymentState(paymentInfo);
+
+if (state === PaymentState.InEscrow) {
+  console.log('Payment can be refunded');
+}
+
+// Get human-readable name
+console.log(PaymentState[state]); // "InEscrow"
+```
+
+## RequestStatus
+
+Enum representing refund request status:
+
+```typescript
+const RequestStatus = {
+  Pending: 0,    // Awaiting decision
+  Approved: 1,   // Approved by merchant/arbiter
+  Denied: 2,     // Denied by merchant/arbiter
+  Cancelled: 3,  // Cancelled by payer
+} as const;
+
+type RequestStatus = typeof RequestStatus[keyof typeof RequestStatus];
+```
+
+### Usage
+
+```typescript
+import { RequestStatus } from '@x402r/core';
+
+const status = await client.getRefundStatus(paymentInfo);
+
+switch (status) {
+  case RequestStatus.Pending:
+    console.log('Waiting for decision');
+    break;
+  case RequestStatus.Approved:
+    console.log('Refund approved!');
+    break;
+  case RequestStatus.Denied:
+    console.log('Refund denied');
+    break;
+  case RequestStatus.Cancelled:
+    console.log('Request cancelled');
+    break;
+}
+```
+
+## RefundRequestData
+
+Data structure for refund requests:
+
+```typescript
+interface RefundRequestData {
+  /** Hash of the payment info */
+  paymentInfoHash: `0x${string}`;
+
+  /** Current status of the request */
+  status: RequestStatus;
+}
+```
+
+## NetworkConfig
+
+Configuration for a supported network:
+
+```typescript
+interface NetworkConfig {
+  /** Chain ID */
+  chainId: number;
+
+  /** AuthCaptureEscrow contract address */
+  authCaptureEscrow: `0x${string}`;
+
+  /** TokenCollector contract address */
+  tokenCollector: `0x${string}`;
+
+  /** RefundRequest contract address */
+  refundRequest: `0x${string}`;
+
+  /** USDC token address */
+  usdc: `0x${string}`;
+}
+```
+
+### Usage
+
+```typescript
+import { getNetworkConfig } from '@x402r/core';
+
+const config = getNetworkConfig(84532); // Base Sepolia
+console.log(config.refundRequest); // RefundRequest contract address
+console.log(config.usdc);          // USDC address
+```
+
+## Type Guards
+
+The core package includes type guards for runtime validation:
+
+```typescript
+import { isPaymentState, isRequestStatus } from '@x402r/core';
+
+// Validate a value is a valid PaymentState
+if (isPaymentState(value)) {
+  // value is PaymentState
+}
+
+// Validate a value is a valid RequestStatus
+if (isRequestStatus(value)) {
+  // value is RequestStatus
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="ABIs" icon="file-code" href="/sdk/core/abis">
+    Contract ABIs for direct interaction.
+  </Card>
+  <Card title="Utilities" icon="wrench" href="/sdk/core/utilities">
+    Helper functions and utilities.
+  </Card>
+</CardGroup>

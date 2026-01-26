@@ -1,0 +1,117 @@
+---
+title: "Installation"
+description: "Install and configure the X402r SDK packages"
+icon: "download"
+---
+
+## Prerequisites
+
+<Note>
+Before installing the SDK, ensure you have:
+- Node.js 18 or later
+- A package manager (npm, yarn, or pnpm)
+- [viem](https://viem.sh) for blockchain interactions
+</Note>
+
+## Install Packages
+
+Install only the packages you need for your use case:
+
+<Tabs>
+  <Tab title="Client (Payer)">
+    ```bash
+    npm install @x402r/client @x402r/core viem
+    ```
+  </Tab>
+  <Tab title="Merchant">
+    ```bash
+    npm install @x402r/merchant @x402r/core viem
+    ```
+  </Tab>
+  <Tab title="Arbiter">
+    ```bash
+    npm install @x402r/arbiter @x402r/core viem
+    ```
+  </Tab>
+  <Tab title="All Packages">
+    ```bash
+    npm install @x402r/client @x402r/merchant @x402r/arbiter @x402r/core viem
+    ```
+  </Tab>
+</Tabs>
+
+## Setup viem Clients
+
+All SDK classes require viem clients for blockchain interaction:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+
+// Public client for reading contract state
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// Wallet client for write operations (requires private key)
+const account = privateKeyToAccount('0x...');
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+```
+
+## Contract Addresses
+
+Get the deployed contract addresses from the network config:
+
+```typescript
+import { getNetworkConfig } from '@x402r/core';
+
+const config = getNetworkConfig(84532); // Base Sepolia
+
+console.log(config.refundRequest);  // RefundRequest contract
+console.log(config.usdc);           // USDC token address
+```
+
+<Warning>
+Never commit private keys to version control. Use environment variables or a secrets manager.
+</Warning>
+
+## Quick Verification
+
+Verify your setup by querying a payment state:
+
+```typescript
+import { X402rClient } from '@x402r/client';
+import { PaymentState } from '@x402r/core';
+
+const client = new X402rClient({
+  publicClient,
+  operatorAddress: '0x...', // Your PaymentOperator address
+});
+
+// Check if the SDK is working
+const state = await client.getPaymentState(paymentInfo);
+console.log('Payment state:', PaymentState[state]);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
+    Learn about payment states, escrow, and the refund lifecycle.
+  </Card>
+  <Card title="Client Quickstart" icon="user" href="/sdk/client/quickstart">
+    Start building as a payer/client.
+  </Card>
+  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant/quickstart">
+    Integrate refunds into your server.
+  </Card>
+  <Card title="Arbiter Quickstart" icon="scale-balanced" href="/sdk/arbiter/quickstart">
+    Build a dispute resolution system.
+  </Card>
+</CardGroup>

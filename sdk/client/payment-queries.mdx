@@ -1,0 +1,142 @@
+---
+title: "Payment Queries"
+description: "Query payment states and details with the Client SDK"
+icon: "magnifying-glass"
+---
+
+The Client SDK provides comprehensive methods for querying payment information from the blockchain.
+
+## Get Payment State
+
+Query the current state of a payment:
+
+```typescript
+import { PaymentState } from '@x402r/core';
+
+const state = await client.getPaymentState(paymentInfo);
+
+// PaymentState enum:
+// 0 = NonExistent
+// 1 = InEscrow
+// 2 = Released
+// 3 = Settled
+// 4 = Expired
+```
+
+## Check Payment Existence
+
+Verify if a payment exists:
+
+```typescript
+const exists = await client.paymentExists(paymentInfoHash);
+if (exists) {
+  console.log('Payment found');
+}
+```
+
+## Check If In Escrow
+
+Quickly check if a payment is currently in escrow:
+
+```typescript
+const inEscrow = await client.isInEscrow(paymentInfoHash);
+if (inEscrow) {
+  console.log('Payment can be refunded');
+}
+```
+
+## Get Payment Details
+
+Retrieve full payment details from a hash:
+
+```typescript
+const details = await client.getPaymentDetails(paymentInfoHash);
+
+console.log('Payer:', details.payer);
+console.log('Receiver:', details.receiver);
+console.log('Amount:', details.maxAmount);
+console.log('Token:', details.token);
+```
+
+## Get My Payments
+
+List all payments made by the connected wallet:
+
+```typescript
+const { hashes } = await client.getMyPayments();
+
+console.log(`You have ${hashes.length} payments`);
+
+for (const hash of hashes) {
+  const state = await client.getPaymentState(
+    await client.getPaymentDetails(hash)
+  );
+  console.log(`${hash}: ${PaymentState[state]}`);
+}
+```
+
+## Get Payment Amounts
+
+Query the available amounts for a payment:
+
+```typescript
+const amounts = await client.getPaymentAmounts(paymentInfo);
+
+console.log('Capturable:', amounts.capturable);  // Can be released
+console.log('Refundable:', amounts.refundable);  // Can be refunded
+```
+
+## Example: Payment Dashboard
+
+```typescript
+import { X402rClient } from '@x402r/client';
+import { PaymentState } from '@x402r/core';
+
+async function showPaymentDashboard(client: X402rClient) {
+  const { hashes } = await client.getMyPayments();
+
+  const summary = {
+    total: hashes.length,
+    inEscrow: 0,
+    released: 0,
+    settled: 0,
+    refundable: BigInt(0),
+  };
+
+  for (const hash of hashes) {
+    const details = await client.getPaymentDetails(hash);
+    const state = await client.getPaymentState(details);
+
+    switch (state) {
+      case PaymentState.InEscrow:
+        summary.inEscrow++;
+        summary.refundable += details.maxAmount;
+        break;
+      case PaymentState.Released:
+        summary.released++;
+        break;
+      case PaymentState.Settled:
+        summary.settled++;
+        break;
+    }
+  }
+
+  console.log('Payment Summary:');
+  console.log(`  Total: ${summary.total}`);
+  console.log(`  In Escrow: ${summary.inEscrow}`);
+  console.log(`  Released: ${summary.released}`);
+  console.log(`  Settled: ${summary.settled}`);
+  console.log(`  Refundable Amount: ${summary.refundable}`);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">
+    Request and manage refunds.
+  </Card>
+  <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
+    Freeze payments and check escrow timing.
+  </Card>
+</CardGroup>
