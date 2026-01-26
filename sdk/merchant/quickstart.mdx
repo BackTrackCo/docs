@@ -46,7 +46,7 @@ const walletClient = createWalletClient({
 });
 
 // Get network configuration
-const config = getNetworkConfig(84532);
+const config = getNetworkConfig('eip155:84532');
 
 // Create X402rMerchant
 const merchant = new X402rMerchant({
@@ -114,13 +114,16 @@ import { refundable, withRefund } from '@x402r/merchant';
 
 // Mark a payment option as refundable
 const option = refundable(
-  { amount: '1000000', token: 'USDC' },
+  {
+    scheme: 'evm',
+    network: 'base-sepolia',
+    token: config.usdc,
+    maxAmountRequired: '1000000',
+    resource: '/api/resource',
+  },
   operatorAddress,
   { escrowPeriod: 86400 } // 24 hours
 );
-
-// Or transform all routes
-const routes = withRefund(existingRoutes, operatorAddress);
 ```
 
 ## Watch for Events
@@ -141,7 +144,7 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { X402rMerchant } from '@x402r/merchant';
-import { PaymentState, RequestStatus, getNetworkConfig } from '@x402r/core';
+import { PaymentState, getNetworkConfig } from '@x402r/core';
 
 async function main() {
   // Setup
@@ -157,7 +160,11 @@ async function main() {
     transport: http(),
   });
 
-  const config = getNetworkConfig(84532);
+  const config = getNetworkConfig('eip155:84532');
+  if (!config) {
+    throw new Error('Network not supported');
+  }
+
   const merchant = new X402rMerchant({
     publicClient,
     walletClient,
@@ -165,29 +172,34 @@ async function main() {
     refundRequestAddress: config.refundRequest,
   });
 
-  // List my payments
-  const { hashes } = await merchant.getReceiverPayments();
-  console.log(`Received ${hashes.length} payments`);
+  try {
+    // List my payments
+    const { hashes } = await merchant.getReceiverPayments();
+    console.log(`Received ${hashes.length} payments`);
 
-  // Check for pending refund requests
-  const pending = await merchant.getPendingRefundRequests();
-  console.log(`${pending.length} pending refund requests`);
+    // Check for pending refund requests
+    const pending = await merchant.getPendingRefundRequests();
+    console.log(`${pending.length} pending refund requests`);
 
-  // Process each pending request
-  for (const hash of pending) {
-    const details = await merchant.getPaymentDetails(hash);
-
-    // Example: auto-approve small refunds
-    if (details.maxAmount < BigInt('5000000')) { // < 5 USDC
-      await merchant.approveRefundRequest(details);
-      await merchant.refundInEscrow(details);
-      console.log('Auto-approved small refund:', hash);
+    // Watch for new refund requests
+    merchant.watchRefundRequests(async (event) => {
+      console.log('New refund request received:', event.args);
+      // Process refund request...
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Merchant operation failed:', error.message);
     }
+    throw error;
   }
 }
 
 main().catch(console.error);
 ```
+
+<Tip>
+Always wrap SDK operations in try-catch blocks. The SDK throws descriptive errors for contract reverts and invalid inputs.
+</Tip>
 
 ## Next Steps
 

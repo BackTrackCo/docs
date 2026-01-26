@@ -71,11 +71,15 @@ Get the deployed contract addresses from the network config:
 ```typescript
 import { getNetworkConfig } from '@x402r/core';
 
-const config = getNetworkConfig(84532); // Base Sepolia
+const config = getNetworkConfig('eip155:84532'); // Base Sepolia
 
 console.log(config.refundRequest);  // RefundRequest contract
 console.log(config.usdc);           // USDC token address
 ```
+
+<Note>
+Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`.
+</Note>
 
 <Warning>
 Never commit private keys to version control. Use environment variables or a secrets manager.

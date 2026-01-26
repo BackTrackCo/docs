@@ -1,0 +1,146 @@
+---
+title: "v1 Limitations"
+description: "Current SDK limitations, workarounds, and roadmap for upcoming features"
+icon: "circle-info"
+---
+
+The v1 SDK focuses on core payment flows. Some features are intentionally deferred to allow the API to stabilize before adding complexity.
+
+## Network Support
+
+| Network | Chain ID | Status |
+|---------|----------|--------|
+| Base Sepolia | 84532 | Supported |
+| Base Mainnet | 8453 | Pending contract deployment |
+
+<Warning>
+The v1 SDK only supports Base Sepolia (testnet). Base Mainnet support will be added once contracts are deployed and audited.
+</Warning>
+
+## Deferred Features
+
+### No `charge()` Function
+
+**What it means:** There's no single function to authorize and release a payment in one transaction.
+
+**Workaround:** Call `authorize()` followed by `release()` separately:
+
+```typescript
+// v1: Two separate transactions
+await operator.authorize(paymentInfo);
+await merchant.release(paymentInfo, amount);
+
+// v1.1 (planned): Single transaction
+// await operator.charge(paymentInfo, amount);
+```
+
+**Expected in:** v1.1
+
+### No `refundPostEscrow()`
+
+**What it means:** Once funds are released to the merchant, refunds require the merchant to manually transfer funds back.
+
+**Workaround:** Refunds must happen while funds are still in escrow:
+
+```typescript
+// v1: Only works while InEscrow
+if (state === PaymentState.InEscrow) {
+  await merchant.refundInEscrow(paymentInfo);
+}
+
+// v1.1 (planned): Works after release too
+// await merchant.refundPostEscrow(paymentInfo, amount);
+```
+
+**Expected in:** v1.1
+
+### Basic Fee Management
+
+**What it means:** The SDK provides `distributeFees()` but no utilities for tracking fee history or managing multi-token fees.
+
+**Workaround:** Track fees manually or query events:
+
+```typescript
+// v1: Manual fee tracking via events
+const feeEvents = await publicClient.getLogs({
+  address: operatorAddress,
+  event: parseAbiItem('event FeesDistributed(address indexed receiver, uint256 amount)'),
+});
+
+// v1.1 (planned): Built-in fee management
+// const feeHistory = await operator.getFeeHistory();
+// const accumulated = await operator.getAccumulatedFees();
+```
+
+**Expected in:** v1.1
+
+### No Evidence/Metadata System
+
+**What it means:** The SDK doesn't provide built-in support for attaching evidence to refund requests or disputes.
+
+**Workaround:** Use external storage (IPFS, database) and reference it off-chain:
+
+```typescript
+// v1: Store evidence externally
+const evidenceHash = await uploadToIPFS(evidence);
+// Store evidenceHash in your database linked to paymentInfoHash
+
+// v2 (planned): Built-in evidence system
+// await client.requestRefund(paymentInfo, { evidence: { ... } });
+```
+
+**Expected in:** v2.0
+
+## API Constraints
+
+### EIP-155 Network Identifiers
+
+Network configuration requires EIP-155 format strings, not chain ID numbers:
+
+```typescript
+// Correct
+const config = getNetworkConfig('eip155:84532');
+
+// Incorrect - will return undefined
+const config = getNetworkConfig(84532);
+```
+
+### PaymentInfo Must Be Complete
+
+All SDK methods require a complete `PaymentInfo` object. You cannot query by hash alone:
+
+```typescript
+// v1: Need full PaymentInfo
+const state = await client.getPaymentState(paymentInfo);
+
+// Not supported in v1
+// const state = await client.getPaymentStateByHash(hash);
+```
+
+## Roadmap
+
+### v1.1 (Next Release)
+
+- `charge()` for immediate settlement
+- `refundPostEscrow()` for post-release refunds
+- Fee accumulation queries and history
+- Base Mainnet support
+
+### v2.0 (Future)
+
+- Evidence/metadata system with pluggable backends (IPFS, XMTP, Arweave)
+- Encrypted communication channels
+- Partial refund negotiations
+- Multi-arbiter support
+- Session-based billing patterns
+
+## Getting Updates
+
+<CardGroup cols={2}>
+  <Card title="GitHub Releases" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/releases">
+    Watch for new SDK releases.
+  </Card>
+  <Card title="SDK Overview" icon="cube" href="/sdk/overview">
+    Return to SDK documentation.
+  </Card>
+</CardGroup>

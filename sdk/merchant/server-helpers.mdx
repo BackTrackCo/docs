@@ -14,9 +14,11 @@ Mark a payment option as refundable:
 import { refundable } from '@x402r/merchant';
 
 const paymentOption = {
-  amount: '1000000', // 1 USDC
-  token: 'USDC',
+  scheme: 'evm',
   network: 'base-sepolia',
+  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
+  maxAmountRequired: '1000000', // 1 USDC (6 decimals)
+  resource: '/api/resource',
 };
 
 const refundableOption = refundable(
@@ -24,7 +26,7 @@ const refundableOption = refundable(
   operatorAddress,
   {
     escrowPeriod: 86400, // 24 hours in seconds
-    refundAddress: refundRequestAddress,
+    refundRequestAddress: refundRequestAddress,
   }
 );
 
@@ -33,8 +35,7 @@ console.log(refundableOption.x402r);
 // {
 //   operator: '0x...',
 //   escrowPeriod: 86400,
-//   refundAddress: '0x...',
-//   isRefundable: true,
+//   refundRequestAddress: '0x...',
 // }
 ```
 
@@ -47,12 +48,22 @@ import { withRefund } from '@x402r/merchant';
 
 const existingRoutes = {
   '/api/premium': {
-    amount: '5000000',
-    token: 'USDC',
+    paymentOptions: [{
+      scheme: 'evm',
+      network: 'base-sepolia',
+      token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+      maxAmountRequired: '5000000',
+      resource: '/api/premium',
+    }],
   },
   '/api/basic': {
-    amount: '1000000',
-    token: 'USDC',
+    paymentOptions: [{
+      scheme: 'evm',
+      network: 'base-sepolia',
+      token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+      maxAmountRequired: '1000000',
+      resource: '/api/basic',
+    }],
   },
 };
 
@@ -61,11 +72,11 @@ const refundableRoutes = withRefund(
   operatorAddress,
   {
     escrowPeriod: 86400,
-    refundAddress: refundRequestAddress,
+    refundRequestAddress: refundRequestAddress,
   }
 );
 
-// All routes now include x402r metadata
+// All payment options now include x402r metadata
 ```
 
 ## Options
@@ -74,14 +85,11 @@ Both helpers accept optional configuration:
 
 ```typescript
 interface RefundableOptions {
-  /** Escrow period in seconds (default: 86400 = 24 hours) */
+  /** Escrow period in seconds */
   escrowPeriod?: number;
 
-  /** Custom RefundRequest contract address */
-  refundAddress?: `0x${string}`;
-
-  /** Custom escrow recorder address */
-  escrowRecorder?: `0x${string}`;
+  /** RefundRequest contract address */
+  refundRequestAddress?: `0x${string}`;
 }
 ```
 
@@ -93,11 +101,17 @@ import { refundable, X402rMerchant } from '@x402r/merchant';
 import { getNetworkConfig } from '@x402r/core';
 
 const app = express();
-const config = getNetworkConfig(84532);
+const config = getNetworkConfig('eip155:84532'); // Base Sepolia
 
 // Payment options with refund support
 const paymentOptions = refundable(
-  { amount: '1000000', token: 'USDC' },
+  {
+    scheme: 'evm',
+    network: 'base-sepolia',
+    token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    maxAmountRequired: '1000000',
+    resource: '/api/paid',
+  },
   operatorAddress,
   { escrowPeriod: 86400 }
 );
@@ -155,17 +169,11 @@ interface X402rMetadata {
   /** PaymentOperator contract address */
   operator: `0x${string}`;
 
-  /** Escrow period in seconds */
-  escrowPeriod: number;
+  /** Escrow period in seconds (optional) */
+  escrowPeriod?: number;
 
-  /** RefundRequest contract address */
-  refundAddress?: `0x${string}`;
-
-  /** EscrowPeriodRecorder address */
-  escrowRecorder?: `0x${string}`;
-
-  /** Whether this payment supports refunds */
-  isRefundable: true;
+  /** RefundRequest contract address (optional) */
+  refundRequestAddress?: `0x${string}`;
 }
 ```
 
@@ -200,14 +208,30 @@ const walletClient = createWalletClient({
   transport: http(),
 });
 
-const config = getNetworkConfig(84532);
-const operatorAddress = '0x...';
+const config = getNetworkConfig('eip155:84532'); // Base Sepolia
+const operatorAddress = '0x...'; // Your PaymentOperator address
 
 // Define routes with refund support
 const routes = withRefund(
   {
-    '/api/data': { amount: '1000000', token: 'USDC' },
-    '/api/premium': { amount: '5000000', token: 'USDC' },
+    '/api/data': {
+      paymentOptions: [{
+        scheme: 'evm',
+        network: 'base-sepolia',
+        token: config.usdc,
+        maxAmountRequired: '1000000',
+        resource: '/api/data',
+      }],
+    },
+    '/api/premium': {
+      paymentOptions: [{
+        scheme: 'evm',
+        network: 'base-sepolia',
+        token: config.usdc,
+        maxAmountRequired: '5000000',
+        resource: '/api/premium',
+      }],
+    },
   },
   operatorAddress,
   { escrowPeriod: 86400 }
@@ -233,7 +257,7 @@ app.get('/api/data', (req, res) => {
 
   if (!payment) {
     return res.status(402).json({
-      accepts: [routes['/api/data']],
+      accepts: routes['/api/data'].paymentOptions,
     });
   }
 

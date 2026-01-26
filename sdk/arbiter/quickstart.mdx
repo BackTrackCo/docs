@@ -46,7 +46,7 @@ const walletClient = createWalletClient({
 });
 
 // Get network configuration
-const config = getNetworkConfig(84532);
+const config = getNetworkConfig('eip155:84532');
 
 // Create X402rArbiter
 const arbiter = new X402rArbiter({
@@ -162,7 +162,11 @@ async function main() {
     transport: http(),
   });
 
-  const config = getNetworkConfig(84532);
+  const config = getNetworkConfig('eip155:84532');
+  if (!config) {
+    throw new Error('Network not supported');
+  }
+
   const arbiter = new X402rArbiter({
     publicClient,
     walletClient,
@@ -170,22 +174,32 @@ async function main() {
     refundRequestAddress: config.refundRequest,
   });
 
-  // Get pending cases
-  const cases = await arbiter.getPendingCases();
-  console.log(`Reviewing ${cases.length} cases`);
+  try {
+    // Get pending cases
+    const cases = await arbiter.getPendingCases();
+    console.log(`Reviewing ${cases.length} cases`);
 
-  // Watch for new cases
-  const { unsubscribe } = arbiter.watchNewCases(async (event) => {
-    console.log('New case to review:', event);
+    // Watch for new cases
+    const { unsubscribe } = arbiter.watchNewCases(async (event) => {
+      console.log('New case to review:', event);
+      // Process the new case...
+    });
 
-    // Process the new case...
-  });
-
-  console.log('Arbiter is now watching for new cases...');
+    console.log('Arbiter is now watching for new cases...');
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Arbiter operation failed:', error.message);
+    }
+    throw error;
+  }
 }
 
 main().catch(console.error);
 ```
+
+<Tip>
+Always wrap SDK operations in try-catch blocks. The SDK throws descriptive errors for contract reverts and unauthorized actions.
+</Tip>
 
 ## Next Steps
 

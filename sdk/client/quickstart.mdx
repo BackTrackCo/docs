@@ -46,7 +46,7 @@ const walletClient = createWalletClient({
 });
 
 // Get network configuration
-const networkConfig = getNetworkConfig(84532);
+const networkConfig = getNetworkConfig('eip155:84532');
 
 // Create X402rClient
 const client = new X402rClient({
@@ -66,15 +66,18 @@ Check the current state of any payment:
 import { PaymentState } from '@x402r/core';
 
 const paymentInfo = {
-  operator: '0x...',
-  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
-  payer: '0x...',
-  receiver: '0x...',
+  operator: '0x...', // PaymentOperator address
+  payer: '0x...',    // Payer address
+  receiver: '0x...', // Merchant address
+  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
   maxAmount: BigInt('1000000'), // 1 USDC
-  minAmount: BigInt('1000000'),
-  nonce: BigInt(1),
-  authorizationDeadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
-  activationTimestamp: BigInt(0),
+  preApprovalExpiry: 0n,
+  authorizationExpiry: BigInt(Math.floor(Date.now() / 1000) + 3600),
+  refundExpiry: BigInt(Math.floor(Date.now() / 1000) + 86400),
+  minFeeBps: 0,
+  maxFeeBps: 0,
+  feeReceiver: '0x...',
+  salt: BigInt('0x123456'),
 };
 
 const state = await client.getPaymentState(paymentInfo);
@@ -136,7 +139,7 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { X402rClient } from '@x402r/client';
-import { PaymentState, RequestStatus, getNetworkConfig } from '@x402r/core';
+import { PaymentState, getNetworkConfig } from '@x402r/core';
 
 async function main() {
   // Setup
@@ -152,7 +155,11 @@ async function main() {
     transport: http(),
   });
 
-  const config = getNetworkConfig(84532);
+  const config = getNetworkConfig('eip155:84532');
+  if (!config) {
+    throw new Error('Network not supported');
+  }
+
   const client = new X402rClient({
     publicClient,
     walletClient,
@@ -160,26 +167,37 @@ async function main() {
     refundRequestAddress: config.refundRequest,
   });
 
-  // Query my payments
-  const { hashes } = await client.getMyPayments();
-  console.log(`Found ${hashes.length} payments`);
+  try {
+    // Query my payments
+    const { hashes } = await client.getMyPayments();
+    console.log(`Found ${hashes.length} payments`);
 
-  // For each payment in escrow, check if we can request a refund
-  for (const hash of hashes) {
-    const details = await client.getPaymentDetails(hash);
-    const state = await client.getPaymentState(details);
+    // For each payment in escrow, check if we can request a refund
+    for (const hash of hashes) {
+      const details = await client.getPaymentDetails(hash);
+      const state = await client.getPaymentState(details);
 
-    if (state === PaymentState.InEscrow) {
-      const hasRequest = await client.hasRefundRequest(details);
-      if (!hasRequest) {
-        console.log(`Payment ${hash} can request refund`);
+      if (state === PaymentState.InEscrow) {
+        const hasRequest = await client.hasRefundRequest(details);
+        if (!hasRequest) {
+          console.log(`Payment ${hash} can request refund`);
+        }
       }
     }
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('Operation failed:', error.message);
+    }
+    throw error;
   }
 }
 
 main().catch(console.error);
 ```
+
+<Tip>
+Always wrap SDK operations in try-catch blocks. The SDK throws descriptive errors for contract reverts and invalid inputs.
+</Tip>
 
 ## Next Steps
 

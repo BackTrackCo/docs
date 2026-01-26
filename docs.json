@@ -82,7 +82,8 @@
             "pages": [
               "sdk/overview",
               "sdk/installation",
-              "sdk/concepts"
+              "sdk/concepts",
+              "sdk/limitations"
             ]
           },
           {

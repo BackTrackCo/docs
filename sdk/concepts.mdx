@@ -36,15 +36,18 @@ The `PaymentInfo` struct uniquely identifies a payment and contains all its para
 
 ```typescript
 interface PaymentInfo {
-  operator: `0x${string}`;      // PaymentOperator contract
-  token: `0x${string}`;         // Payment token (e.g., USDC)
-  payer: `0x${string}`;         // Payer's address
-  receiver: `0x${string}`;      // Merchant's address
-  maxAmount: bigint;            // Maximum payment amount
-  minAmount: bigint;            // Minimum payment amount
-  nonce: bigint;                // Unique nonce for this payment
-  authorizationDeadline: bigint; // Deadline for authorization
-  activationTimestamp: bigint;   // When payment becomes active
+  operator: `0x${string}`;          // PaymentOperator contract address
+  payer: `0x${string}`;             // Payer's address
+  receiver: `0x${string}`;          // Merchant's address
+  token: `0x${string}`;             // Payment token (e.g., USDC)
+  maxAmount: bigint;                // Maximum payment amount
+  preApprovalExpiry: bigint;        // Pre-approval expiry timestamp (0n if not used)
+  authorizationExpiry: bigint;      // When authorization expires
+  refundExpiry: bigint;             // Deadline for refund requests
+  minFeeBps: number;                // Minimum fee in basis points
+  maxFeeBps: number;                // Maximum fee in basis points
+  feeReceiver: `0x${string}`;       // Address that receives fees
+  salt: bigint;                     // Unique salt for this payment
 }
 ```
 
@@ -135,19 +138,35 @@ Freezing a payment does not automatically escalate to an arbiter. It simply paus
 
 ## Contract Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                     PaymentOperator                          │
-│  authorize() • release() • refundInEscrow() • settle()       │
-└──────────────────────────────────────────────────────────────┘
-        │                    │                    │
-        ▼                    ▼                    ▼
-┌───────────────┐  ┌─────────────────────┐  ┌──────────────────┐
-│ RefundRequest │  │ EscrowPeriodRecorder│  │ Conditions       │
-│               │  │                     │  │                  │
-│ Request/Cancel│  │ Freeze/Unfreeze     │  │ Access Control   │
-│ Approve/Deny  │  │ Track escrow time   │  │ Time-based       │
-└───────────────┘  └─────────────────────┘  └──────────────────┘
+```mermaid
+flowchart TB
+    subgraph PO[PaymentOperator]
+        direction LR
+        auth[authorize]
+        rel[release]
+        ref[refundInEscrow]
+        set[settle]
+    end
+
+    subgraph Components[Supporting Contracts]
+        direction LR
+        subgraph RR[RefundRequest]
+            rr1[Request/Cancel]
+            rr2[Approve/Deny]
+        end
+        subgraph EPR[EscrowPeriodRecorder]
+            epr1[Freeze/Unfreeze]
+            epr2[Track escrow time]
+        end
+        subgraph Cond[Conditions]
+            c1[Access Control]
+            c2[Time-based rules]
+        end
+    end
+
+    PO --> RR
+    PO --> EPR
+    PO --> Cond
 ```
 
 ## Next Steps

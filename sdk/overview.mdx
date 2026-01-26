@@ -44,20 +44,41 @@ The SDK is organized into four packages, each designed for a specific role in th
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      @x402r/core                            │
-│  Types • ABIs • Network Config • Utilities • Conditions     │
-└─────────────────────────────────────────────────────────────┘
-        ▲                    ▲                    ▲
-        │                    │                    │
-┌───────┴───────┐  ┌─────────┴─────────┐  ┌──────┴──────┐
-│ @x402r/client │  │ @x402r/merchant   │  │ @x402r/arbiter │
-│               │  │                   │  │               │
-│ Payment Query │  │ Release/Refund    │  │ Approve/Deny  │
-│ Refund Request│  │ Server Helpers    │  │ AI Hooks      │
-│ Escrow Ops    │  │ Event Watch       │  │ Batch Ops     │
-└───────────────┘  └───────────────────┘  └───────────────┘
+```mermaid
+flowchart BT
+    subgraph core[@x402r/core]
+        direction LR
+        types[Types]
+        abis[ABIs]
+        config[Network Config]
+        utils[Utilities]
+        cond[Conditions]
+    end
+
+    subgraph client[@x402r/client]
+        direction LR
+        pq[Payment Query]
+        rr[Refund Request]
+        eo[Escrow Ops]
+    end
+
+    subgraph merchant[@x402r/merchant]
+        direction LR
+        rf[Release/Refund]
+        sh[Server Helpers]
+        ew[Event Watch]
+    end
+
+    subgraph arbiter[@x402r/arbiter]
+        direction LR
+        ad[Approve/Deny]
+        ai[AI Hooks]
+        bo[Batch Ops]
+    end
+
+    client --> core
+    merchant --> core
+    arbiter --> core
 ```
 
 ## Network Support
@@ -65,7 +86,11 @@ The SDK is organized into four packages, each designed for a specific role in th
 | Network | Chain ID | Status |
 |---------|----------|--------|
 | Base Sepolia | 84532 | Supported |
-| Base Mainnet | 8453 | Coming Soon |
+| Base Mainnet | 8453 | Pending |
+
+<Note>
+Base Mainnet support is pending contract deployment. The v1 SDK currently targets Base Sepolia for development and testing. See the [limitations page](/sdk/limitations) for details on v1 constraints.
+</Note>
 
 ## Next Steps
 
