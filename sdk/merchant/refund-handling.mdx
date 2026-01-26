@@ -128,7 +128,8 @@ interface RefundPolicy {
 
 async function processRefundsWithPolicy(
   merchant: X402rMerchant,
-  policy: RefundPolicy
+  policy: RefundPolicy,
+  recorderAddress: `0x${string}`
 ) {
   const pending = await merchant.getPendingRefundRequests();
 

@@ -97,7 +97,10 @@ Release all eligible payments:
 import { X402rMerchant } from '@x402r/merchant';
 import { PaymentState } from '@x402r/core';
 
-async function releaseAllEligible(merchant: X402rMerchant) {
+async function releaseAllEligible(
+  merchant: X402rMerchant,
+  recorderAddress: `0x${string}`
+) {
   const { hashes } = await merchant.getReceiverPayments();
   const released: string[] = [];
 

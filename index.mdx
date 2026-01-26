@@ -1,97 +1,87 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "x402r adds escrow deposits, refund windows, and dispute resolution to HTTP-native payments"
 ---
 
-## Setting up
+**x402r** is a refundable payments protocol extension for [x402](https://www.x402.org/). It enables secure, reversible transactions with built-in buyer protection through smart contract escrow on Base.
 
-Get your documentation site up and running in minutes.
+## Why x402r?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Standard x402 payments are immediate and irreversible. x402r adds:
 
-## Make it yours
+- **Escrow deposits** — Funds held in smart contracts until conditions are met
+- **Refund windows** — Configurable time periods for buyers to request refunds
+- **Dispute resolution** — Arbiter system for handling contested transactions
+- **Yield generation** — Escrowed funds earn yield via Aave while waiting
 
-Design a docs site that looks great and empowers your users.
+## How It Works
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Merchant
+    participant Escrow
+    participant Arbiter
+
+    Client->>Escrow: Pay (funds held)
+    Escrow-->>Merchant: Payment notification
+
+    alt Happy path
+        Merchant->>Escrow: Release funds
+        Escrow->>Merchant: Transfer
+    else Refund requested
+        Client->>Escrow: Request refund
+        Merchant->>Escrow: Approve/Deny
+        alt Disputed
+            Arbiter->>Escrow: Resolve dispute
+        end
+    end
+```
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Protocol Overview" icon="diagram-project" href="/x402-integration/overview">
+    Understand how x402r extends the x402 protocol.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    Explore the escrow and payment operator contracts.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="SDK Quickstart" icon="code" href="/sdk/overview">
+    Start building with the TypeScript SDK.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Deploy Contracts" icon="rocket" href="/contract-deployment">
+    Deploy your own payment operator instance.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Architecture
 
-Everything you need to create world-class documentation.
+x402r consists of three main components:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+| Component | Purpose |
+|-----------|---------|
+| **PaymentOperator** | Manages payment authorization, release, and refunds |
+| **RefundRequest** | Handles refund request lifecycle and approvals |
+| **EscrowPeriodRecorder** | Tracks escrow timing and freeze states |
 
-## Need inspiration?
+## Supported Networks
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+| Network | Chain ID | Status |
+|---------|----------|--------|
+| Base Sepolia | 84532 | Supported |
+| Base Mainnet | 8453 | Pending |
+
+## Resources
+
+<CardGroup cols={3}>
+  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo">
+    Source code and examples.
+  </Card>
+  <Card title="SDK Reference" icon="book" href="https://backtrackco.github.io/x402r-sdk">
+    TypeDoc API documentation.
+  </Card>
+  <Card title="Support" icon="envelope" href="mailto:hi@x402r.org">
+    Get help with integration.
+  </Card>
+</CardGroup>

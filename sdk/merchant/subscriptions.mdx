@@ -165,7 +165,8 @@ merchant.watchReleases((event) => {
   }
 });
 
-// Watch freeze events
+// Watch freeze events (recorderAddress from getNetworkConfig)
+const recorderAddress = config.escrowPeriodRecorder;
 merchant.watchFreezeEvents(recorderAddress, (event) => {
   const hash = event.args.paymentInfoHash;
   if (event.eventName === 'PaymentFrozen') {

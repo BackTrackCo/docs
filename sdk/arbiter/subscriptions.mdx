@@ -185,7 +185,8 @@ function setupSubscriptions(arbiter: X402rArbiter, recorderAddress: string) {
     }
   });
 
-  // Freeze events
+  // Freeze events (recorderAddress from getNetworkConfig)
+  const recorderAddress = config.escrowPeriodRecorder;
   arbiter.watchFreezeEvents(recorderAddress, (event) => {
     if (event.eventName === 'PaymentFrozen') {
       state.frozenPayments.add(event.args.paymentInfoHash);
