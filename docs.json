@@ -114,15 +114,6 @@
               "sdk/arbiter/ai-integration",
               "sdk/arbiter/subscriptions"
             ]
-          },
-          {
-            "group": "Core Package",
-            "pages": [
-              "sdk/core/types",
-              "sdk/core/abis",
-              "sdk/core/utilities",
-              "sdk/core/conditions"
-            ]
           }
         ]
       },
