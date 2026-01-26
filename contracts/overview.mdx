@@ -61,20 +61,21 @@ Safe token storage and transfer utilities.
 
 ## What x402r Adds
 
-x402r extends commerce-payments with refund-specific capabilities:
+x402r extends commerce-payments with flexible payment capabilities:
 
-### 1. Arbitration & Dispute Resolution
+### 1. Generic Payment Operator
 
-**ArbitrationOperator** - Payment operator with designated arbiter for disputes
+**PaymentOperator** - Flexible payment operator with pluggable conditions
 
 **RefundRequest** - Structured refund request workflow
 
 **Key additions:**
-- Arbiter role for neutral third-party dispute resolution
+- Fee recipient for protocol and operator fee distribution
+- Configurable authorization via conditions (not hardcoded roles)
 - Refund request states: `Pending` → `Approved`/`Denied`/`Cancelled`
 - In-escrow refunds (during escrow period)
 - Post-escrow refunds (after release)
-- Fee distribution to protocol and arbiters
+- Support for marketplace, subscription, streaming, and custom flows
 
 ### 2. Pluggable Condition System
 
@@ -108,7 +109,7 @@ x402r extends commerce-payments with refund-specific capabilities:
 
 ### 4. Factory Pattern
 
-**ArbitrationOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
+**PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
 
 **EscrowPeriodConditionFactory** - Deploys condition/recorder pairs
 
@@ -124,13 +125,13 @@ x402r extends commerce-payments with refund-specific capabilities:
 
 | Feature | Commerce Payments | x402r |
 |---------|------------------|-------|
-| **Refunds** | Manual void/reclaim | Structured refund requests with arbiter approval |
+| **Refunds** | Manual void/reclaim | Structured refund requests with configurable approval |
 | **Escrow Period** | Not enforced | Configurable time-lock before release |
-| **Dispute Resolution** | Not built-in | Arbiter role with decision workflow |
+| **Dispute Resolution** | Not built-in | Optional arbiter workflow via conditions |
 | **Authorization** | Operator-based only | Pluggable conditions (access, time, combinators) |
-| **Freeze Mechanism** | Not available | Payer can freeze during escrow period |
+| **Freeze Mechanism** | Not available | Configurable freeze during escrow period |
 | **Deployment** | Direct deployment | Factory pattern with CREATE2 |
-| **Fees** | Not enforced | Configurable protocol and arbiter fees |
+| **Fees** | Not enforced | Configurable protocol and operator fees |
 
 ## Use Cases
 
@@ -141,17 +142,18 @@ x402r extends commerce-payments with refund-specific capabilities:
 - Direct integrations
 
 ### x402r (Extension) Suitable For:
-- Marketplace payments with buyer protection
-- Escrow with time-based release
-- Disputed transactions requiring arbitration
-- Complex authorization requirements
-- Freeze protection against fraud
+- **Marketplaces** - Buyer protection with time-based escrow and disputes
+- **Subscriptions** - Time-limited authorizations with charge capability
+- **Streaming** - Time-proportional payments with custom conditions
+- **Grants/DAO** - Multisig-controlled releases and refunds
+- **Escrow Services** - Professional escrow with freeze protection
+- **API Payments** - Service provider controlled charge flows
 
 ## Design Principles
 
 <Accordion title="Immutability by Default">
 Most contracts are immutable to prevent rug pulls and ensure trustlessness:
-- **ArbitrationOperator** - Cannot pause or upgrade
+- **PaymentOperator** - Cannot pause or upgrade
 - **EscrowPeriodCondition** - Cannot modify escrow period
 - **FreezePolicy** - Cannot change freeze rules
 

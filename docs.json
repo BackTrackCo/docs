@@ -38,11 +38,11 @@
             ]
           },
           {
-            "group": "AI tools",
+            "group": "X402 Protocol Integration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "x402-integration/overview",
+              "x402-integration/escrow-scheme",
+              "x402-integration/comparison"
             ]
           },
           {
@@ -54,6 +54,14 @@
               "contracts/factories",
               "contracts/conditions",
               "contracts/examples"
+            ]
+          },
+          {
+            "group": "AI tools",
+            "pages": [
+              "ai-tools/cursor",
+              "ai-tools/claude-code",
+              "ai-tools/windsurf"
             ]
           },
           {

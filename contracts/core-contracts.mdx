@@ -1,26 +1,27 @@
 ---
 title: "Core Contracts"
-description: "Detailed explanation of ArbitrationOperator, RefundRequest, and AuthCaptureEscrow"
+description: "Detailed explanation of PaymentOperator, RefundRequest, and AuthCaptureEscrow"
 icon: "file-contract"
 ---
 
-## ArbitrationOperator
+## PaymentOperator
 
 The main payment operator contract with pluggable conditions for flexible authorization logic.
 
 ### Overview
 
-- **Type:** Operator instance (one per arbiter)
-- **Deployment:** Via ArbitrationOperatorFactory
+- **Type:** Operator instance (one per fee recipient + configuration)
+- **Deployment:** Via PaymentOperatorFactory
 - **Immutability:** Cannot be paused or upgraded
 - **Configuration:** 10 slots for conditions and recorders
+- **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
 ### Immutable Fields
 
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
-address public immutable ARBITER;             // Designated arbiter
-address public immutable PROTOCOL_FEE_RECIPIENT; // Fee recipient
+address public immutable FEE_RECIPIENT;       // Operator fee recipient
+address public immutable PROTOCOL_FEE_RECIPIENT; // Protocol fee recipient
 ```
 
 ### Mutable Fields
@@ -97,7 +98,13 @@ function release(bytes32 paymentId) external nonReentrant
 5. Call `RELEASE_RECORDER`
 6. Emit `PaymentReleased`
 
-**Access:** Controlled by `RELEASE_CONDITION` (typically receiver OR arbiter + escrow passed)
+**Access:** Controlled by `RELEASE_CONDITION`
+
+<Note>
+**Marketplace example:** Receiver OR StaticAddressCondition(arbiter) + escrow passed
+**Subscription example:** StaticAddressCondition(serviceProvider)
+**DAO example:** StaticAddressCondition(daoMultisig)
+</Note>
 
 #### refundInEscrow()
 
@@ -109,12 +116,19 @@ function refundInEscrow(bytes32 paymentId) external nonReentrant
 
 **Flow:**
 1. Check payment is in escrow
-2. Check `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+2. Check `REFUND_IN_ESCROW_CONDITION` (configurable per operator)
 3. Call `escrow.void()` to return funds to payer
 4. Call `REFUND_IN_ESCROW_RECORDER`
 5. Emit `PaymentRefunded`
 
-**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION`
+
+<Note>
+**Marketplace example:** StaticAddressCondition(arbiter) - disputes
+**Return policy example:** Receiver OR StaticAddressCondition(arbiter)
+**DAO example:** StaticAddressCondition(daoMultisig)
+**Subscription example:** address(0) - no refunds
+</Note>
 
 #### refundPostEscrow()
 
@@ -126,13 +140,19 @@ function refundPostEscrow(bytes32 paymentId) external nonReentrant
 
 **Flow:**
 1. Check payment has been released
-2. Check `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+2. Check `REFUND_POST_ESCROW_CONDITION` (configurable per operator)
 3. Call `escrow.reclaim()` to take back funds from receiver
 4. Transfer to payer
 5. Call `REFUND_POST_ESCROW_RECORDER`
 6. Emit `PaymentRefunded`
 
-**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`
+
+<Note>
+**Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
+**Return policy example:** Receiver - voluntary returns
+**Most configurations:** address(0) - no post-escrow refunds
+</Note>
 
 ### Fee Configuration
 
@@ -142,21 +162,34 @@ Fees can be enabled/disabled and configured by the owner.
 
 ```solidity
 uint16 public maxTotalFeeRate;        // e.g., 5 = 0.05% = 5 basis points
-uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to arbiter
+uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to fee recipient
+address public immutable FEE_RECIPIENT; // Who receives operator share of fees
 ```
 
 **Example Fee Calculation:**
-```
-Payment: 1000 USDC
-Max Fee Rate: 5 basis points (0.05%)
-Protocol %: 25%
 
-Total Fee = 1000 * 0.05% = 0.5 USDC
-├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
-└─ Arbiter Fee = 0.5 * 75% = 0.375 USDC → arbiter
+<Frame>
+  <img src="/images/fee-distribution.png" alt="Fee distribution showing payment split between receiver, protocol, and operator" />
+</Frame>
 
-Receiver Gets = 1000 - 0.5 = 999.5 USDC
-```
+**Breakdown:**
+- **Payment:** 1000 USDC (100%)
+- **Total Fee:** 0.5 USDC (0.05% or 5 basis points)
+  - **Protocol Fee:** 0.125 USDC (25% of fee)
+  - **Operator Fee:** 0.375 USDC (75% of fee)
+- **Receiver Gets:** 999.5 USDC (99.95%)
+
+The FEE_RECIPIENT can be configured as:
+- Arbiter (marketplace with disputes)
+- Service Provider (subscriptions)
+- Platform Treasury (platform-controlled)
+- DAO Multisig (governance-controlled)
+
+**FEE_RECIPIENT examples:**
+- Arbiter (marketplace with disputes)
+- Service Provider (subscriptions)
+- Platform Treasury (platform-controlled)
+- DAO Multisig (governance-controlled)
 
 #### Updating Fees (24-hour Timelock)
 
@@ -244,10 +277,19 @@ Manages refund requests independent of operator implementation.
 
 ### Request Status States
 
-```
-Pending ──┬──► Approved ──► (Arbiter executes refund via operator)
-          ├──► Denied
-          └──► Cancelled (by requester)
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Approved: Arbiter approves
+    Pending --> Denied: Arbiter denies
+    Pending --> Cancelled: Requester cancels
+    Approved --> [*]: Arbiter executes refund via operator
+
+    note right of Approved
+        Arbiter must call
+        operator.refundInEscrow()
+        or operator.refundPostEscrow()
+    end note
 ```
 
 ### Key Methods
@@ -344,20 +386,30 @@ x402r uses a forked version of commerce-payments with added **partial void** sup
 
 ### Payment State Machine
 
-```
-NonExistent
-    │
-    │ authorize()
-    ▼
-InEscrow ────────────┐
-    │                │
-    │ release()      │ void() / refundInEscrow()
-    ▼                │
-Released             │
-    │                │
-    │ (settled)      │ reclaim() / refundPostEscrow()
-    ▼                ▼
-       Settled
+```mermaid
+stateDiagram-v2
+    [*] --> NonExistent
+    NonExistent --> InEscrow: authorize()
+    InEscrow --> Released: release()
+    InEscrow --> Settled: void() / refundInEscrow()
+    Released --> Settled: (settled)
+    InEscrow --> Settled: reclaim() / refundPostEscrow()
+    Settled --> [*]
+
+    note right of InEscrow
+        Funds locked in escrow
+        Payer can reclaim after expiry
+    end note
+
+    note right of Released
+        Funds transferred to receiver
+        Can still refund post-escrow
+    end note
+
+    note right of Settled
+        Terminal state
+        No further actions possible
+    end note
 ```
 
 ### Key Methods

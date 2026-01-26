@@ -22,35 +22,47 @@ For detailed visual architecture diagrams, see the [x402r-contracts repository](
 3. **Operator** calls `escrow.authorize()` to lock funds
 4. **Operator** stores payment info in mapping
 5. **Operator** calls `AUTHORIZE_RECORDER` to record timestamp
-6. **Escrow period** begins (e.g., 7 days)
-7. After escrow period: **Receiver** or **Arbiter** calls `operator.release(paymentId)`
-8. **Operator** checks `RELEASE_CONDITION` (must pass escrow period check)
+6. **Escrow period** begins (e.g., 7 days) - if configured
+7. After escrow period: **Authorized address(es)** call `operator.release(paymentId)` (e.g., receiver, designated address, or both)
+8. **Operator** checks `RELEASE_CONDITION` (configurable - can include time checks, role checks, etc.)
 9. **Operator** calls `escrow.release()` to transfer funds to receiver
-10. **Operator** distributes fees (if enabled)
+10. **Operator** distributes fees to protocol and fee recipient (if enabled)
 11. **Operator** calls `RELEASE_RECORDER` to update state
 
 ### Refund Flow (In-Escrow)
 
+**Example: Marketplace with arbiter dispute resolution**
+
 1. **Payer** calls `refundRequest.requestRefund(paymentId, operator)`
 2. **RefundRequest** creates request with status `Pending`
-3. **Arbiter** reviews dispute
-4. **Arbiter** calls `refundRequest.updateStatus(paymentId, operator, Approved)`
-5. **Arbiter** calls `operator.refundInEscrow(paymentId)`
-6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (arbiter only)
+3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
+4. **Designated address** calls `refundRequest.updateStatus(paymentId, operator, Approved)`
+5. **Designated address** calls `operator.refundInEscrow(paymentId)`
+6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (configured per operator)
 7. **Operator** calls `escrow.void()` to return funds to payer
 8. **Operator** calls `REFUND_IN_ESCROW_RECORDER`
 9. Funds transferred back to payer
 
+<Note>
+Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-allowed (return policy), DAO-controlled (governance), or disabled (subscriptions).
+</Note>
+
 ### Freeze Flow
+
+**Example: Marketplace with payer freeze protection**
 
 **Timeline:**
 - **Day 0:** Payment authorized, escrow period begins
-- **Day 0-7:** Payer can freeze if suspicious
-- **Day 3:** Payer freezes payment (freeze lasts 3 days)
+- **Day 0-7:** Payer can freeze if suspicious (per FreezePolicy)
+- **Day 3:** Payer freezes payment (freeze lasts 3 days per policy)
 - **Day 3-6:** Payment frozen, release blocked
-- **Day 6:** Freeze expires automatically (or arbiter unfreezes early)
+- **Day 6:** Freeze expires automatically (or designated address unfreezes early per FreezePolicy)
 - **Day 7:** Escrow period ends
-- **Day 7+:** Receiver or arbiter can release (if not frozen)
+- **Day 7+:** Authorized address(es) can release (if not frozen)
+
+<Note>
+Freeze policies are optional and configurable. Define who can freeze, who can unfreeze, and how long freeze lasts.
+</Note>
 
 <Warning>
 **MEV Protection:** Payers should freeze EARLY if suspicious, not at the deadline. Use private mempool (Flashbots Protect) if freezing near expiry to avoid front-running.
@@ -75,7 +87,7 @@ When an action is called (e.g., `release()`):
 
 ### Combinator Example
 
-**OrCondition([ReceiverCondition, ArbiterCondition])**
+**OrCondition([ReceiverCondition, StaticAddressCondition(arbiter)])**
 - Checks if caller is receiver: Yes → PASS
 - If not receiver, checks if caller is arbiter: Yes → PASS
 - If neither: FAIL
@@ -85,22 +97,29 @@ When an action is called (e.g., `release()`):
 - Then checks EscrowPeriodCondition: PASS (escrow period elapsed, not frozen)
 - Both passed → PASS (action allowed)
 
+<Note>
+This example shows marketplace configuration. For subscriptions, you might use `StaticAddressCondition(serviceProvider)` instead. For DAO governance, use `StaticAddressCondition(daoMultisig)`.
+</Note>
+
 ## Data Flow
 
 ### Payment Information Storage
 
 ```solidity
-// In ArbitrationOperator
-mapping(bytes32 => PaymentInfo) public payments;
+// In PaymentOperator
+mapping(bytes32 => PaymentInfo) public paymentInfos;
 
+// PaymentInfo is from base commerce-payments (AuthCaptureEscrow)
 struct PaymentInfo {
     address payer;
     address receiver;
-    address arbiter;
+    address operator;           // The PaymentOperator address
     uint256 amount;
     address token;
-    PaymentState state;
-    uint256 index;
+    uint48 authorizationExpiry; // When authorization expires
+    uint16 minFeeBps;           // Minimum fee in basis points
+    uint16 maxFeeBps;           // Maximum fee in basis points
+    address feeReceiver;        // Who receives fees (operator itself)
 }
 ```
 
@@ -121,13 +140,15 @@ struct RecordedInfo {
 
 For a 1000 USDC payment with 0.05% fee (5 basis points) and 25% protocol share:
 
-```
-Total Fee = 1000 * 0.05% = 0.5 USDC
-├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
-└─ Arbiter Fee = 0.5 * 75% = 0.375 USDC → arbiter
+<Frame>
+  <img src="/images/fee-distribution.svg" alt="Fee distribution showing payment split between receiver, protocol, and operator" />
+</Frame>
 
-Receiver Amount = 1000 - 0.5 = 999.5 USDC
-```
+**FEE_RECIPIENT** can be:
+- Arbiter address (marketplace with disputes)
+- Service provider address (subscriptions, APIs)
+- Platform treasury (platform-controlled)
+- DAO multisig (governance-controlled)
 
 ## Roles & Permissions
 
@@ -135,8 +156,17 @@ Receiver Amount = 1000 - 0.5 = 999.5 USDC
 |------|-------------|--------------|
 | **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
 | **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
-| **Arbiter** | `refundInEscrow()`, `refundPostEscrow()`, `updateStatus()` on refund requests | Can only act on payments using their operator |
-| **Owner** | `queueFeesEnabled()`, `executeFeesEnabled()`, `queueFeeUpdate()`, `executeFeeUpdate()`, `rescueETH()` | 24-hour timelock on fee changes |
+| **Designated Address** | Any action per conditions (e.g., `refundInEscrow()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
+| **Owner** | `queueFeesEnabled()`, `executeFeesEnabled()`, `rescueETH()` | 24-hour timelock on fee changes |
+
+<Note>
+"Designated Address" is configured per operator via StaticAddressCondition. Can be:
+- **Arbiter** (marketplace with disputes)
+- **Service Provider** (subscriptions, APIs)
+- **DAO Multisig** (governance-controlled)
+- **Platform Treasury** (platform-controlled)
+- **Compliance Officer** (regulated services)
+</Note>
 
 ## Security Features
 

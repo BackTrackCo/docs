@@ -117,25 +117,47 @@ function check(PaymentInfo calldata payment, address caller)
 - Charge: Let receiver charge partial amounts
 - Refund: Let receiver voluntarily refund
 
-### ArbiterCondition
+### StaticAddressCondition
 
-Only the designated arbiter can call the action.
+Only a designated address can call the action.
 
-**Address (Base Sepolia):** `0x32471D31910a009273A812dE0894d9f0ADef4834`
+**Deployment:** Deploy per use case (not a singleton)
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
-    external view returns (bool)
-{
-    return caller == operator.ARBITER();
+contract StaticAddressCondition is ICondition {
+    address public immutable DESIGNATED_ADDRESS;
+
+    constructor(address _designatedAddress) {
+        DESIGNATED_ADDRESS = _designatedAddress;
+    }
+
+    function check(PaymentInfo calldata payment, address caller)
+        external view returns (bool)
+    {
+        return caller == DESIGNATED_ADDRESS;
+    }
 }
 ```
 
 **Use cases:**
-- Refund: Let arbiter resolve disputes
-- Release: Let arbiter force release if needed
-- Custom: Arbiter-controlled flows
+- **Arbiter:** Deploy with arbiter address for dispute resolution
+- **Service Provider:** Deploy with provider address for subscriptions
+- **DAO Treasury:** Deploy with multisig address for governance
+- **Compliance Officer:** Deploy with compliance address for approvals
+- **Platform:** Deploy with platform address for controlled releases
+
+**Example:**
+```typescript
+// For marketplace arbiter
+const arbiterCondition = new StaticAddressCondition(arbiterAddress);
+
+// For subscription service provider
+const providerCondition = new StaticAddressCondition(serviceProviderAddress);
+
+// For DAO governance
+const daoCondition = new StaticAddressCondition(daoMultisigAddress);
+```
 
 ### AlwaysTrueCondition
 
@@ -231,14 +253,24 @@ config.releaseCondition = address(releaseCondition);
 ```
 
 **Logic Tree:**
+
+```mermaid
+flowchart TD
+    AND[AndCondition] --> OR[OrCondition]
+    AND --> ESC[EscrowPeriodCondition ✓]
+    OR --> REC[ReceiverCondition ✓]
+    OR --> ARB[ArbiterCondition ✗]
+    AND --> RES[Result: PASS]
+
+    style AND fill:#4f46e5,stroke:#4338ca,color:#fff
+    style OR fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style REC fill:#10b981,stroke:#059669,color:#fff
+    style ARB fill:#ef4444,stroke:#dc2626,color:#fff
+    style ESC fill:#10b981,stroke:#059669,color:#fff
+    style RES fill:#10b981,stroke:#059669,color:#fff
 ```
-AndCondition
-├─ OrCondition
-│  ├─ ReceiverCondition ✓
-│  └─ ArbiterCondition ✗
-└─ EscrowPeriodCondition ✓
-Result: PASS (one branch of OR passed, AND both passed)
-```
+
+(One branch of OR passed, AND both passed)
 
 ---
 
@@ -446,20 +478,25 @@ config = {
 
 **Use case:** Fully managed escrow service
 
-### Pattern 4: Multi-Party Release
+### Pattern 4: Multi-Party Release (2-of-3)
 
 ```solidity
-// Requires 2 of 3: Payer, Receiver, Arbiter
+// Requires any 2 of 3 parties to agree: Payer, Receiver, or Arbiter
+// This creates three OR branches, each requiring a different pair to call simultaneously
 const twoOfThree = new OrCondition([
-    new AndCondition([PAYER_CONDITION, RECEIVER_CONDITION]),
-    new AndCondition([PAYER_CONDITION, ARBITER_CONDITION]),
-    new AndCondition([RECEIVER_CONDITION, ARBITER_CONDITION])
+    new AndCondition([PAYER_CONDITION, RECEIVER_CONDITION]),      // Payer AND Receiver
+    new AndCondition([PAYER_CONDITION, ARBITER_CONDITION]),       // Payer AND Arbiter
+    new AndCondition([RECEIVER_CONDITION, ARBITER_CONDITION])     // Receiver AND Arbiter
 ]);
 
 config.releaseCondition = address(twoOfThree);
 ```
 
-**Use case:** Multi-sig style releases
+**Use case:** Multi-sig style releases requiring coordination
+
+<Warning>
+This pattern requires that TWO parties call `release()` in a SINGLE transaction (e.g., via a multisig contract or meta-transaction). It does NOT allow separate calls from two parties. For most use cases, use `OrCondition` to allow ANY authorized party to release individually, or implement a custom voting condition.
+</Warning>
 
 ---
 

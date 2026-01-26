@@ -40,18 +40,19 @@ x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic con
   </Accordion>
 </AccordionGroup>
 
-## Arbitration Operator Factory
+## Payment Operator Factory
 
-Deploys ArbitrationOperator instances with deterministic addresses.
+Deploys PaymentOperator instances with deterministic addresses.
 
 ### Contract Address
 
-**Base Sepolia:** [`0x46C44071BDf9753482400B76d88A5850318b776F`](https://sepolia.basescan.org/address/0x46C44071BDf9753482400B76d88A5850318b776F)
+**Base Sepolia:** TBD (deploy generic version)
 
 ### Configuration Structure
 
 ```solidity
 struct OperatorConfig {
+    address feeRecipient;             // Who receives operator fees
     address authorizeCondition;
     address authorizeRecorder;
     address chargeCondition;
@@ -68,19 +69,16 @@ struct OperatorConfig {
 ### Deployment Method
 
 ```solidity
-function deploy(
-    address arbiter,
-    OperatorConfig calldata config,
-    uint16 maxFeeBps,
-    uint8 protocolFeePct
+function deployOperator(
+    OperatorConfig calldata config
 ) external returns (address operator)
 ```
 
-**Parameters:**
-- `arbiter` - Address of designated arbiter for this operator
-- `config` - 10-slot configuration (5 conditions + 5 recorders)
-- `maxFeeBps` - Maximum total fee in basis points (e.g., 5 = 0.05%)
-- `protocolFeePct` - Protocol's share of fees 0-100 (e.g., 25 = 25%)
+**Parameters (in config):**
+- `feeRecipient` - Who receives operator fees (arbiter, service provider, treasury, etc.)
+- `authorizeCondition` through `refundPostEscrowRecorder` - 10-slot configuration
+
+**Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
 
 **Returns:** Address of deployed operator (or existing if already deployed)
 
@@ -89,77 +87,109 @@ function deploy(
 Predict the operator address before deployment:
 
 ```solidity
-function predictOperatorAddress(
-    address arbiter,
-    OperatorConfig calldata config,
-    uint16 maxFeeBps,
-    uint8 protocolFeePct
+function computeAddress(
+    OperatorConfig calldata config
 ) external view returns (address)
 ```
 
 **Usage:**
 ```typescript
-const predictedAddress = await factory.predictOperatorAddress(
-  arbiterAddress,
-  config,
-  5,    // 0.05% max fee
-  25    // 25% to protocol
-);
+const config = {
+  feeRecipient: arbiterAddress,
+  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  // ... rest of config
+};
+
+const predictedAddress = await factory.computeAddress(config);
 
 console.log("Operator will be deployed at:", predictedAddress);
 
 // Deploy - will use same address
-const deployedAddress = await factory.deploy(
-  arbiterAddress,
-  config,
-  5,
-  25
-);
+const deployedAddress = await factory.deployOperator(config);
 
 assert(deployedAddress === predictedAddress);
 ```
 
 ### Example Deployment
 
-```typescript
-import { ArbitrationOperatorFactory } from "@x402r/contracts";
+#### Marketplace Operator
 
-const factory = new ethers.Contract(
-  FACTORY_ADDRESS,
-  ArbitrationOperatorFactory.abi,
-  signer
-);
+```typescript
+import { createWalletClient, http, getContract, zeroAddress } from 'viem';
+import { base } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { PaymentOperatorFactory, StaticAddressCondition } from "@x402r/contracts";
+
+const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
+
+const account = privateKeyToAccount('0x...');
+const walletClient = createWalletClient({
+  account,
+  chain: base,
+  transport: http()
+});
+
+const factory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: walletClient
+});
+
+// Deploy condition for arbiter
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 // Define configuration
 const config = {
+  feeRecipient: arbiterAddress,  // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
-  chargeCondition: ethers.constants.AddressZero,  // Default allow
-  chargeRecorder: ethers.constants.AddressZero,   // No recording
-  releaseCondition: releaseCondition,              // Custom logic
+  chargeCondition: zeroAddress,  // Default allow
+  chargeRecorder: zeroAddress,   // No recording
+  releaseCondition: new AndCondition([
+    arbiterCondition.address,
+    escrowPeriodCondition
+  ]),
   releaseRecorder: escrowRecorder,
-  refundInEscrowCondition: ARBITER_CONDITION,
-  refundInEscrowRecorder: ethers.constants.AddressZero,
-  refundPostEscrowCondition: ARBITER_CONDITION,
-  refundPostEscrowRecorder: ethers.constants.AddressZero
+  refundInEscrowCondition: arbiterCondition.address,
+  refundInEscrowRecorder: zeroAddress,
+  refundPostEscrowCondition: arbiterCondition.address,
+  refundPostEscrowRecorder: zeroAddress
 };
 
 // Deploy operator
-const tx = await factory.deploy(
-  arbiterAddress,
-  config,
-  5,    // 0.05% max fee
-  25    // 25% protocol fee
-);
+const hash = await factory.write.deployOperator([config]);
+const receipt = await walletClient.waitForTransactionReceipt({ hash });
+const operatorAddress = receipt.logs[0].address;
 
-const receipt = await tx.wait();
-const operatorAddress = receipt.events[0].args.operator;
+console.log("Deployed marketplace operator at:", operatorAddress);
+```
 
-console.log("Deployed operator at:", operatorAddress);
+#### Subscription Operator
+
+```typescript
+// Deploy condition for service provider
+const providerCondition = await new StaticAddressCondition(serviceProviderAddress);
+
+const config = {
+  feeRecipient: serviceProviderAddress,  // Provider earns fees
+  authorizeCondition: PAYER_CONDITION,
+  authorizeRecorder: zeroAddress,
+  chargeCondition: providerCondition.address,
+  chargeRecorder: zeroAddress,
+  releaseCondition: providerCondition.address,
+  releaseRecorder: zeroAddress,
+  refundInEscrowCondition: zeroAddress,  // No refunds
+  refundInEscrowRecorder: zeroAddress,
+  refundPostEscrowCondition: zeroAddress,
+  refundPostEscrowRecorder: zeroAddress
+};
+
+const hash = await factory.write.deployOperator([config]);
+console.log("Deployed subscription operator, tx:", hash);
 ```
 
 <Tip>
-If you call `deploy()` with the same parameters twice, the factory returns the existing operator address without deploying a new contract.
+If you call `deployOperator()` with the same configuration twice, the factory returns the existing operator address without deploying a new contract.
 </Tip>
 
 ---
@@ -202,24 +232,39 @@ The factory deploys two contracts:
    - Provides data to condition
 
 **Relationship:**
-```
-EscrowPeriodCondition ──reads state──► EscrowPeriodRecorder ──references──► FreezePolicy
+
+```mermaid
+flowchart LR
+    Condition[EscrowPeriodCondition] -->|reads state| Recorder[EscrowPeriodRecorder]
+    Recorder -->|references| Policy[FreezePolicy]
+
+    style Condition fill:#4f46e5,stroke:#4338ca,color:#fff
+    style Recorder fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style Policy fill:#f59e0b,stroke:#d97706,color:#fff
 ```
 
 ### Example Deployment
 
 ```typescript
-const factory = new ethers.Contract(
-  ESCROW_PERIOD_FACTORY_ADDRESS,
-  EscrowPeriodConditionFactory.abi,
-  signer
-);
+import { getContract } from 'viem';
+
+const ESCROW_PERIOD_FACTORY_ADDRESS = '0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178';
+
+const factory = getContract({
+  address: ESCROW_PERIOD_FACTORY_ADDRESS,
+  abi: EscrowPeriodConditionFactory.abi,
+  client: walletClient
+});
 
 // Deploy 7-day escrow with 3-day payer freeze
-const [conditionAddress, recorderAddress] = await factory.deploy(
+const hash = await factory.write.deploy([
   7 * 24 * 60 * 60,    // 7 days
   payerFreezePolicyAddress
-);
+]);
+
+const receipt = await walletClient.waitForTransactionReceipt({ hash });
+// Extract condition and recorder addresses from event logs
+const [conditionAddress, recorderAddress] = receipt.logs[0].topics;
 
 console.log("Condition:", conditionAddress);
 console.log("Recorder:", recorderAddress);
@@ -439,14 +484,33 @@ bytes32 salt = keccak256(abi.encode(
 Same configuration on different chains = same address:
 
 ```typescript
+import { createPublicClient } from 'viem';
+import { baseSepolia, optimismSepolia } from 'viem/chains';
+
 // Deploy on Base Sepolia
-const addressBaseSepolia = await factory.deploy(arbiter, config, 5, 25);
+const baseFactory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: baseWalletClient
+});
+
+const baseHash = await baseFactory.write.deployOperator([config]);
+const baseReceipt = await baseWalletClient.waitForTransactionReceipt({ hash: baseHash });
+const addressBaseSepolia = baseReceipt.logs[0].address;
 
 // Deploy on Optimism Sepolia with identical params
-const addressOptimismSepolia = await factory.deploy(arbiter, config, 5, 25);
+const opFactory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: opWalletClient
+});
+
+const opHash = await opFactory.write.deployOperator([config]);
+const opReceipt = await opWalletClient.waitForTransactionReceipt({ hash: opHash });
+const addressOptimismSepolia = opReceipt.logs[0].address;
 
 // Addresses are identical!
-assert(addressBaseSepolia === addressOptimismSepolia);
+console.assert(addressBaseSepolia === addressOptimismSepolia);
 ```
 
 This enables:

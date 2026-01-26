@@ -1,0 +1,80 @@
+direction: down
+
+title: Fee Distribution Example - 1000 USDC Payment {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 24
+    bold: true
+  }
+}
+
+payment: Payment\n1000 USDC {
+  style: {
+    fill: "#4f46e5"
+    stroke: "#4338ca"
+    font-color: "#ffffff"
+    bold: true
+  }
+}
+
+total_fee: Total Fee\n0.5 USDC {
+  style: {
+    fill: "#8b5cf6"
+    stroke: "#7c3aed"
+    font-color: "#ffffff"
+    bold: true
+  }
+}
+
+receiver: Receiver Gets\n999.5 USDC {
+  style: {
+    fill: "#10b981"
+    stroke: "#059669"
+    font-color: "#ffffff"
+    bold: true
+  }
+}
+
+protocol_fee: Protocol Fee\n0.125 USDC\n(25% of fee) {
+  style: {
+    fill: "#f59e0b"
+    stroke: "#d97706"
+    font-color: "#ffffff"
+    bold: true
+  }
+}
+
+operator_fee: Operator Fee\n0.375 USDC\n(75% of fee) {
+  style: {
+    fill: "#f59e0b"
+    stroke: "#d97706"
+    font-color: "#ffffff"
+    bold: true
+  }
+}
+
+protocol_treasury: Protocol\nTreasury {
+  style: {
+    fill: "#e5e7eb"
+    stroke: "#9ca3af"
+    font-color: "#374151"
+    bold: true
+  }
+}
+
+fee_recipient: FEE_RECIPIENT\nArbiter/Provider/DAO {
+  style: {
+    fill: "#e5e7eb"
+    stroke: "#9ca3af"
+    font-color: "#374151"
+    bold: true
+  }
+}
+
+payment -> total_fee
+payment -> receiver
+total_fee -> protocol_fee
+total_fee -> operator_fee
+protocol_fee -> protocol_treasury
+operator_fee -> fee_recipient
