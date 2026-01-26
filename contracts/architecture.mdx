@@ -140,12 +140,21 @@ struct RecordedInfo {
 
 For a 1000 USDC payment with 0.05% fee (5 basis points) and 25% protocol share:
 
-```
-Total Fee = 1000 * 0.05% = 0.5 USDC
-├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
-└─ Operator Fee = 0.5 * 75% = 0.375 USDC → FEE_RECIPIENT
+```mermaid
+flowchart TD
+    Payment["Payment: 1000 USDC"]
+    Payment --> TotalFee["Total Fee: 0.5 USDC<br/>(0.05%)"]
+    TotalFee --> ProtocolFee["Protocol Fee: 0.125 USDC<br/>(25% of fee)"]
+    TotalFee --> OperatorFee["Operator Fee: 0.375 USDC<br/>(75% of fee)"]
+    ProtocolFee --> ProtocolRecipient[protocolFeeRecipient]
+    OperatorFee --> FeeRecipient[FEE_RECIPIENT]
+    Payment --> Receiver["Receiver: 999.5 USDC"]
 
-Receiver Amount = 1000 - 0.5 = 999.5 USDC
+    style Payment fill:#4f46e5,stroke:#4338ca,color:#fff
+    style TotalFee fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style ProtocolFee fill:#f59e0b,stroke:#d97706,color:#fff
+    style OperatorFee fill:#f59e0b,stroke:#d97706,color:#fff
+    style Receiver fill:#10b981,stroke:#059669,color:#fff
 ```
 
 **FEE_RECIPIENT** can be:

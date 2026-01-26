@@ -36,21 +36,27 @@ The escrow scheme provides four primitives:
 
 ## Visual Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           EXACT PAYMENT                                 │
-│   Client ──────────────────────────────────────────────► Receiver       │
-│                     (immediate, no recourse)                            │
-└─────────────────────────────────────────────────────────────────────────┘
+### Exact Payment
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          ESCROW PAYMENT                                 │
-│   Client ────► Escrow ────► [Operator Logic] ────► Receiver             │
-│                    │                                                    │
-│                    └─ Funds held until:                                 │
-│                       • Operator calls capture()                        │
-│                       • Or payer reclaims after expiry                  │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    Client -->|"immediate<br/>no recourse"| Receiver
+
+    style Client fill:#4f46e5,stroke:#4338ca,color:#fff
+    style Receiver fill:#10b981,stroke:#059669,color:#fff
+```
+
+### Escrow Payment
+
+```mermaid
+graph LR
+    Client -->|authorize| Escrow
+    Escrow -->|"Operator Logic"| Receiver
+    Escrow -.->|"Funds held until:<br/>• Operator calls capture()<br/>• Or payer reclaims after expiry"| Escrow
+
+    style Client fill:#4f46e5,stroke:#4338ca,color:#fff
+    style Escrow fill:#f59e0b,stroke:#d97706,color:#fff
+    style Receiver fill:#10b981,stroke:#059669,color:#fff
 ```
 
 ## Operator Flexibility

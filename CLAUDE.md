@@ -50,6 +50,16 @@ icon: "icon-name"  # Optional, for navigation
 - Relative paths for internal links: `[page](./path/to/page)`
 - Images need alt text, use `<Frame>` for screenshots
 
+### Diagrams
+
+- **Always use Mermaid** for diagrams, never ASCII art
+- Mintlify has native Mermaid support with proper rendering
+- Use appropriate diagram types:
+  - `sequenceDiagram` for flows and interactions
+  - `flowchart` or `graph` for architecture and decision trees
+  - `stateDiagram` for state machines
+- Keep diagrams simple and readable
+
 ---
 
 ## Mintlify Components

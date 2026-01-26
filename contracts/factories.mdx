@@ -232,8 +232,15 @@ The factory deploys two contracts:
    - Provides data to condition
 
 **Relationship:**
-```
-EscrowPeriodCondition ──reads state──► EscrowPeriodRecorder ──references──► FreezePolicy
+
+```mermaid
+flowchart LR
+    Condition[EscrowPeriodCondition] -->|reads state| Recorder[EscrowPeriodRecorder]
+    Recorder -->|references| Policy[FreezePolicy]
+
+    style Condition fill:#4f46e5,stroke:#4338ca,color:#fff
+    style Recorder fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style Policy fill:#f59e0b,stroke:#d97706,color:#fff
 ```
 
 ### Example Deployment

@@ -78,26 +78,21 @@ icon: "code"
 
 ### Payment Flow
 
-```
-Day 0: Buyer authorizes 100 USDC payment
-│
-├─ Funds locked in escrow
-├─ Buyer can freeze if suspicious
-│
-Day 5: Buyer notices issue, freezes payment
-│
-├─ Payment frozen for 3 days
-├─ Seller cannot release even after day 7
-│
-Day 7: Escrow period ends (but payment still frozen)
-│
-Day 8: Freeze expires automatically (or arbiter unfreezes early)
-│
-├─ Seller can now release
-│
-Day 9: Seller calls release()
-│
-└─ 99.95 USDC to seller, 0.05 USDC fees
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Payment Timeline with Freeze
+    Day 0 : Buyer authorizes 100 USDC payment
+          : Funds locked in escrow
+          : Buyer can freeze if suspicious
+    Day 5 : Buyer notices issue, freezes payment
+          : Payment frozen for 3 days
+          : Seller cannot release even after day 7
+    Day 7 : Escrow period ends (but payment still frozen)
+    Day 8 : Freeze expires automatically (or arbiter unfreezes early)
+          : Seller can now release
+    Day 9 : Seller calls release()
+          : 99.95 USDC to seller, 0.05 USDC fees
 ```
 
 ---
@@ -194,25 +189,21 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-Day 0: Buyer authorizes payment
-│
-├─ Seller ships product
-│
-Day 10: Product arrives
-│
-├─ Buyer inspects product
-├─ Buyer finds defect, freezes payment
-│
-Day 14: Escrow period ends (but frozen)
-│
-Day 15: Buyer reports issue to arbiter
-│
-├─ Arbiter investigates
-│
-Day 16: Arbiter decides refund is warranted
-│
-└─ Arbiter calls refundInEscrow() → Funds returned to buyer
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Physical Goods Payment Timeline
+    Day 0 : Buyer authorizes payment
+          : Seller ships product
+    Day 10 : Product arrives
+           : Buyer inspects product
+           : Buyer finds defect, freezes payment
+    Day 14 : Escrow period ends (but frozen)
+    Day 15 : Buyer reports issue to arbiter
+           : Arbiter investigates
+    Day 16 : Arbiter decides refund is warranted
+           : Arbiter calls refundInEscrow()
+           : Funds returned to buyer
 ```
 
 ---
@@ -259,20 +250,20 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-Client authorizes 1000 USDC for project
-│
-├─ Milestone 1 complete (Day 5)
-│  └─ Freelancer calls charge(300 USDC)
-│      └─ Receives 300 USDC (minus fees)
-│
-├─ Milestone 2 complete (Day 10)
-│  └─ Freelancer calls charge(400 USDC)
-│      └─ Receives 400 USDC (minus fees)
-│
-└─ Final milestone (Day 15)
-   └─ Freelancer calls release() for remaining 300 USDC
-       └─ Receives 300 USDC (minus fees)
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Milestone-Based Payment Timeline
+    Day 0 : Client authorizes 1000 USDC for project
+    Day 5 : Milestone 1 complete
+          : Freelancer calls charge(300 USDC)
+          : Receives 300 USDC (minus fees)
+    Day 10 : Milestone 2 complete
+           : Freelancer calls charge(400 USDC)
+           : Receives 400 USDC (minus fees)
+    Day 15 : Final milestone
+           : Freelancer calls release() for remaining 300 USDC
+           : Receives 300 USDC (minus fees)
 ```
 
 ---
@@ -363,17 +354,16 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-Buyer purchases product
-│
-├─ Seller ships, buyer receives
-│
-Day 5: Buyer requests return
-│
-├─ Seller approves return
-├─ Seller calls refundInEscrow()
-│
-└─ Buyer receives full refund
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Receiver-Initiated Refund Timeline
+    Day 0 : Buyer purchases product
+          : Seller ships, buyer receives
+    Day 5 : Buyer requests return
+          : Seller approves return
+          : Seller calls refundInEscrow()
+          : Buyer receives full refund
 ```
 
 ---
@@ -416,24 +406,20 @@ For subscriptions with dispute resolution, deploy an arbiter condition and use i
 
 ### Payment Flow
 
-```
-Day 0: User authorizes 1200 USDC for 12 months
-│      (sets authorizationExpiry = block.timestamp + 365 days)
-│
-Month 1: Service provider charges 100 USDC
-│
-Month 2: Service provider charges 100 USDC
-│
-├─ Continues monthly...
-│
-Month 6: User disputes charge
-│
-├─ Arbiter investigates
-├─ Arbiter refunds if warranted
-│
-Month 12: Authorization expires
-│
-└─ User can reclaim any unused funds via void()
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Subscription Payment Timeline
+    Day 0 : User authorizes 1200 USDC for 12 months
+          : Sets authorizationExpiry = block.timestamp + 365 days
+    Month 1 : Service provider charges 100 USDC
+    Month 2 : Service provider charges 100 USDC
+            : Continues monthly...
+    Month 6 : User disputes charge
+            : Arbiter investigates
+            : Arbiter refunds if warranted
+    Month 12 : Authorization expires
+             : User can reclaim any unused funds via void()
 ```
 
 ---
@@ -467,16 +453,17 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-DAO authorizes 50,000 USDC grant
-│
-├─ Grantee works on milestone
-│
-Month 3: Grantee completes milestone
-│
-├─ DAO reviews work
-├─ DAO multisig votes to approve release
-└─ DAO calls release() → Grantee receives funds
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title DAO Grant Timeline
+    Day 0 : DAO authorizes 50,000 USDC grant
+          : Grantee works on milestone
+    Month 3 : Grantee completes milestone
+            : DAO reviews work
+            : DAO multisig votes to approve release
+            : DAO calls release()
+            : Grantee receives funds
 ```
 
 **Benefits:**
@@ -522,16 +509,16 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-User authorizes 10,000 USDC for 100 days streaming
-│
-Day 10: Receiver charges for 10 days (1,000 USDC)
-│
-Day 20: Receiver charges for 10 days (1,000 USDC)
-│
-Day 30: User cancels stream
-│
-└─ User calls void() → Receives remaining 7,000 USDC back
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title Streaming Payment Timeline
+    Day 0 : User authorizes 10,000 USDC for 100 days streaming
+    Day 10 : Receiver charges for 10 days (1,000 USDC)
+    Day 20 : Receiver charges for 10 days (1,000 USDC)
+    Day 30 : User cancels stream
+           : User calls void()
+           : Receives remaining 7,000 USDC back
 ```
 
 **Benefits:**
@@ -571,15 +558,15 @@ const operator = await operatorFactory.deployOperator(config);
 
 ### Payment Flow
 
-```
-Company A authorizes 100,000 USDC for Invoice #1234
-│
-├─ Company B ships goods
-│
-Day 30: Payment terms met (Net 30)
-│
-├─ Company B calls release()
-└─ Company B receives 99,900 USDC (100K - 0.1% platform fee)
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'16px'}}}%%
+timeline
+    title B2B Invoice Payment Timeline
+    Day 0 : Company A authorizes 100,000 USDC for Invoice #1234
+          : Company B ships goods
+    Day 30 : Payment terms met (Net 30)
+           : Company B calls release()
+           : Company B receives 99,900 USDC (100K - 0.1% platform fee)
 ```
 
 **Benefits:**

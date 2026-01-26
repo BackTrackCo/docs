@@ -167,16 +167,22 @@ address public immutable FEE_RECIPIENT; // Who receives operator share of fees
 ```
 
 **Example Fee Calculation:**
-```
-Payment: 1000 USDC
-Max Fee Rate: 5 basis points (0.05%)
-Protocol %: 25%
 
-Total Fee = 1000 * 0.05% = 0.5 USDC
-├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
-└─ Operator Fee = 0.5 * 75% = 0.375 USDC → FEE_RECIPIENT
+```mermaid
+flowchart TD
+    Payment["Payment: 1000 USDC<br/>Max Fee: 5 bps (0.05%)<br/>Protocol %: 25%"]
+    Payment --> TotalFee["Total Fee: 0.5 USDC"]
+    TotalFee --> ProtocolFee["Protocol Fee: 0.125 USDC<br/>(25% of fee)"]
+    TotalFee --> OperatorFee["Operator Fee: 0.375 USDC<br/>(75% of fee)"]
+    ProtocolFee --> ProtocolRecipient[protocolFeeRecipient]
+    OperatorFee --> FeeRecipient[FEE_RECIPIENT]
+    Payment --> Receiver["Receiver Gets: 999.5 USDC"]
 
-Receiver Gets = 1000 - 0.5 = 999.5 USDC
+    style Payment fill:#4f46e5,stroke:#4338ca,color:#fff
+    style TotalFee fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style ProtocolFee fill:#f59e0b,stroke:#d97706,color:#fff
+    style OperatorFee fill:#f59e0b,stroke:#d97706,color:#fff
+    style Receiver fill:#10b981,stroke:#059669,color:#fff
 ```
 
 **FEE_RECIPIENT examples:**
@@ -271,10 +277,19 @@ Manages refund requests independent of operator implementation.
 
 ### Request Status States
 
-```
-Pending ──┬──► Approved ──► (Arbiter executes refund via operator)
-          ├──► Denied
-          └──► Cancelled (by requester)
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Approved: Arbiter approves
+    Pending --> Denied: Arbiter denies
+    Pending --> Cancelled: Requester cancels
+    Approved --> [*]: Arbiter executes refund via operator
+
+    note right of Approved
+        Arbiter must call
+        operator.refundInEscrow()
+        or operator.refundPostEscrow()
+    end note
 ```
 
 ### Key Methods
@@ -371,20 +386,30 @@ x402r uses a forked version of commerce-payments with added **partial void** sup
 
 ### Payment State Machine
 
-```
-NonExistent
-    │
-    │ authorize()
-    ▼
-InEscrow ────────────┐
-    │                │
-    │ release()      │ void() / refundInEscrow()
-    ▼                │
-Released             │
-    │                │
-    │ (settled)      │ reclaim() / refundPostEscrow()
-    ▼                ▼
-       Settled
+```mermaid
+stateDiagram-v2
+    [*] --> NonExistent
+    NonExistent --> InEscrow: authorize()
+    InEscrow --> Released: release()
+    InEscrow --> Settled: void() / refundInEscrow()
+    Released --> Settled: (settled)
+    InEscrow --> Settled: reclaim() / refundPostEscrow()
+    Settled --> [*]
+
+    note right of InEscrow
+        Funds locked in escrow
+        Payer can reclaim after expiry
+    end note
+
+    note right of Released
+        Funds transferred to receiver
+        Can still refund post-escrow
+    end note
+
+    note right of Settled
+        Terminal state
+        No further actions possible
+    end note
 ```
 
 ### Key Methods

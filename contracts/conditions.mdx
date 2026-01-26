@@ -253,14 +253,24 @@ config.releaseCondition = address(releaseCondition);
 ```
 
 **Logic Tree:**
+
+```mermaid
+flowchart TD
+    AND[AndCondition] --> OR[OrCondition]
+    AND --> ESC[EscrowPeriodCondition ✓]
+    OR --> REC[ReceiverCondition ✓]
+    OR --> ARB[ArbiterCondition ✗]
+    AND --> RES[Result: PASS]
+
+    style AND fill:#4f46e5,stroke:#4338ca,color:#fff
+    style OR fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style REC fill:#10b981,stroke:#059669,color:#fff
+    style ARB fill:#ef4444,stroke:#dc2626,color:#fff
+    style ESC fill:#10b981,stroke:#059669,color:#fff
+    style RES fill:#10b981,stroke:#059669,color:#fff
 ```
-AndCondition
-├─ OrCondition
-│  ├─ ReceiverCondition ✓
-│  └─ ArbiterCondition ✗
-└─ EscrowPeriodCondition ✓
-Result: PASS (one branch of OR passed, AND both passed)
-```
+
+(One branch of OR passed, AND both passed)
 
 ---
 
