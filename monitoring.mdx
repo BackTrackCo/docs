@@ -202,8 +202,8 @@ async function indexPayments(fromBlock: bigint) {
   }
 }
 
-// Run every 12 seconds (Base block time)
-setInterval(() => indexPayments(lastIndexedBlock), 12000);
+// Run every 2 seconds (Base block time)
+setInterval(() => indexPayments(lastIndexedBlock), 2000);
 ```
 
 ## Dashboard and Analytics

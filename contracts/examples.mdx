@@ -62,13 +62,13 @@ icon: "code"
       authorizeCondition: ALWAYS_TRUE_CONDITION,
       authorizeRecorder: escrowRecorder,
       chargeCondition: RECEIVER_CONDITION,
-      chargeRecorder: address(0),
+      chargeRecorder: '0x0000000000000000000000000000000000000000',
       releaseCondition: releaseCondition,
       releaseRecorder: escrowRecorder,
       refundInEscrowCondition: arbiterCondition.address,
-      refundInEscrowRecorder: address(0),
+      refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
       refundPostEscrowCondition: arbiterCondition.address,
-      refundPostEscrowRecorder: address(0)
+      refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
     };
 
     const operator = await operatorFactory.deployOperator(config);
@@ -114,16 +114,16 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
-  authorizeCondition: address(0),             // Not used (charge handles auth)
-  authorizeRecorder: address(0),
+  authorizeCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
-  releaseRecorder: address(0),
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: address(0),
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: address(0)
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -179,14 +179,14 @@ const config = {
   feeRecipient: arbiterAddress,         // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
-  chargeCondition: address(0),
-  chargeRecorder: address(0),
+  chargeCondition: '0x0000000000000000000000000000000000000000',
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: escrowRecorder,
   refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: address(0),
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: address(0)
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -231,7 +231,7 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 const [escrowCondition, escrowRecorder] =
   await escrowPeriodFactory.deploy(
     3 * 24 * 60 * 60,     // 3 days per milestone
-    address(0)            // No freeze
+    '0x0000000000000000000000000000000000000000'            // No freeze
   );
 
 // Receiver can release after short escrow
@@ -245,13 +245,13 @@ const config = {
   authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
   authorizeRecorder: escrowRecorder,
   chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: escrowRecorder,
   refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: address(0),
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: address(0)
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -290,15 +290,15 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns all fees
   authorizeCondition: arbiterCondition.address,      // Arbiter creates payments
-  authorizeRecorder: address(0),
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: arbiterCondition.address,         // Arbiter charges
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: arbiterCondition.address,        // Arbiter releases
-  releaseRecorder: address(0),
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: arbiterCondition.address, // Arbiter refunds
-  refundInEscrowRecorder: address(0),
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: address(0)
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -329,7 +329,7 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 const [escrowCondition, escrowRecorder] =
   await escrowPeriodFactory.deploy(
     7 * 24 * 60 * 60,
-    address(0)            // No freeze
+    '0x0000000000000000000000000000000000000000'            // No freeze
   );
 
 // Receiver OR Arbiter can release
@@ -348,14 +348,14 @@ const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
-  chargeCondition: address(0),
-  chargeRecorder: address(0),
+  chargeCondition: '0x0000000000000000000000000000000000000000',
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: escrowRecorder,
   refundInEscrowCondition: refundCondition,    // Receiver OR Arbiter
-  refundInEscrowRecorder: address(0),
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: RECEIVER_CONDITION, // Only receiver post-escrow
-  refundPostEscrowRecorder: address(0)
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -392,15 +392,15 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 const config = {
   feeRecipient: serviceProviderAddress,       // Service provider earns fees
   authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
-  authorizeRecorder: address(0),
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: providerCondition.address, // Provider charges monthly
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: providerCondition.address,// Provider releases
-  releaseRecorder: address(0),
-  refundInEscrowCondition: address(0),        // No refunds (no arbiter)
-  refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: address(0),
-  refundPostEscrowRecorder: address(0)
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  refundInEscrowCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
+  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -451,15 +451,15 @@ const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
 const config = {
   feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
   authorizeCondition: daoCondition.address,   // DAO authorizes grants
-  authorizeRecorder: address(0),
-  chargeCondition: address(0),
-  chargeRecorder: address(0),
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
+  chargeCondition: '0x0000000000000000000000000000000000000000',
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: daoCondition.address,     // DAO must approve releases
-  releaseRecorder: address(0),
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: daoCondition.address,  // DAO can refund if needed
-  refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: address(0),      // No post-escrow refunds
-  refundPostEscrowRecorder: address(0)
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
+  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-escrow refunds
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -503,18 +503,18 @@ const timeProportionalCondition = await new TimeProportionalCondition();
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
   authorizeCondition: PAYER_CONDITION,        // Payer authorizes stream
-  authorizeRecorder: address(0),
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: new AndCondition([
     RECEIVER_CONDITION,
     timeProportionalCondition                 // Can only charge proportional to time
   ]),
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Receiver releases remaining
-  releaseRecorder: address(0),
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: PAYER_CONDITION,   // Payer can cancel stream
-  refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: address(0),      // No refunds after charged
-  refundPostEscrowRecorder: address(0)
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
+  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -555,15 +555,15 @@ const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
   authorizeCondition: PAYER_CONDITION,        // Payer creates invoice payment
-  authorizeRecorder: address(0),
+  authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
-  chargeRecorder: address(0),
+  chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
-  releaseRecorder: address(0),
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
-  refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: address(0),      // No post-delivery refunds
-  refundPostEscrowRecorder: address(0)
+  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
+  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds
+  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);

@@ -115,13 +115,25 @@ assert(deployedAddress === predictedAddress);
 #### Marketplace Operator
 
 ```typescript
+import { createWalletClient, http, getContract, zeroAddress } from 'viem';
+import { base } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 import { PaymentOperatorFactory, StaticAddressCondition } from "@x402r/contracts";
 
-const factory = new ethers.Contract(
-  FACTORY_ADDRESS,
-  PaymentOperatorFactory.abi,
-  signer
-);
+const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
+
+const account = privateKeyToAccount('0x...');
+const walletClient = createWalletClient({
+  account,
+  chain: base,
+  transport: http()
+});
+
+const factory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: walletClient
+});
 
 // Deploy condition for arbiter
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
@@ -131,23 +143,23 @@ const config = {
   feeRecipient: arbiterAddress,  // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
-  chargeCondition: ethers.constants.AddressZero,  // Default allow
-  chargeRecorder: ethers.constants.AddressZero,   // No recording
+  chargeCondition: zeroAddress,  // Default allow
+  chargeRecorder: zeroAddress,   // No recording
   releaseCondition: new AndCondition([
     arbiterCondition.address,
     escrowPeriodCondition
   ]),
   releaseRecorder: escrowRecorder,
   refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: ethers.constants.AddressZero,
+  refundInEscrowRecorder: zeroAddress,
   refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: ethers.constants.AddressZero
+  refundPostEscrowRecorder: zeroAddress
 };
 
 // Deploy operator
-const tx = await factory.deployOperator(config);
-const receipt = await tx.wait();
-const operatorAddress = receipt.events[0].args.operator;
+const hash = await factory.write.deployOperator([config]);
+const receipt = await walletClient.waitForTransactionReceipt({ hash });
+const operatorAddress = receipt.logs[0].address;
 
 console.log("Deployed marketplace operator at:", operatorAddress);
 ```
@@ -161,19 +173,19 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 const config = {
   feeRecipient: serviceProviderAddress,  // Provider earns fees
   authorizeCondition: PAYER_CONDITION,
-  authorizeRecorder: ethers.constants.AddressZero,
+  authorizeRecorder: zeroAddress,
   chargeCondition: providerCondition.address,
-  chargeRecorder: ethers.constants.AddressZero,
+  chargeRecorder: zeroAddress,
   releaseCondition: providerCondition.address,
-  releaseRecorder: ethers.constants.AddressZero,
-  refundInEscrowCondition: ethers.constants.AddressZero,  // No refunds
-  refundInEscrowRecorder: ethers.constants.AddressZero,
-  refundPostEscrowCondition: ethers.constants.AddressZero,
-  refundPostEscrowRecorder: ethers.constants.AddressZero
+  releaseRecorder: zeroAddress,
+  refundInEscrowCondition: zeroAddress,  // No refunds
+  refundInEscrowRecorder: zeroAddress,
+  refundPostEscrowCondition: zeroAddress,
+  refundPostEscrowRecorder: zeroAddress
 };
 
-const tx = await factory.deployOperator(config);
-console.log("Deployed subscription operator at:", tx);
+const hash = await factory.write.deployOperator([config]);
+console.log("Deployed subscription operator, tx:", hash);
 ```
 
 <Tip>
@@ -227,17 +239,25 @@ EscrowPeriodCondition ──reads state──► EscrowPeriodRecorder ──refe
 ### Example Deployment
 
 ```typescript
-const factory = new ethers.Contract(
-  ESCROW_PERIOD_FACTORY_ADDRESS,
-  EscrowPeriodConditionFactory.abi,
-  signer
-);
+import { getContract } from 'viem';
+
+const ESCROW_PERIOD_FACTORY_ADDRESS = '0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178';
+
+const factory = getContract({
+  address: ESCROW_PERIOD_FACTORY_ADDRESS,
+  abi: EscrowPeriodConditionFactory.abi,
+  client: walletClient
+});
 
 // Deploy 7-day escrow with 3-day payer freeze
-const [conditionAddress, recorderAddress] = await factory.deploy(
+const hash = await factory.write.deploy([
   7 * 24 * 60 * 60,    // 7 days
   payerFreezePolicyAddress
-);
+]);
+
+const receipt = await walletClient.waitForTransactionReceipt({ hash });
+// Extract condition and recorder addresses from event logs
+const [conditionAddress, recorderAddress] = receipt.logs[0].topics;
 
 console.log("Condition:", conditionAddress);
 console.log("Recorder:", recorderAddress);
@@ -457,14 +477,33 @@ bytes32 salt = keccak256(abi.encode(
 Same configuration on different chains = same address:
 
 ```typescript
+import { createPublicClient } from 'viem';
+import { baseSepolia, optimismSepolia } from 'viem/chains';
+
 // Deploy on Base Sepolia
-const addressBaseSepolia = await factory.deploy(arbiter, config, 5, 25);
+const baseFactory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: baseWalletClient
+});
+
+const baseHash = await baseFactory.write.deployOperator([config]);
+const baseReceipt = await baseWalletClient.waitForTransactionReceipt({ hash: baseHash });
+const addressBaseSepolia = baseReceipt.logs[0].address;
 
 // Deploy on Optimism Sepolia with identical params
-const addressOptimismSepolia = await factory.deploy(arbiter, config, 5, 25);
+const opFactory = getContract({
+  address: FACTORY_ADDRESS,
+  abi: PaymentOperatorFactory.abi,
+  client: opWalletClient
+});
+
+const opHash = await opFactory.write.deployOperator([config]);
+const opReceipt = await opWalletClient.waitForTransactionReceipt({ hash: opHash });
+const addressOptimismSepolia = opReceipt.logs[0].address;
 
 // Addresses are identical!
-assert(addressBaseSepolia === addressOptimismSepolia);
+console.assert(addressBaseSepolia === addressOptimismSepolia);
 ```
 
 This enables:

@@ -468,20 +468,25 @@ config = {
 
 **Use case:** Fully managed escrow service
 
-### Pattern 4: Multi-Party Release
+### Pattern 4: Multi-Party Release (2-of-3)
 
 ```solidity
-// Requires 2 of 3: Payer, Receiver, Arbiter
+// Requires any 2 of 3 parties to agree: Payer, Receiver, or Arbiter
+// This creates three OR branches, each requiring a different pair to call simultaneously
 const twoOfThree = new OrCondition([
-    new AndCondition([PAYER_CONDITION, RECEIVER_CONDITION]),
-    new AndCondition([PAYER_CONDITION, ARBITER_CONDITION]),
-    new AndCondition([RECEIVER_CONDITION, ARBITER_CONDITION])
+    new AndCondition([PAYER_CONDITION, RECEIVER_CONDITION]),      // Payer AND Receiver
+    new AndCondition([PAYER_CONDITION, ARBITER_CONDITION]),       // Payer AND Arbiter
+    new AndCondition([RECEIVER_CONDITION, ARBITER_CONDITION])     // Receiver AND Arbiter
 ]);
 
 config.releaseCondition = address(twoOfThree);
 ```
 
-**Use case:** Multi-sig style releases
+**Use case:** Multi-sig style releases requiring coordination
+
+<Warning>
+This pattern requires that TWO parties call `release()` in a SINGLE transaction (e.g., via a multisig contract or meta-transaction). It does NOT allow separate calls from two parties. For most use cases, use `OrCondition` to allow ANY authorized party to release individually, or implement a custom voting condition.
+</Warning>
 
 ---
 
