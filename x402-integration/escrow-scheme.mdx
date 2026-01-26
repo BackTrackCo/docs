@@ -36,28 +36,19 @@ The escrow scheme provides four primitives:
 
 ## Visual Flow
 
-### Exact Payment
+<Frame>
+  <img src="/images/escrow-vs-exact.svg" alt="Comparison of exact payment (immediate settlement) vs escrow payment (deferred settlement with operator control)" />
+</Frame>
 
-```mermaid
-graph LR
-    Client -->|"immediate<br/>no recourse"| Receiver
+### Key Differences
 
-    style Client fill:#4f46e5,stroke:#4338ca,color:#fff
-    style Receiver fill:#10b981,stroke:#059669,color:#fff
-```
-
-### Escrow Payment
-
-```mermaid
-graph LR
-    Client -->|authorize| Escrow
-    Escrow -->|"Operator Logic"| Receiver
-    Escrow -.->|"Funds held until:<br/>• Operator calls capture()<br/>• Or payer reclaims after expiry"| Escrow
-
-    style Client fill:#4f46e5,stroke:#4338ca,color:#fff
-    style Escrow fill:#f59e0b,stroke:#d97706,color:#fff
-    style Receiver fill:#10b981,stroke:#059669,color:#fff
-```
+| Aspect | Exact | Escrow |
+|--------|-------|--------|
+| **Settlement** | Immediate on request | Deferred until conditions met |
+| **Payer Protection** | None (payment final) | Refundable until capture |
+| **Resource Delivery** | After payment clears | Immediately after authorization |
+| **Recourse** | No recourse | Can reclaim after expiry |
+| **Use Case** | Trusted, low-value, instant | High-value, variable cost, disputes |
 
 ## Operator Flexibility
 

@@ -168,22 +168,22 @@ address public immutable FEE_RECIPIENT; // Who receives operator share of fees
 
 **Example Fee Calculation:**
 
-```mermaid
-flowchart TD
-    Payment["Payment: 1000 USDC<br/>Max Fee: 5 bps (0.05%)<br/>Protocol %: 25%"]
-    Payment --> TotalFee["Total Fee: 0.5 USDC"]
-    TotalFee --> ProtocolFee["Protocol Fee: 0.125 USDC<br/>(25% of fee)"]
-    TotalFee --> OperatorFee["Operator Fee: 0.375 USDC<br/>(75% of fee)"]
-    ProtocolFee --> ProtocolRecipient[protocolFeeRecipient]
-    OperatorFee --> FeeRecipient[FEE_RECIPIENT]
-    Payment --> Receiver["Receiver Gets: 999.5 USDC"]
+<Frame>
+  <img src="/images/fee-distribution.png" alt="Fee distribution showing payment split between receiver, protocol, and operator" />
+</Frame>
 
-    style Payment fill:#4f46e5,stroke:#4338ca,color:#fff
-    style TotalFee fill:#8b5cf6,stroke:#7c3aed,color:#fff
-    style ProtocolFee fill:#f59e0b,stroke:#d97706,color:#fff
-    style OperatorFee fill:#f59e0b,stroke:#d97706,color:#fff
-    style Receiver fill:#10b981,stroke:#059669,color:#fff
-```
+**Breakdown:**
+- **Payment:** 1000 USDC (100%)
+- **Total Fee:** 0.5 USDC (0.05% or 5 basis points)
+  - **Protocol Fee:** 0.125 USDC (25% of fee)
+  - **Operator Fee:** 0.375 USDC (75% of fee)
+- **Receiver Gets:** 999.5 USDC (99.95%)
+
+The FEE_RECIPIENT can be configured as:
+- Arbiter (marketplace with disputes)
+- Service Provider (subscriptions)
+- Platform Treasury (platform-controlled)
+- DAO Multisig (governance-controlled)
 
 **FEE_RECIPIENT examples:**
 - Arbiter (marketplace with disputes)

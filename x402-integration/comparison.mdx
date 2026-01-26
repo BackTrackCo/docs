@@ -322,19 +322,30 @@ If escrow proves unnecessary:
 ## Decision Tree
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#fafafa','primaryTextColor':'#1f2937','primaryBorderColor':'#9ca3af','secondaryColor':'#f3f4f6','tertiaryColor':'#ffffff','lineColor':'#6b7280','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
 flowchart TD
-    A[Is transaction value > $10?]
+    A{Transaction over $10?}
     A -->|Yes| B[Consider escrow]
-    A -->|No| C[Is usage variable/unknown?]
+    A -->|No| C{Variable usage?}
     C -->|Yes| D[Use escrow]
-    C -->|No| E[Do you fully trust the provider?]
+    C -->|No| E{Trust provider?}
     E -->|Yes| F[Use exact]
-    E -->|No| G[Use escrow with arbiter]
+    E -->|No| G[Use escrow]
 
-    style B fill:#f59e0b,stroke:#d97706,color:#fff
+    B --> H{Check factors}
+    H -->|Long task| D
+    H -->|Quick task| F
+    H -->|Dispute risk| G
+
     style D fill:#f59e0b,stroke:#d97706,color:#fff
     style F fill:#4f46e5,stroke:#4338ca,color:#fff
     style G fill:#f59e0b,stroke:#d97706,color:#fff
+
+    style A fill:#64748b,stroke:#475569,color:#fff
+    style B fill:#64748b,stroke:#475569,color:#fff
+    style C fill:#64748b,stroke:#475569,color:#fff
+    style E fill:#64748b,stroke:#475569,color:#fff
+    style H fill:#64748b,stroke:#475569,color:#fff
 ```
 
 ## Next Steps

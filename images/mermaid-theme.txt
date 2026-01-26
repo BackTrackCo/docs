@@ -1,0 +1,15 @@
+Standard Mermaid Theme for x402r Documentation
+===============================================
+
+Apply this to the top of all Mermaid sequence diagrams:
+
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#f3f4f6','primaryTextColor':'#1f2937','primaryBorderColor':'#9ca3af','lineColor':'#6b7280','secondaryColor':'#e5e7eb','tertiaryColor':'#fafafa','noteBkgColor':'#fef3c7','noteTextColor':'#78350f','noteBorderColor':'#f59e0b','actorBkg':'#e0e7ff','actorBorder':'#6366f1','actorTextColor':'#1e3a8a','signalColor':'#4b5563','signalTextColor':'#111827','labelBoxBkgColor':'#dbeafe','labelBoxBorderColor':'#3b82f6','labelTextColor':'#1e40af','loopTextColor':'#1f2937','activationBkgColor':'#c7d2fe','activationBorderColor':'#6366f1','sequenceNumberColor':'#f9fafb','fontFamily':'ui-sans-serif, system-ui, sans-serif'}}}%%
+
+Color Scheme:
+- Primary background: #f3f4f6 (gray-100)
+- Text: #1f2937 (gray-800)
+- Borders: #9ca3af (gray-400)
+- Lines: #6b7280 (gray-500)
+- Notes: #fef3c7 (amber-100) with #78350f (amber-900) text
+- Actors: #e0e7ff (indigo-100) with #1e3a8a (indigo-900) text
+- Signals: #4b5563 (gray-600)
