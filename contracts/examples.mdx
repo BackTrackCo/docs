@@ -11,13 +11,20 @@ icon: "code"
 ### Complete Configuration
 
 <Steps>
+  <Step title="Deploy Arbiter Condition">
+    ```typescript
+    // Deploy designated address condition for arbiter
+    const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+    ```
+  </Step>
+
   <Step title="Deploy Freeze Policy">
     ```typescript
     // Payer can freeze, arbiter can unfreeze (or wait for expiry)
     const freezePolicy = await freezePolicyFactory.deploy(
-      PAYER_CONDITION,      // Only payer can freeze
-      ARBITER_CONDITION,    // Only arbiter can unfreeze
-      3 * 24 * 60 * 60      // 3 days (auto-expires)
+      PAYER_CONDITION,              // Only payer can freeze
+      arbiterCondition.address,     // Only arbiter can unfreeze
+      3 * 24 * 60 * 60              // 3 days (auto-expires)
     );
     ```
   </Step>
@@ -38,7 +45,7 @@ icon: "code"
     // (Receiver OR Arbiter) AND EscrowPassed
     const receiverOrArbiter = await new OrCondition([
       RECEIVER_CONDITION,
-      ARBITER_CONDITION
+      arbiterCondition.address
     ]);
 
     const releaseCondition = await new AndCondition([
@@ -51,24 +58,20 @@ icon: "code"
   <Step title="Deploy Operator">
     ```typescript
     const config = {
+      feeRecipient: arbiterAddress,         // Arbiter earns fees for dispute resolution
       authorizeCondition: ALWAYS_TRUE_CONDITION,
       authorizeRecorder: escrowRecorder,
       chargeCondition: RECEIVER_CONDITION,
       chargeRecorder: address(0),
       releaseCondition: releaseCondition,
       releaseRecorder: escrowRecorder,
-      refundInEscrowCondition: ARBITER_CONDITION,
+      refundInEscrowCondition: arbiterCondition.address,
       refundInEscrowRecorder: address(0),
-      refundPostEscrowCondition: ARBITER_CONDITION,
+      refundPostEscrowCondition: arbiterCondition.address,
       refundPostEscrowRecorder: address(0)
     };
 
-    const operator = await operatorFactory.deploy(
-      arbiterAddress,
-      config,
-      5,    // 0.05% fee
-      25    // 25% to protocol
-    );
+    const operator = await operatorFactory.deployOperator(config);
     ```
   </Step>
 </Steps>
@@ -106,25 +109,24 @@ Day 9: Seller calls release()
 ### Configuration
 
 ```typescript
+// Deploy arbiter condition for disputes
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+
 const config = {
+  feeRecipient: arbiterAddress,               // Arbiter earns fees
   authorizeCondition: address(0),             // Not used (charge handles auth)
   authorizeRecorder: address(0),
   chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
   chargeRecorder: address(0),
   releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
   releaseRecorder: address(0),
-  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowCondition: arbiterCondition.address,
   refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowCondition: arbiterCondition.address,
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(
-  arbiterAddress,
-  config,
-  10,   // 0.1% fee (higher for instant payment)
-  50    // 50% to protocol
-);
+const operator = await operatorFactory.deployOperator(config);
 ```
 
 ### Payment Flow
@@ -150,11 +152,14 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 ### Configuration
 
 ```typescript
+// Deploy arbiter condition
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+
 // Receiver can freeze for 5 days, arbiter can unfreeze
 const freezePolicy = await freezePolicyFactory.deploy(
-  RECEIVER_CONDITION,   // Receiver can freeze (product defect)
-  ARBITER_CONDITION,    // Arbiter can unfreeze (dispute resolution)
-  5 * 24 * 60 * 60      // 5 days (auto-expires)
+  RECEIVER_CONDITION,           // Receiver can freeze (product defect)
+  arbiterCondition.address,     // Arbiter can unfreeze (dispute resolution)
+  5 * 24 * 60 * 60              // 5 days (auto-expires)
 );
 
 // 14-day escrow (shipping + inspection)
@@ -166,24 +171,25 @@ const [escrowCondition, escrowRecorder] =
 
 // Receiver OR Arbiter can release (after escrow + not frozen)
 const releaseCondition = await new AndCondition([
-  await new OrCondition([RECEIVER_CONDITION, ARBITER_CONDITION]),
+  await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   escrowCondition
 ]);
 
 const config = {
+  feeRecipient: arbiterAddress,         // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
   chargeCondition: address(0),
   chargeRecorder: address(0),
   releaseCondition: releaseCondition,
   releaseRecorder: escrowRecorder,
-  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowCondition: arbiterCondition.address,
   refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowCondition: arbiterCondition.address,
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(arbiterAddress, config, 3, 20);
+const operator = await operatorFactory.deployOperator(config);
 ```
 
 ### Payment Flow
@@ -218,6 +224,9 @@ Day 16: Arbiter decides refund is warranted
 ### Configuration
 
 ```typescript
+// Deploy arbiter condition for disputes
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+
 // No freeze policy (service-based)
 const [escrowCondition, escrowRecorder] =
   await escrowPeriodFactory.deploy(
@@ -232,19 +241,20 @@ const releaseCondition = await new AndCondition([
 ]);
 
 const config = {
+  feeRecipient: arbiterAddress,               // Arbiter earns fees
   authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
   authorizeRecorder: escrowRecorder,
   chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
   chargeRecorder: address(0),
   releaseCondition: releaseCondition,
   releaseRecorder: escrowRecorder,
-  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowCondition: arbiterCondition.address,
   refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowCondition: arbiterCondition.address,
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(arbiterAddress, config, 8, 30);
+const operator = await operatorFactory.deployOperator(config);
 ```
 
 ### Payment Flow
@@ -274,26 +284,29 @@ Client authorizes 1000 USDC for project
 ### Configuration
 
 ```typescript
+// Deploy arbiter condition
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+
 const config = {
-  authorizeCondition: ARBITER_CONDITION,      // Arbiter creates payments
+  feeRecipient: arbiterAddress,               // Arbiter earns all fees
+  authorizeCondition: arbiterCondition.address,      // Arbiter creates payments
   authorizeRecorder: address(0),
-  chargeCondition: ARBITER_CONDITION,         // Arbiter charges
+  chargeCondition: arbiterCondition.address,         // Arbiter charges
   chargeRecorder: address(0),
-  releaseCondition: ARBITER_CONDITION,        // Arbiter releases
+  releaseCondition: arbiterCondition.address,        // Arbiter releases
   releaseRecorder: address(0),
-  refundInEscrowCondition: ARBITER_CONDITION, // Arbiter refunds
+  refundInEscrowCondition: arbiterCondition.address, // Arbiter refunds
   refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowCondition: arbiterCondition.address,
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(
-  arbiterAddress,
-  config,
-  20,   // 0.2% fee (higher for managed service)
-  100   // 100% to arbiter (protocol takes no cut)
-);
+const operator = await operatorFactory.deployOperator(config);
 ```
+
+<Note>
+Factory-level fees still apply (MAX_TOTAL_FEE_RATE and PROTOCOL_FEE_PERCENTAGE). This example assumes protocol takes no cut at factory level.
+</Note>
 
 **Use cases:**
 - Professional escrow services
@@ -309,6 +322,9 @@ const operator = await operatorFactory.deploy(
 ### Configuration
 
 ```typescript
+// Deploy arbiter condition
+const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+
 // 7-day escrow
 const [escrowCondition, escrowRecorder] =
   await escrowPeriodFactory.deploy(
@@ -318,17 +334,18 @@ const [escrowCondition, escrowRecorder] =
 
 // Receiver OR Arbiter can release
 const releaseCondition = await new AndCondition([
-  await new OrCondition([RECEIVER_CONDITION, ARBITER_CONDITION]),
+  await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   escrowCondition
 ]);
 
 // Receiver OR Arbiter can refund
 const refundCondition = await new OrCondition([
   RECEIVER_CONDITION,
-  ARBITER_CONDITION
+  arbiterCondition.address
 ]);
 
 const config = {
+  feeRecipient: arbiterAddress,               // Arbiter earns fees
   authorizeCondition: ALWAYS_TRUE_CONDITION,
   authorizeRecorder: escrowRecorder,
   chargeCondition: address(0),
@@ -341,7 +358,7 @@ const config = {
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(arbiterAddress, config, 5, 25);
+const operator = await operatorFactory.deployOperator(config);
 ```
 
 ### Payment Flow
@@ -368,27 +385,30 @@ Day 5: Buyer requests return
 ### Configuration
 
 ```typescript
+// Deploy condition for service provider (no arbiter needed for subscriptions)
+const providerCondition = await new StaticAddressCondition(serviceProviderAddress);
+
 // Receiver can charge immediately (no escrow)
 const config = {
+  feeRecipient: serviceProviderAddress,       // Service provider earns fees
   authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
   authorizeRecorder: address(0),
-  chargeCondition: RECEIVER_CONDITION,        // Receiver charges monthly
+  chargeCondition: providerCondition.address, // Provider charges monthly
   chargeRecorder: address(0),
-  releaseCondition: RECEIVER_CONDITION,       // Receiver releases
+  releaseCondition: providerCondition.address,// Provider releases
   releaseRecorder: address(0),
-  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowCondition: address(0),        // No refunds (no arbiter)
   refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowCondition: address(0),
   refundPostEscrowRecorder: address(0)
 };
 
-const operator = await operatorFactory.deploy(
-  arbiterAddress,
-  config,
-  15,   // 0.15% fee
-  40    // 40% to protocol
-);
+const operator = await operatorFactory.deployOperator(config);
 ```
+
+<Note>
+For subscriptions with dispute resolution, deploy an arbiter condition and use it for refund conditions. This example shows a simple subscription without arbiter.
+</Note>
 
 <Tip>
 **Authorization Expiry for Subscriptions:** When authorizing, set `authorizationExpiry` to limit how long the service provider can charge. For example, a 12-month subscription would set expiry to `block.timestamp + 365 days`. After expiry, the payer can reclaim any unused funds by calling `void()`.
