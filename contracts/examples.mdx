@@ -1,0 +1,584 @@
+---
+title: "Configuration Examples"
+description: "Complete configuration examples for common x402r use cases"
+icon: "code"
+---
+
+## Example 1: Standard E-Commerce with 7-Day Escrow
+
+**Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can release after escrow.
+
+### Complete Configuration
+
+<Steps>
+  <Step title="Deploy Freeze Policy">
+    ```typescript
+    // Payer can freeze for 3 days
+    const freezePolicy = await freezePolicyFactory.deploy(
+      PAYER_CONDITION,      // Only payer can freeze
+      PAYER_CONDITION,      // Only payer can unfreeze
+      3 * 24 * 60 * 60      // 3 days
+    );
+    ```
+  </Step>
+
+  <Step title="Deploy Escrow Period Condition">
+    ```typescript
+    // 7-day escrow with freeze support
+    const [escrowCondition, escrowRecorder] =
+      await escrowPeriodFactory.deploy(
+        7 * 24 * 60 * 60,    // 7 days
+        freezePolicy
+      );
+    ```
+  </Step>
+
+  <Step title="Create Release Condition">
+    ```typescript
+    // (Receiver OR Arbiter) AND EscrowPassed
+    const receiverOrArbiter = await new OrCondition([
+      RECEIVER_CONDITION,
+      ARBITER_CONDITION
+    ]);
+
+    const releaseCondition = await new AndCondition([
+      receiverOrArbiter,
+      escrowCondition
+    ]);
+    ```
+  </Step>
+
+  <Step title="Deploy Operator">
+    ```typescript
+    const config = {
+      authorizeCondition: ALWAYS_TRUE_CONDITION,
+      authorizeRecorder: escrowRecorder,
+      chargeCondition: RECEIVER_CONDITION,
+      chargeRecorder: address(0),
+      releaseCondition: releaseCondition,
+      releaseRecorder: escrowRecorder,
+      refundInEscrowCondition: ARBITER_CONDITION,
+      refundInEscrowRecorder: address(0),
+      refundPostEscrowCondition: ARBITER_CONDITION,
+      refundPostEscrowRecorder: address(0)
+    };
+
+    const operator = await operatorFactory.deploy(
+      arbiterAddress,
+      config,
+      5,    // 0.05% fee
+      25    // 25% to protocol
+    );
+    ```
+  </Step>
+</Steps>
+
+### Payment Flow
+
+```
+Day 0: Buyer authorizes 100 USDC payment
+│
+├─ Funds locked in escrow
+├─ Buyer can freeze if suspicious
+│
+Day 5: Buyer notices issue, freezes payment
+│
+├─ Payment frozen for 3 days
+├─ Seller cannot release even after day 7
+│
+Day 7: Escrow period ends (but payment still frozen)
+│
+Day 8: Freeze expires OR buyer unfreezes
+│
+├─ Seller can now release
+│
+Day 9: Seller calls release()
+│
+└─ 99.95 USDC to seller, 0.05 USDC fees
+```
+
+---
+
+## Example 2: Instant Release (No Escrow)
+
+**Use Case:** Trusted seller scenario or digital goods where buyer wants instant delivery.
+
+### Configuration
+
+```typescript
+const config = {
+  authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
+  authorizeRecorder: address(0),              // No time tracking
+  chargeCondition: address(0),                // Default allow
+  chargeRecorder: address(0),
+  releaseCondition: RECEIVER_CONDITION,       // Only receiver
+  releaseRecorder: address(0),                // No tracking needed
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(
+  arbiterAddress,
+  config,
+  10,   // 0.1% fee (higher for instant release)
+  50    // 50% to protocol
+);
+```
+
+### Payment Flow
+
+```
+Buyer authorizes → Seller immediately releases → Funds transferred
+                   (no waiting period)
+```
+
+**Trade-offs:**
+- ✅ Instant delivery
+- ✅ Better UX for digital goods
+- ❌ No buyer protection period
+- ❌ Refunds require arbiter intervention
+
+---
+
+## Example 3: Physical Goods with Extended Escrow
+
+**Use Case:** International shipping with 14-day escrow and 5-day receiver freeze period.
+
+### Configuration
+
+```typescript
+// Receiver can freeze for 5 days (product inspection period)
+const freezePolicy = await freezePolicyFactory.deploy(
+  RECEIVER_CONDITION,   // Receiver can freeze
+  RECEIVER_CONDITION,   // Receiver can unfreeze
+  5 * 24 * 60 * 60      // 5 days
+);
+
+// 14-day escrow (shipping + inspection)
+const [escrowCondition, escrowRecorder] =
+  await escrowPeriodFactory.deploy(
+    14 * 24 * 60 * 60,   // 14 days
+    freezePolicy
+  );
+
+// Receiver OR Arbiter can release (after escrow + not frozen)
+const releaseCondition = await new AndCondition([
+  await new OrCondition([RECEIVER_CONDITION, ARBITER_CONDITION]),
+  escrowCondition
+]);
+
+const config = {
+  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  authorizeRecorder: escrowRecorder,
+  chargeCondition: address(0),
+  chargeRecorder: address(0),
+  releaseCondition: releaseCondition,
+  releaseRecorder: escrowRecorder,
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(arbiterAddress, config, 3, 20);
+```
+
+### Payment Flow
+
+```
+Day 0: Buyer authorizes payment
+│
+├─ Seller ships product
+│
+Day 10: Product arrives
+│
+├─ Buyer inspects product
+├─ Buyer finds defect, freezes payment
+│
+Day 14: Escrow period ends (but frozen)
+│
+Day 15: Buyer reports issue to arbiter
+│
+├─ Arbiter investigates
+│
+Day 16: Arbiter decides refund is warranted
+│
+└─ Arbiter calls refundInEscrow() → Funds returned to buyer
+```
+
+---
+
+## Example 4: Service-Based Payments (Milestone Release)
+
+**Use Case:** Freelance work with milestone-based releases. Receiver can trigger partial releases.
+
+### Configuration
+
+```typescript
+// No freeze policy (service-based)
+const [escrowCondition, escrowRecorder] =
+  await escrowPeriodFactory.deploy(
+    3 * 24 * 60 * 60,     // 3 days per milestone
+    address(0)            // No freeze
+  );
+
+// Receiver can release after short escrow
+const releaseCondition = await new AndCondition([
+  RECEIVER_CONDITION,    // Only receiver
+  escrowCondition
+]);
+
+const config = {
+  authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
+  authorizeRecorder: escrowRecorder,
+  chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
+  chargeRecorder: address(0),
+  releaseCondition: releaseCondition,
+  releaseRecorder: escrowRecorder,
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(arbiterAddress, config, 8, 30);
+```
+
+### Payment Flow
+
+```
+Client authorizes 1000 USDC for project
+│
+├─ Milestone 1 complete (Day 5)
+│  └─ Freelancer calls charge(300 USDC)
+│      └─ Receives 300 USDC (minus fees)
+│
+├─ Milestone 2 complete (Day 10)
+│  └─ Freelancer calls charge(400 USDC)
+│      └─ Receives 400 USDC (minus fees)
+│
+└─ Final milestone (Day 15)
+   └─ Freelancer calls release() for remaining 300 USDC
+       └─ Receives 300 USDC (minus fees)
+```
+
+---
+
+## Example 5: Arbiter-Controlled Escrow
+
+**Use Case:** Fully managed escrow service where arbiter controls all actions.
+
+### Configuration
+
+```typescript
+const config = {
+  authorizeCondition: ARBITER_CONDITION,      // Arbiter creates payments
+  authorizeRecorder: address(0),
+  chargeCondition: ARBITER_CONDITION,         // Arbiter charges
+  chargeRecorder: address(0),
+  releaseCondition: ARBITER_CONDITION,        // Arbiter releases
+  releaseRecorder: address(0),
+  refundInEscrowCondition: ARBITER_CONDITION, // Arbiter refunds
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(
+  arbiterAddress,
+  config,
+  20,   // 0.2% fee (higher for managed service)
+  100   // 100% to arbiter (protocol takes no cut)
+);
+```
+
+**Use cases:**
+- Professional escrow services
+- Legal settlements
+- High-value transactions requiring oversight
+
+---
+
+## Example 6: Receiver-Initiated Refunds
+
+**Use Case:** Receiver can voluntarily offer refunds (e.g., return policy).
+
+### Configuration
+
+```typescript
+// 7-day escrow
+const [escrowCondition, escrowRecorder] =
+  await escrowPeriodFactory.deploy(
+    7 * 24 * 60 * 60,
+    address(0)            // No freeze
+  );
+
+// Receiver OR Arbiter can release
+const releaseCondition = await new AndCondition([
+  await new OrCondition([RECEIVER_CONDITION, ARBITER_CONDITION]),
+  escrowCondition
+]);
+
+// Receiver OR Arbiter can refund
+const refundCondition = await new OrCondition([
+  RECEIVER_CONDITION,
+  ARBITER_CONDITION
+]);
+
+const config = {
+  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  authorizeRecorder: escrowRecorder,
+  chargeCondition: address(0),
+  chargeRecorder: address(0),
+  releaseCondition: releaseCondition,
+  releaseRecorder: escrowRecorder,
+  refundInEscrowCondition: refundCondition,    // Receiver OR Arbiter
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: RECEIVER_CONDITION, // Only receiver post-escrow
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(arbiterAddress, config, 5, 25);
+```
+
+### Payment Flow
+
+```
+Buyer purchases product
+│
+├─ Seller ships, buyer receives
+│
+Day 5: Buyer requests return
+│
+├─ Seller approves return
+├─ Seller calls refundInEscrow()
+│
+└─ Buyer receives full refund
+```
+
+---
+
+## Example 7: Two-Party Approval Required
+
+**Use Case:** Both payer and receiver must agree to release (mutual consent).
+
+### Configuration
+
+```typescript
+// Both payer AND receiver must call to release
+const twoPartyApproval = await new AndCondition([
+  PAYER_CONDITION,      // Payer must approve
+  RECEIVER_CONDITION    // Receiver must approve
+]);
+
+// NOTE: This requires a custom recorder to track approvals
+// For simplicity, using arbiter as tie-breaker
+
+const releaseCondition = await new OrCondition([
+  twoPartyApproval,     // Both parties agree
+  ARBITER_CONDITION     // OR arbiter decides
+]);
+
+const config = {
+  authorizeCondition: PAYER_CONDITION,
+  authorizeRecorder: address(0),
+  chargeCondition: address(0),
+  chargeRecorder: address(0),
+  releaseCondition: releaseCondition,
+  releaseRecorder: address(0),
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(arbiterAddress, config, 5, 25);
+```
+
+<Warning>
+**Note:** This example requires BOTH payer and receiver to call `release()` simultaneously, which isn't practical. For real two-party approval, you'd need a custom condition that tracks approvals separately.
+</Warning>
+
+---
+
+## Example 8: Subscription Payments
+
+**Use Case:** Recurring payments with automatic charge capability.
+
+### Configuration
+
+```typescript
+// Receiver can charge immediately (no escrow)
+const config = {
+  authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
+  authorizeRecorder: address(0),
+  chargeCondition: RECEIVER_CONDITION,        // Receiver charges monthly
+  chargeRecorder: address(0),
+  releaseCondition: RECEIVER_CONDITION,       // Receiver releases
+  releaseRecorder: address(0),
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: address(0),
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: address(0)
+};
+
+const operator = await operatorFactory.deploy(
+  arbiterAddress,
+  config,
+  15,   // 0.15% fee
+  40    // 40% to protocol
+);
+```
+
+### Payment Flow
+
+```
+Month 1: User authorizes 1200 USDC (12 months)
+│
+├─ Service provider charges 100 USDC
+│
+Month 2: Service provider charges 100 USDC
+│
+├─ Continues monthly...
+│
+Month 6: User disputes charge
+│
+├─ Arbiter investigates
+└─ Arbiter refunds if warranted
+```
+
+---
+
+## Fee Configuration Comparison
+
+| Use Case | Max Fee (bps) | Protocol % | Arbiter % | Total on 1000 USDC |
+|----------|---------------|------------|-----------|-------------------|
+| Standard E-Commerce | 5 (0.05%) | 25% | 75% | 0.50 USDC |
+| Instant Release | 10 (0.1%) | 50% | 50% | 1.00 USDC |
+| Physical Goods | 3 (0.03%) | 20% | 80% | 0.30 USDC |
+| Service/Milestone | 8 (0.08%) | 30% | 70% | 0.80 USDC |
+| Managed Escrow | 20 (0.2%) | 0% | 100% | 2.00 USDC |
+| Subscription | 15 (0.15%) | 40% | 60% | 1.50 USDC |
+
+---
+
+## Configuration Checklist
+
+Before deploying, verify:
+
+- [ ] Freeze policy suits your use case
+- [ ] Escrow period is appropriate for delivery time
+- [ ] Release condition prevents premature releases
+- [ ] Refund conditions allow arbiter intervention
+- [ ] Fee rates are competitive and sustainable
+- [ ] Protocol fee percentage is reasonable
+- [ ] Tested on testnet with same configuration
+- [ ] Arbiter address is controlled (preferably multisig)
+- [ ] Condition contracts are verified on block explorer
+
+---
+
+## Testing Your Configuration
+
+```typescript
+// Deploy on Base Sepolia first
+const testOperator = await testnetFactory.deploy(
+  testArbiter,
+  config,
+  5,
+  25
+);
+
+// Test payment flow
+const paymentId = ethers.utils.keccak256(
+  ethers.utils.toUtf8Bytes("test-payment-1")
+);
+
+// 1. Authorize
+await testOperator.connect(payer).authorize(
+  paymentId,
+  receiver.address,
+  ethers.utils.parseUnits("100", 6),  // 100 USDC
+  USDC_ADDRESS
+);
+
+// 2. Try to release immediately (should fail if escrow configured)
+await expect(
+  testOperator.connect(receiver).release(paymentId)
+).to.be.revertedWith("EscrowPeriodNotPassed");
+
+// 3. Fast forward time
+await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
+await ethers.provider.send("evm_mine", []);
+
+// 4. Release after escrow
+await testOperator.connect(receiver).release(paymentId);
+
+// Verify funds transferred correctly
+```
+
+---
+
+## Best Practices
+
+<Accordion title="Start Conservative">
+Use well-tested configurations for your first deployments:
+- Standard 7-day escrow
+- 3-day payer freeze
+- Arbiter-only refunds
+- Low fee rates (3-5 bps)
+</Accordion>
+
+<Accordion title="Match Industry Standards">
+Research competitors' escrow periods and fees:
+- E-commerce: 3-7 days typical
+- Freelance: 3-14 days per milestone
+- High-value: 14-30 days common
+</Accordion>
+
+<Accordion title="Test Edge Cases">
+Test your configuration handles:
+- Immediate release attempts
+- Freeze during escrow
+- Freeze expiry
+- Refunds in both states
+- Fee distribution
+- Multiple partial charges
+</Accordion>
+
+<Accordion title="Document Your Config">
+Keep records of deployed configurations:
+```json
+{
+  "operator": "0x...",
+  "arbiter": "0x...",
+  "escrowPeriod": "7 days",
+  "freezeDuration": "3 days",
+  "freezeBy": "payer",
+  "releaseBy": "receiver OR arbiter",
+  "maxFeeBps": 5,
+  "protocolFeePct": 25,
+  "network": "base-mainnet",
+  "deployedAt": "2025-01-25"
+}
+```
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy Contracts" icon="rocket" href="/contract-deployment">
+    Deploy your configuration to mainnet or testnet.
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/monitoring">
+    Set up monitoring for your deployed contracts.
+  </Card>
+  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
+    Review contract methods and security features.
+  </Card>
+  <Card title="Conditions" icon="filter" href="/contracts/conditions">
+    Learn more about custom conditions.
+  </Card>
+</CardGroup>

@@ -1,0 +1,494 @@
+---
+title: "Core Contracts"
+description: "Detailed explanation of ArbitrationOperator, RefundRequest, and AuthCaptureEscrow"
+icon: "file-contract"
+---
+
+## ArbitrationOperator
+
+The main payment operator contract with pluggable conditions for flexible authorization logic.
+
+### Overview
+
+- **Type:** Operator instance (one per arbiter)
+- **Deployment:** Via ArbitrationOperatorFactory
+- **Immutability:** Cannot be paused or upgraded
+- **Configuration:** 10 slots for conditions and recorders
+
+### Immutable Fields
+
+```solidity
+address public immutable ESCROW;              // AuthCaptureEscrow address
+address public immutable ARBITER;             // Designated arbiter
+address public immutable PROTOCOL_FEE_RECIPIENT; // Fee recipient
+```
+
+### Mutable Fields
+
+```solidity
+uint16 public maxTotalFeeRate;               // Max fee in basis points
+uint8 public protocolFeePercentage;          // Protocol's share (0-100)
+mapping(bytes32 => PaymentInfo) public payments; // Payment data
+```
+
+### 10-Slot Configuration
+
+<Accordion title="Condition Slots (Before Actions)">
+1. **AUTHORIZE_CONDITION** - Who can authorize payments
+2. **CHARGE_CONDITION** - Who can charge partial amounts
+3. **RELEASE_CONDITION** - Who can release from escrow
+4. **REFUND_IN_ESCROW_CONDITION** - Who can refund during escrow
+5. **REFUND_POST_ESCROW_CONDITION** - Who can refund after release
+
+**Default:** `address(0)` = always allow
+</Accordion>
+
+<Accordion title="Recorder Slots (After Actions)">
+1. **AUTHORIZE_RECORDER** - Record authorization (e.g., timestamp)
+2. **CHARGE_RECORDER** - Record charge event
+3. **RELEASE_RECORDER** - Record release
+4. **REFUND_IN_ESCROW_RECORDER** - Record in-escrow refund
+5. **REFUND_POST_ESCROW_RECORDER** - Record post-escrow refund
+
+**Default:** `address(0)` = no recording (no-op)
+</Accordion>
+
+### Key Methods
+
+#### authorize()
+
+Authorizes a payment and locks funds in escrow.
+
+```solidity
+function authorize(
+    bytes32 paymentId,
+    address receiver,
+    uint256 amount,
+    address token
+) external nonReentrant
+```
+
+**Flow:**
+1. Check `AUTHORIZE_CONDITION` (if set)
+2. Call `escrow.authorize()`
+3. Store payment info in mapping
+4. Call `AUTHORIZE_RECORDER` (if set)
+5. Emit `PaymentAuthorized`
+
+**Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
+
+#### release()
+
+Releases funds from escrow to receiver.
+
+```solidity
+function release(bytes32 paymentId) external nonReentrant
+```
+
+**Flow:**
+1. Check payment exists and is in escrow
+2. Check `RELEASE_CONDITION` (typically requires escrow period passed)
+3. Call `escrow.release()`
+4. Distribute fees (if enabled)
+5. Call `RELEASE_RECORDER`
+6. Emit `PaymentReleased`
+
+**Access:** Controlled by `RELEASE_CONDITION` (typically receiver OR arbiter + escrow passed)
+
+#### refundInEscrow()
+
+Refunds payment while still in escrow.
+
+```solidity
+function refundInEscrow(bytes32 paymentId) external nonReentrant
+```
+
+**Flow:**
+1. Check payment is in escrow
+2. Check `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+3. Call `escrow.void()` to return funds to payer
+4. Call `REFUND_IN_ESCROW_RECORDER`
+5. Emit `PaymentRefunded`
+
+**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION` (typically arbiter only)
+
+#### refundPostEscrow()
+
+Refunds payment after it has been released.
+
+```solidity
+function refundPostEscrow(bytes32 paymentId) external nonReentrant
+```
+
+**Flow:**
+1. Check payment has been released
+2. Check `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+3. Call `escrow.reclaim()` to take back funds from receiver
+4. Transfer to payer
+5. Call `REFUND_POST_ESCROW_RECORDER`
+6. Emit `PaymentRefunded`
+
+**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION` (typically arbiter only)
+
+### Fee Configuration
+
+Fees can be enabled/disabled and configured by the owner.
+
+#### Fee Structure
+
+```solidity
+uint16 public maxTotalFeeRate;        // e.g., 5 = 0.05% = 5 basis points
+uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to arbiter
+```
+
+**Example Fee Calculation:**
+```
+Payment: 1000 USDC
+Max Fee Rate: 5 basis points (0.05%)
+Protocol %: 25%
+
+Total Fee = 1000 * 0.05% = 0.5 USDC
+├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
+└─ Arbiter Fee = 0.5 * 75% = 0.375 USDC → arbiter
+
+Receiver Gets = 1000 - 0.5 = 999.5 USDC
+```
+
+#### Updating Fees (24-hour Timelock)
+
+```solidity
+// Step 1: Queue new fees
+operator.queueFeeUpdate(
+    10,  // New max fee: 10 basis points (0.1%)
+    30   // New protocol %: 30%
+);
+
+// Step 2: Wait 24 hours
+
+// Step 3: Execute
+operator.executeFeeUpdate();
+```
+
+#### Emergency Fee Disable
+
+```solidity
+// Queue disable
+operator.queueFeesEnabled(false);
+
+// Wait 24 hours
+
+// Execute
+operator.executeFeesEnabled();
+```
+
+<Warning>
+Fee changes require 24-hour timelock. Plan ahead for fee updates. Consider pre-queuing emergency actions.
+</Warning>
+
+### Security Features
+
+- **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
+- **Ownership** - Solady's Ownable with 2-step transfer
+- **Timelock** - 24-hour delay on all fee changes
+- **Immutable Core** - Escrow and arbiter cannot be changed
+
+---
+
+## RefundRequest
+
+Manages refund requests independent of operator implementation.
+
+### Overview
+
+- **Type:** Singleton (one per network)
+- **Deployment:** Direct deployment (no factory)
+- **Purpose:** Track refund request lifecycle
+
+### Request Types
+
+<Tabs>
+  <Tab title="In-Escrow Refunds">
+    **Who can request:** Payer, Receiver, OR Arbiter
+
+    **Typical flow:**
+    1. Payer suspects fraud, requests refund
+    2. Arbiter investigates
+    3. Arbiter approves or denies request
+    4. If approved, arbiter calls `operator.refundInEscrow()`
+
+    **Use cases:**
+    - Buyer remorse
+    - Seller fraud
+    - Payment error
+  </Tab>
+
+  <Tab title="Post-Escrow Refunds">
+    **Who can request:** Receiver only
+
+    **Typical flow:**
+    1. Receiver realizes product defect after release
+    2. Receiver requests refund
+    3. Arbiter investigates
+    4. If approved, arbiter calls `operator.refundPostEscrow()`
+
+    **Use cases:**
+    - Product defects discovered later
+    - Service not as described
+    - Voluntary refund by merchant
+  </Tab>
+</Tabs>
+
+### Request Status States
+
+```
+Pending ──┬──► Approved ──► (Arbiter executes refund via operator)
+          ├──► Denied
+          └──► Cancelled (by requester)
+```
+
+### Key Methods
+
+#### requestRefund()
+
+Creates a new refund request.
+
+```solidity
+function requestRefund(
+    bytes32 paymentId,
+    address operator
+) external
+```
+
+**Access Control:**
+- In-escrow: Payer, Receiver, or Arbiter
+- Post-escrow: Receiver only
+
+#### updateStatus()
+
+Arbiter approves or denies a refund request.
+
+```solidity
+function updateStatus(
+    bytes32 paymentId,
+    address operator,
+    RequestStatus newStatus
+) external
+```
+
+**Access:** Arbiter only
+
+**Valid transitions:**
+- `Pending` → `Approved`
+- `Pending` → `Denied`
+
+#### cancelRefundRequest()
+
+Requester cancels their own request.
+
+```solidity
+function cancelRefundRequest(
+    bytes32 paymentId,
+    address operator
+) external
+```
+
+**Access:** Original requester only
+
+**Valid transition:**
+- `Pending` → `Cancelled`
+
+### Usage Example
+
+```typescript
+// 1. Payer requests refund
+await refundRequest.requestRefund(paymentId, operatorAddress);
+// Status: Pending
+
+// 2. Arbiter reviews and approves
+await refundRequest.updateStatus(
+  paymentId,
+  operatorAddress,
+  RequestStatus.Approved
+);
+// Status: Approved
+
+// 3. Arbiter executes refund via operator
+await operator.refundInEscrow(paymentId);
+// Funds returned to payer
+```
+
+<Note>
+RefundRequest is **advisory only**. Approval does not automatically execute refunds - the arbiter must call the operator's refund function.
+</Note>
+
+---
+
+## AuthCaptureEscrow
+
+Base escrow contract from commerce-payments library.
+
+### Overview
+
+- **Type:** Singleton (one per network)
+- **Source:** [commerce-payments](https://github.com/BackTrackCo/commerce-payments) (x402r fork)
+- **Purpose:** Hold ERC-20 tokens during payment lifecycle
+- **Access:** Operator-based (only registered operators can manage payments)
+
+<Note>
+x402r uses a forked version of commerce-payments with added **partial void** support for handling partially completed orders.
+</Note>
+
+### Payment State Machine
+
+```
+NonExistent
+    │
+    │ authorize()
+    ▼
+InEscrow ────────────┐
+    │                │
+    │ release()      │ void() / refundInEscrow()
+    ▼                │
+Released             │
+    │                │
+    │ (settled)      │ reclaim() / refundPostEscrow()
+    ▼                ▼
+       Settled
+```
+
+### Key Methods
+
+#### authorize()
+
+Locks tokens in escrow. Called by operator.
+
+```solidity
+function authorize(
+    bytes32 paymentId,
+    address payer,
+    address receiver,
+    uint256 amount,
+    address token,
+    address operator
+) external onlyOperator
+```
+
+**Requires:** Payer has approved escrow contract for `amount` of `token`
+
+#### release()
+
+Releases tokens to receiver. Called by operator.
+
+```solidity
+function release(
+    bytes32 paymentId
+) external onlyOperator returns (uint256 amount)
+```
+
+**State change:** `InEscrow` → `Released`
+
+#### void()
+
+Returns tokens to payer (full refund). Called by operator.
+
+```solidity
+function void(
+    bytes32 paymentId
+) external onlyOperator
+```
+
+**State change:** `InEscrow` → `Settled`
+
+**Use case:** Refund during escrow period
+
+#### reclaim()
+
+Takes tokens back from receiver to give to payer. Called by operator.
+
+```solidity
+function reclaim(
+    bytes32 paymentId,
+    address from,
+    uint256 amount
+) external onlyOperator
+```
+
+**State change:** `Released` → `Settled`
+
+**Use case:** Refund after release
+
+**Requires:** Receiver has approved escrow for `amount`
+
+#### partialVoid()
+
+Returns partial amount to payer.
+
+```solidity
+function partialVoid(
+    bytes32 paymentId,
+    uint256 amount
+) external onlyOperator
+```
+
+**Use case:** Partial refunds for partially fulfilled orders
+
+### Security Features
+
+- **Operator whitelist** - Only registered operators can manage payments
+- **Reentrancy protection** - All state changes protected
+- **Event logging** - Complete audit trail
+
+---
+
+## Supporting Contracts
+
+### ERC3009PaymentCollector
+
+Payment collection with gasless meta-transactions.
+
+**Features:**
+- ERC-3009 `transferWithAuthorization()` support
+- Nonce-based replay protection
+- Deadline-based expiry
+- Multicall3 integration
+
+**Use case:** Allow payers to authorize payments via signed messages instead of direct transactions (gasless UX).
+
+### TokenStore
+
+Safe token transfer utilities from commerce-payments.
+
+**Features:**
+- Reentrancy-safe transfers
+- SafeERC20 integration
+- Balance tracking
+
+---
+
+## Contract Addresses
+
+### Base Sepolia Testnet
+
+| Contract | Address |
+|----------|---------|
+| AuthCaptureEscrow | [`0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8`](https://sepolia.basescan.org/address/0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8) |
+| ERC3009PaymentCollector | [`0xed02d3E5167BCc9582D851885A89b050AB816a56`](https://sepolia.basescan.org/address/0xed02d3E5167BCc9582D851885A89b050AB816a56) |
+| RefundRequest | [`0x26A3d27139b442Be5ECc10c8608c494627B660BF`](https://sepolia.basescan.org/address/0x26A3d27139b442Be5ECc10c8608c494627B660BF) |
+| ArbitrationOperatorFactory | [`0x46C44071BDf9753482400B76d88A5850318b776F`](https://sepolia.basescan.org/address/0x46C44071BDf9753482400B76d88A5850318b776F) |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Learn about factory deployment patterns.
+  </Card>
+  <Card title="Conditions" icon="filter" href="/contracts/conditions">
+    Explore the pluggable condition system.
+  </Card>
+  <Card title="Examples" icon="code" href="/contracts/examples">
+    See real-world configuration examples.
+  </Card>
+  <Card title="Deploy Contracts" icon="rocket" href="/contract-deployment">
+    Deploy contracts to your network.
+  </Card>
+</CardGroup>

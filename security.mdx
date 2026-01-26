@@ -1,0 +1,315 @@
+---
+title: "Security"
+description: "Security policy, incident response, and vulnerability reporting for x402r protocol"
+icon: "shield"
+---
+
+## Overview
+
+Security is paramount for x402r, a protocol handling financial transactions. This page covers vulnerability reporting, incident response procedures, and security best practices.
+
+<Warning>
+The x402r smart contracts are currently **UNAUDITED**. Use at your own risk. A bug bounty program will be launched after contracts are audited.
+</Warning>
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability, please report it responsibly.
+
+### DO NOT Create Public Issues
+
+**Never** create public GitHub issues for security vulnerabilities. This protects users and gives the team time to fix issues before they can be exploited.
+
+### Private Disclosure Methods
+
+<Steps>
+  <Step title="Email (Preferred)">
+    Send details to **security@x402r.com**
+  </Step>
+  <Step title="GitHub Security Advisories">
+    Use the [private vulnerability reporting](https://github.com/x402r/x402r-contracts/security/advisories/new) feature
+  </Step>
+</Steps>
+
+### What to Include
+
+When reporting a vulnerability, provide:
+
+- **Description** of the vulnerability
+- **Steps to reproduce** the issue
+- **Potential impact** assessment
+- **Suggested fix** (if you have one)
+- **Proof of concept** code (if applicable)
+
+### Response Timeline
+
+| Action | Timeline |
+|--------|----------|
+| Initial acknowledgment | 24 hours |
+| Severity assessment | 48 hours |
+| Fix development | 1-7 days (severity dependent) |
+| Public disclosure | After fix deployed + 7 days |
+
+## Severity Levels
+
+Security issues are classified by impact and exploitability:
+
+| Level | Description | Examples | Response Time |
+|-------|-------------|----------|---------------|
+| **CRITICAL** | Active exploit, funds at risk | Reentrancy drain, access control bypass | Immediate (< 1 hour) |
+| **HIGH** | Exploitable vulnerability, no active exploit | Logic error enabling theft | < 24 hours |
+| **MEDIUM** | Limited impact vulnerability | DoS, griefing attacks | < 72 hours |
+| **LOW** | Minor issues, best practice violations | Gas inefficiency, code quality | Next release |
+
+## Incident Response Procedures
+
+### Emergency Contacts
+
+In case of a security incident, the following roles coordinate the response:
+
+| Role | Responsibility |
+|------|---------------|
+| **Security Lead** | Triage vulnerabilities, coordinate response |
+| **Contract Owner** | Execute emergency transactions (via multisig) |
+| **Multisig Signers** | Approve emergency actions |
+
+### Phase 1: Detection & Triage (0-1 hour)
+
+<Accordion title="Initial Response Checklist">
+  ```
+  1. [ ] Confirm the vulnerability/incident
+  2. [ ] Assess severity level
+  3. [ ] Alert security lead and contract owner
+  4. [ ] Begin incident log documentation
+  5. [ ] Determine if emergency action needed
+  ```
+</Accordion>
+
+### Phase 2: Containment (1-4 hours)
+
+For CRITICAL/HIGH severity incidents:
+
+<Steps>
+  <Step title="Disable Fees (if applicable)">
+    Owner calls `queueFeesEnabled(false)` then `executeFeesEnabled()` after 24h timelock.
+
+    <Note>
+    Consider pre-queuing emergency actions to bypass the 24-hour delay.
+    </Note>
+  </Step>
+
+  <Step title="Alert Users">
+    Notify via official channels:
+    - Twitter/X: [@x402rorg](https://twitter.com/x402rorg)
+    - Discord
+    - Telegram
+    - Email alerts to integrators
+  </Step>
+
+  <Step title="Coordinate with Ecosystem">
+    If funds are at risk, contact:
+    - Block builders (Flashbots) for transaction censoring
+    - Exchanges for deposit monitoring
+    - Bridge operators if cross-chain impact
+  </Step>
+</Steps>
+
+### Phase 3: Investigation (4-24 hours)
+
+<Accordion title="Investigation Checklist">
+  ```
+  1. [ ] Root cause analysis
+  2. [ ] Determine scope of impact
+  3. [ ] Identify affected addresses/transactions
+  4. [ ] Develop fix or mitigation
+  5. [ ] Internal security review of fix
+  ```
+</Accordion>
+
+### Phase 4: Remediation (24-72 hours)
+
+**For upgradeable contracts:**
+- Deploy and apply fix
+- Verify fix effectiveness
+
+**For immutable contracts** (ArbitrationOperator, EscrowPeriodCondition):
+1. Deploy new version with fix
+2. Coordinate migration with integrators
+3. Update documentation
+4. Old contracts remain functional but deprecated
+
+<Warning>
+Most x402r contracts are **immutable** - they cannot be paused or upgraded. Response requires deploying new versions and coordinating migrations.
+</Warning>
+
+### Phase 5: Recovery & Disclosure (72+ hours)
+
+<Steps>
+  <Step title="Assess Impact">
+    Quantify total impact: funds lost, users affected, transactions impacted
+  </Step>
+
+  <Step title="Recovery Options">
+    - Protocol treasury compensation
+    - Insurance claims
+    - Negotiation with attacker (white hat scenarios)
+  </Step>
+
+  <Step title="Post-Mortem">
+    Write detailed incident report including:
+    - Timeline of events
+    - Root cause analysis
+    - Actions taken
+    - Lessons learned
+    - Prevention measures
+  </Step>
+
+  <Step title="Public Disclosure">
+    Publish disclosure 7 days after fix is deployed
+  </Step>
+</Steps>
+
+## Emergency Actions
+
+### Available Contract Controls
+
+| Action | Method | Timelock | Notes |
+|--------|--------|----------|-------|
+| Disable fees | `queueFeesEnabled(false)` → `executeFeesEnabled()` | 24 hours | Prevents fee distribution during incidents |
+| Rescue stuck ETH | `rescueETH()` | None | Owner only, for accidentally sent ETH |
+| Transfer ownership | `requestOwnershipHandover()` → `completeOwnershipHandover()` | 48 hours | Two-step process |
+
+### Immutable Contract Limitations
+
+These contracts **cannot** be paused or upgraded:
+
+- **ArbitrationOperator** - No payment pause function
+- **EscrowPeriodCondition** - Cannot modify escrow periods
+- **FreezePolicy instances** - Cannot change freeze rules after deployment
+
+**Mitigation strategy:**
+1. Deploy new contract version with fixes
+2. Deprecate old contracts in documentation
+3. Coordinate with integrators to migrate
+4. Old contracts remain functional but should not be used
+
+### Pre-positioned Emergency Actions
+
+To reduce incident response time, maintain pre-queued emergency actions:
+
+```solidity
+// Pre-queue fee disable for instant execution in emergencies
+// Refresh this periodically (every ~20 days)
+
+// 1. Queue the disable
+operator.queueFeesEnabled(false);
+
+// 2. Wait 24 hours, then if no emergency, re-enable
+operator.executeFeesEnabled(); // executes false, disabling fees
+
+// 3. Queue re-enable
+operator.queueFeesEnabled(true);
+
+// 4. After 24h, re-enable
+operator.executeFeesEnabled();
+
+// 5. Queue next disable (ready for emergencies)
+operator.queueFeesEnabled(false);
+```
+
+<Tip>
+Maintaining a pre-queued emergency action bypasses the 24-hour timelock, enabling immediate response to CRITICAL incidents.
+</Tip>
+
+## Monitoring for Security Issues
+
+Set up alerts for anomalous activity:
+
+| Event | Alert Condition | Severity |
+|-------|----------------|----------|
+| `PaymentAuthorized` | Unusual volume spike, abnormally large amounts | HIGH |
+| `PaymentReleased` | Rapid releases, pattern deviating from normal | MEDIUM |
+| `PaymentRefunded` | High refund rate (>10% in 24h) | MEDIUM |
+| `PaymentFrozen` | Mass freezing of payments | HIGH |
+| `OwnershipTransferred` | Any ownership change | CRITICAL |
+| `FeeUpdateQueued` | Unexpected fee configuration changes | HIGH |
+
+See [Monitoring](/monitoring) for implementation details.
+
+## Security Best Practices
+
+### For Protocol Operators
+
+- **Use multisig wallets** (Gnosis Safe) for all owner addresses
+- **Never share private keys** - use hardware wallets
+- **Maintain emergency contacts** - ensure 24/7 availability
+- **Monitor contracts continuously** - set up automated alerts
+- **Test emergency procedures** - conduct regular drills
+- **Pre-queue emergency actions** - maintain readiness
+
+### For Integrators
+
+- **Test on testnets first** - use Base Sepolia before mainnet
+- **Monitor your payments** - track state transitions
+- **Handle edge cases** - refunds, freezes, disputes
+- **Stay updated** - subscribe to security advisories
+- **Implement timeouts** - don't assume payments complete instantly
+
+### For Arbiters
+
+- **Secure your arbiter keys** - use hardware wallets or multisig
+- **Monitor refund requests** - respond promptly to disputes
+- **Document decisions** - maintain transparency
+- **Follow dispute resolution guidelines** - consistent rulings
+
+## Post-Incident Checklist
+
+After any security incident, complete this checklist:
+
+```
+- [ ] Incident log completed with timeline
+- [ ] Root cause identified and documented
+- [ ] Fix deployed and verified
+- [ ] Affected users notified
+- [ ] Post-mortem report published
+- [ ] Security documentation updated
+- [ ] Monitoring rules updated to detect similar issues
+- [ ] Team retrospective conducted
+- [ ] Public disclosure published (if applicable)
+- [ ] Lessons incorporated into development process
+```
+
+## Bug Bounty Program
+
+A bug bounty program will launch after the contracts are professionally audited.
+
+**Scope will include:**
+- Smart contract vulnerabilities
+- Economic exploits
+- Access control issues
+- Logic errors
+
+**Out of scope:**
+- Known issues documented in audits
+- Frontend vulnerabilities (reported separately)
+- Social engineering attacks
+
+Stay tuned for bounty details and reward structure.
+
+## Contact Information
+
+- **Security Email**: [security@x402r.com](mailto:security@x402r.com)
+- **General Inquiries**: [contact@x402r.org](mailto:contact@x402r.org)
+- **Twitter/X**: [@x402rorg](https://twitter.com/x402rorg)
+- **GitHub**: [BackTrackCo](https://github.com/BackTrackCo)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Contract Deployment" icon="rocket" href="/contract-deployment">
+    Learn how to securely deploy x402r contracts.
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/monitoring">
+    Set up monitoring and alerts for your deployment.
+  </Card>
+</CardGroup>

@@ -1,0 +1,225 @@
+---
+title: "Architecture"
+description: "System architecture, payment flows, and contract relationships"
+icon: "diagram-project"
+---
+
+## System Diagrams
+
+For detailed visual architecture diagrams, see the [x402r-contracts repository](https://github.com/BackTrackCo/x402r-contracts#architecture):
+
+- [System Overview](https://github.com/BackTrackCo/x402r-contracts#system-overview) - User interactions, operator slots, and escrow state machine
+- [Contract Relationships](https://github.com/BackTrackCo/x402r-contracts#contract-relationships) - How factories, operators, and conditions interact
+- [Condition Combinator Pattern](https://github.com/BackTrackCo/x402r-contracts#condition-combinator-pattern) - Composable authorization logic
+- [Escrow Period & Freeze Flow](https://github.com/BackTrackCo/x402r-contracts#escrow-period--freeze-flow) - Timeline of payment states
+
+## Payment Flow Sequence
+
+### Standard Payment (Happy Path)
+
+1. **Payer** calls `operator.authorize(paymentId, receiver, amount, token)`
+2. **Operator** checks `AUTHORIZE_CONDITION` (if set)
+3. **Operator** calls `escrow.authorize()` to lock funds
+4. **Operator** stores payment info in mapping
+5. **Operator** calls `AUTHORIZE_RECORDER` to record timestamp
+6. **Escrow period** begins (e.g., 7 days)
+7. After escrow period: **Receiver** or **Arbiter** calls `operator.release(paymentId)`
+8. **Operator** checks `RELEASE_CONDITION` (must pass escrow period check)
+9. **Operator** calls `escrow.release()` to transfer funds to receiver
+10. **Operator** distributes fees (if enabled)
+11. **Operator** calls `RELEASE_RECORDER` to update state
+
+### Refund Flow (In-Escrow)
+
+1. **Payer** calls `refundRequest.requestRefund(paymentId, operator)`
+2. **RefundRequest** creates request with status `Pending`
+3. **Arbiter** reviews dispute
+4. **Arbiter** calls `refundRequest.updateStatus(paymentId, operator, Approved)`
+5. **Arbiter** calls `operator.refundInEscrow(paymentId)`
+6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (arbiter only)
+7. **Operator** calls `escrow.void()` to return funds to payer
+8. **Operator** calls `REFUND_IN_ESCROW_RECORDER`
+9. Funds transferred back to payer
+
+### Freeze Flow
+
+**Timeline:**
+- **Day 0:** Payment authorized, escrow period begins
+- **Day 0-7:** Payer can freeze if suspicious
+- **Day 3:** Payer freezes payment (freeze lasts 3 days)
+- **Day 3-6:** Payment frozen, release blocked
+- **Day 6:** Freeze expires OR payer unfreezes manually
+- **Day 7:** Escrow period ends
+- **Day 7+:** Receiver or arbiter can release (if not frozen)
+
+<Warning>
+**MEV Protection:** Payers should freeze EARLY if suspicious, not at the deadline. Use private mempool (Flashbots Protect) if freezing near expiry to avoid front-running.
+</Warning>
+
+## Condition Evaluation Flow
+
+### Authorization Check (Before Action)
+
+When an action is called (e.g., `release()`):
+
+1. **Load Condition** - Get the condition address from operator slot
+2. **Evaluate Condition** - Call `condition.check(paymentInfo, caller)`
+   - Check if caller matches required role (e.g., receiver, arbiter)
+   - Check state (e.g., escrow period passed, not frozen)
+   - Check other requirements (e.g., time constraints)
+3. **Result:**
+   - `true` → Proceed to execute action
+   - `false` → Revert with `NotAuthorized` error
+4. **Execute Action** - Call escrow method
+5. **Call Recorder** - Update state after successful execution
+
+### Combinator Example
+
+**OrCondition([ReceiverCondition, ArbiterCondition])**
+- Checks if caller is receiver: Yes → PASS
+- If not receiver, checks if caller is arbiter: Yes → PASS
+- If neither: FAIL
+
+**AndCondition([OrCondition(...), EscrowPeriodCondition])**
+- First checks OrCondition: PASS (caller is receiver or arbiter)
+- Then checks EscrowPeriodCondition: PASS (escrow period elapsed, not frozen)
+- Both passed → PASS (action allowed)
+
+## Data Flow
+
+### Payment Information Storage
+
+```solidity
+// In ArbitrationOperator
+mapping(bytes32 => PaymentInfo) public payments;
+
+struct PaymentInfo {
+    address payer;
+    address receiver;
+    address arbiter;
+    uint256 amount;
+    address token;
+    PaymentState state;
+    uint256 index;
+}
+```
+
+### Escrow Period Recording
+
+```solidity
+// In EscrowPeriodRecorder
+mapping(bytes32 => RecordedInfo) public recordedInfo;
+
+struct RecordedInfo {
+    uint40 authorizedAt;  // Block timestamp when authorized
+    bool frozen;          // Is payment currently frozen
+    uint40 frozenAt;      // When payment was frozen
+}
+```
+
+### Fee Distribution
+
+For a 1000 USDC payment with 0.05% fee (5 basis points) and 25% protocol share:
+
+```
+Total Fee = 1000 * 0.05% = 0.5 USDC
+├─ Protocol Fee = 0.5 * 25% = 0.125 USDC → protocolFeeRecipient
+└─ Arbiter Fee = 0.5 * 75% = 0.375 USDC → arbiter
+
+Receiver Amount = 1000 - 0.5 = 999.5 USDC
+```
+
+## Roles & Permissions
+
+| Role | Capabilities | Restrictions |
+|------|-------------|--------------|
+| **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
+| **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
+| **Arbiter** | `refundInEscrow()`, `refundPostEscrow()`, `updateStatus()` on refund requests | Can only act on payments using their operator |
+| **Owner** | `queueFeesEnabled()`, `executeFeesEnabled()`, `queueFeeUpdate()`, `executeFeeUpdate()`, `rescueETH()` | 24-hour timelock on fee changes |
+
+## Security Features
+
+### Reentrancy Protection
+
+All state-changing functions use `ReentrancyGuardTransient` (EIP-1153):
+- More gas-efficient than persistent storage
+- Automatic cleanup after transaction
+- Protection against cross-function reentrancy
+
+### Timelock Protection
+
+Fee changes require 24-hour delay:
+
+```typescript
+// Step 1: Queue change
+await operator.queueFeeUpdate(newMaxFee, newProtocolPct);
+
+// Step 2: Wait 24 hours
+
+// Step 3: Execute
+await operator.executeFeeUpdate();
+```
+
+Emergency disable also requires timelock:
+
+```typescript
+// Step 1: Queue disable
+await operator.queueFeesEnabled(false);
+
+// Step 2: Wait 24 hours
+
+// Step 3: Execute
+await operator.executeFeesEnabled();
+```
+
+### Two-Step Ownership
+
+Ownership transfers use Solady's Ownable pattern:
+
+1. Current owner calls `requestOwnershipHandover(newOwner)`
+2. New owner calls `completeOwnershipHandover()`
+3. 48-hour window for completion
+
+## Event Architecture
+
+### Core Events
+
+```solidity
+// Payment lifecycle
+event PaymentAuthorized(bytes32 indexed paymentId, address indexed payer, uint256 amount);
+event PaymentReleased(bytes32 indexed paymentId, uint256 amount);
+event PaymentRefunded(bytes32 indexed paymentId, uint256 amount, bool inEscrow);
+
+// Refund requests
+event RefundRequested(bytes32 indexed paymentId, address indexed requester);
+event RefundApproved(bytes32 indexed paymentId, address indexed approver);
+event RefundDenied(bytes32 indexed paymentId, address indexed denier);
+
+// Freeze state
+event PaymentFrozen(bytes32 indexed paymentId, uint40 frozenAt);
+event PaymentUnfrozen(bytes32 indexed paymentId);
+
+// Fee changes
+event FeeUpdateQueued(uint256 newMaxFee, uint256 newProtocolPct, uint256 effectiveTime);
+event FeeUpdateExecuted(uint256 maxFee, uint256 protocolPct);
+```
+
+These events enable off-chain monitoring and indexing. See [Monitoring](/monitoring) for implementation details.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
+    Learn about individual contract implementations.
+  </Card>
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Understand factory deployment patterns.
+  </Card>
+  <Card title="Conditions" icon="filter" href="/contracts/conditions">
+    Explore the condition system and combinators.
+  </Card>
+  <Card title="Examples" icon="code" href="/contracts/examples">
+    See real-world configuration examples.
+  </Card>
+</CardGroup>

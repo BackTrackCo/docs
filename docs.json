@@ -44,6 +44,25 @@
               "ai-tools/claude-code",
               "ai-tools/windsurf"
             ]
+          },
+          {
+            "group": "Smart Contracts",
+            "pages": [
+              "contracts/overview",
+              "contracts/architecture",
+              "contracts/core-contracts",
+              "contracts/factories",
+              "contracts/conditions",
+              "contracts/examples"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "contract-deployment",
+              "monitoring",
+              "security"
+            ]
           }
         ]
       },

@@ -1,0 +1,533 @@
+---
+title: "Factories"
+description: "Factory patterns, CREATE2 deployments, and deterministic addresses"
+icon: "industry"
+---
+
+## Overview
+
+x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic contract deployments. Factories enable on-demand instance creation with predictable addresses.
+
+## Why Factories?
+
+<AccordionGroup>
+  <Accordion title="Deterministic Addresses (CREATE2)">
+    Addresses are predictable before deployment, enabling:
+    - Off-chain address generation
+    - Cross-chain address consistency
+    - Contract-to-contract communication without registries
+  </Accordion>
+
+  <Accordion title="Shared Configuration">
+    Multiple instances can share immutable configuration:
+    - Lower deployment costs
+    - Consistent behavior across instances
+    - Centralized ownership control
+  </Accordion>
+
+  <Accordion title="Idempotent Deployments">
+    Calling factory with same parameters returns existing contract:
+    - Safe to call multiple times
+    - No duplicate deployments
+    - Automatic deduplication
+  </Accordion>
+
+  <Accordion title="Gas Optimization">
+    Singleton conditions deployed once, reused everywhere:
+    - PayerCondition, ReceiverCondition deployed once
+    - All operators share the same condition instances
+    - Minimal storage overhead
+  </Accordion>
+</AccordionGroup>
+
+## Arbitration Operator Factory
+
+Deploys ArbitrationOperator instances with deterministic addresses.
+
+### Contract Address
+
+**Base Sepolia:** [`0x46C44071BDf9753482400B76d88A5850318b776F`](https://sepolia.basescan.org/address/0x46C44071BDf9753482400B76d88A5850318b776F)
+
+### Configuration Structure
+
+```solidity
+struct OperatorConfig {
+    address authorizeCondition;
+    address authorizeRecorder;
+    address chargeCondition;
+    address chargeRecorder;
+    address releaseCondition;
+    address releaseRecorder;
+    address refundInEscrowCondition;
+    address refundInEscrowRecorder;
+    address refundPostEscrowCondition;
+    address refundPostEscrowRecorder;
+}
+```
+
+### Deployment Method
+
+```solidity
+function deploy(
+    address arbiter,
+    OperatorConfig calldata config,
+    uint16 maxFeeBps,
+    uint8 protocolFeePct
+) external returns (address operator)
+```
+
+**Parameters:**
+- `arbiter` - Address of designated arbiter for this operator
+- `config` - 10-slot configuration (5 conditions + 5 recorders)
+- `maxFeeBps` - Maximum total fee in basis points (e.g., 5 = 0.05%)
+- `protocolFeePct` - Protocol's share of fees 0-100 (e.g., 25 = 25%)
+
+**Returns:** Address of deployed operator (or existing if already deployed)
+
+### Address Prediction
+
+Predict the operator address before deployment:
+
+```solidity
+function predictOperatorAddress(
+    address arbiter,
+    OperatorConfig calldata config,
+    uint16 maxFeeBps,
+    uint8 protocolFeePct
+) external view returns (address)
+```
+
+**Usage:**
+```typescript
+const predictedAddress = await factory.predictOperatorAddress(
+  arbiterAddress,
+  config,
+  5,    // 0.05% max fee
+  25    // 25% to protocol
+);
+
+console.log("Operator will be deployed at:", predictedAddress);
+
+// Deploy - will use same address
+const deployedAddress = await factory.deploy(
+  arbiterAddress,
+  config,
+  5,
+  25
+);
+
+assert(deployedAddress === predictedAddress);
+```
+
+### Example Deployment
+
+```typescript
+import { ArbitrationOperatorFactory } from "@x402r/contracts";
+
+const factory = new ethers.Contract(
+  FACTORY_ADDRESS,
+  ArbitrationOperatorFactory.abi,
+  signer
+);
+
+// Define configuration
+const config = {
+  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  authorizeRecorder: escrowRecorder,
+  chargeCondition: ethers.constants.AddressZero,  // Default allow
+  chargeRecorder: ethers.constants.AddressZero,   // No recording
+  releaseCondition: releaseCondition,              // Custom logic
+  releaseRecorder: escrowRecorder,
+  refundInEscrowCondition: ARBITER_CONDITION,
+  refundInEscrowRecorder: ethers.constants.AddressZero,
+  refundPostEscrowCondition: ARBITER_CONDITION,
+  refundPostEscrowRecorder: ethers.constants.AddressZero
+};
+
+// Deploy operator
+const tx = await factory.deploy(
+  arbiterAddress,
+  config,
+  5,    // 0.05% max fee
+  25    // 25% protocol fee
+);
+
+const receipt = await tx.wait();
+const operatorAddress = receipt.events[0].args.operator;
+
+console.log("Deployed operator at:", operatorAddress);
+```
+
+<Tip>
+If you call `deploy()` with the same parameters twice, the factory returns the existing operator address without deploying a new contract.
+</Tip>
+
+---
+
+## Escrow Period Condition Factory
+
+Deploys EscrowPeriodCondition and EscrowPeriodRecorder pairs for time-based release logic.
+
+### Contract Address
+
+**Base Sepolia:** [`0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178`](https://sepolia.basescan.org/address/0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178)
+
+### Deployment Method
+
+```solidity
+function deploy(
+    uint40 escrowPeriod,
+    address freezePolicy
+) external returns (address condition, address recorder)
+```
+
+**Parameters:**
+- `escrowPeriod` - Duration in seconds (e.g., `7 * 24 * 60 * 60` for 7 days)
+- `freezePolicy` - Address of FreezePolicy contract (or `address(0)` for no freezing)
+
+**Returns:** Tuple of (condition, recorder) addresses
+
+### How It Works
+
+The factory deploys two contracts:
+
+1. **EscrowPeriodCondition** (stateless)
+   - Checks if escrow period has elapsed
+   - Checks if payment is frozen
+   - Returns true/false for authorization
+
+2. **EscrowPeriodRecorder** (stateful)
+   - Records authorization timestamp
+   - Tracks freeze state
+   - Provides data to condition
+
+**Relationship:**
+```
+EscrowPeriodCondition ──reads state──► EscrowPeriodRecorder ──references──► FreezePolicy
+```
+
+### Example Deployment
+
+```typescript
+const factory = new ethers.Contract(
+  ESCROW_PERIOD_FACTORY_ADDRESS,
+  EscrowPeriodConditionFactory.abi,
+  signer
+);
+
+// Deploy 7-day escrow with 3-day payer freeze
+const [conditionAddress, recorderAddress] = await factory.deploy(
+  7 * 24 * 60 * 60,    // 7 days
+  payerFreezePolicyAddress
+);
+
+console.log("Condition:", conditionAddress);
+console.log("Recorder:", recorderAddress);
+
+// Use in operator config
+const config = {
+  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  authorizeRecorder: recorderAddress,        // Record auth time
+  // ...
+  releaseCondition: conditionAddress,        // Check escrow passed
+  releaseRecorder: recorderAddress,          // Update state
+  // ...
+};
+```
+
+### Common Escrow Periods
+
+| Use Case | Recommended Period |
+|----------|-------------------|
+| Digital goods / services | 1-3 days |
+| Physical goods (domestic) | 7-14 days |
+| Physical goods (international) | 14-30 days |
+| Large purchases / services | 30-60 days |
+| No escrow (instant release) | 0 (use different condition) |
+
+---
+
+## Freeze Policy Factory
+
+Deploys FreezePolicy instances with custom freeze/unfreeze conditions.
+
+### Contract Address
+
+**Base Sepolia:** [`0x536439b00002CB3c0141391A92aFBB3e1E3f8604`](https://sepolia.basescan.org/address/0x536439b00002CB3c0141391A92aFBB3e1E3f8604)
+
+### Deployment Method
+
+```solidity
+function deploy(
+    address freezeCondition,
+    address unfreezeCondition,
+    uint40 freezeDuration
+) external returns (address freezePolicy)
+```
+
+**Parameters:**
+- `freezeCondition` - Who can freeze (e.g., PayerCondition, ReceiverCondition, OrCondition)
+- `unfreezeCondition` - Who can unfreeze (typically same as freezeCondition)
+- `freezeDuration` - How long freeze lasts in seconds (e.g., `3 * 24 * 60 * 60` for 3 days)
+
+**Returns:** Address of deployed FreezePolicy
+
+### Condition Singletons
+
+Use these pre-deployed condition contracts:
+
+| Condition | Address (Base Sepolia) | Description |
+|-----------|------------------------|-------------|
+| PayerCondition | `0xDc0D800007ceACFf1299b926Ce22B4d4edCE6Ce7` | Only payer can call |
+| ReceiverCondition | `0x138Bf828643350AA3692aedDE8b2254eDF4D07EF` | Only receiver can call |
+| ArbiterCondition | `0x32471D31910a009273A812dE0894d9f0ADef4834` | Only arbiter can call |
+| AlwaysTrueCondition | `0xe2659dc0d716B1226DF6a09A5f47862cd1ff6733` | Anyone can call |
+
+### Example Deployments
+
+<Tabs>
+  <Tab title="Payer Freeze">
+    Only payer can freeze/unfreeze for 3 days:
+
+    ```typescript
+    const freezePolicy = await freezePolicyFactory.deploy(
+      PAYER_CONDITION,      // Only payer can freeze
+      PAYER_CONDITION,      // Only payer can unfreeze
+      3 * 24 * 60 * 60      // 3 days
+    );
+    ```
+  </Tab>
+
+  <Tab title="Receiver Freeze">
+    Only receiver can freeze/unfreeze for 5 days:
+
+    ```typescript
+    const freezePolicy = await freezePolicyFactory.deploy(
+      RECEIVER_CONDITION,   // Only receiver can freeze
+      RECEIVER_CONDITION,   // Only receiver can unfreeze
+      5 * 24 * 60 * 60      // 5 days
+    );
+    ```
+  </Tab>
+
+  <Tab title="Payer OR Receiver">
+    Either payer or receiver can freeze, both can unfreeze:
+
+    ```typescript
+    // First deploy OrCondition
+    const orCondition = await new OrCondition([
+      PAYER_CONDITION,
+      RECEIVER_CONDITION
+    ]);
+
+    const freezePolicy = await freezePolicyFactory.deploy(
+      orCondition.address,  // Payer OR Receiver
+      orCondition.address,  // Payer OR Receiver
+      3 * 24 * 60 * 60      // 3 days
+    );
+    ```
+  </Tab>
+
+  <Tab title="Arbiter Controlled">
+    Only arbiter can freeze/unfreeze:
+
+    ```typescript
+    const freezePolicy = await freezePolicyFactory.deploy(
+      ARBITER_CONDITION,    // Only arbiter can freeze
+      ARBITER_CONDITION,    // Only arbiter can unfreeze
+      7 * 24 * 60 * 60      // 7 days
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### Freeze Duration Guidelines
+
+| Duration | Use Case |
+|----------|----------|
+| 1 day | Quick investigation period |
+| 3 days | Standard fraud check window |
+| 5-7 days | Extended investigation |
+| 14+ days | Complex dispute resolution |
+
+<Warning>
+Freeze duration should balance payer protection with receiver UX. Too long and receivers may avoid the platform. Too short and payers can't adequately investigate.
+</Warning>
+
+---
+
+## Factory Ownership
+
+All factories are owned by a multisig wallet for security.
+
+### Owner Capabilities
+
+Factory owners can:
+- Update factory configuration (if mutable fields exist)
+- Rescue stuck ETH (via `rescueETH()`)
+- Transfer ownership (2-step process)
+
+Factory owners **cannot:**
+- Modify deployed instances
+- Pause or stop operations
+- Access funds in deployed operators
+
+### Ownership Transfer
+
+```solidity
+// Current owner initiates
+factory.requestOwnershipHandover(newOwner);
+
+// New owner completes (within 48 hours)
+factory.completeOwnershipHandover();
+```
+
+---
+
+## Gas Costs
+
+Approximate gas costs for factory deployments (Base Sepolia):
+
+| Operation | Gas Cost | USD (at 0.1 gwei, $3000 ETH) |
+|-----------|----------|------------------------------|
+| Deploy ArbitrationOperator | ~2.5M gas | ~$0.75 |
+| Deploy EscrowPeriod (condition + recorder) | ~1.8M gas | ~$0.54 |
+| Deploy FreezePolicy | ~800K gas | ~$0.24 |
+| Predict address (view call) | 0 gas | $0.00 |
+
+<Tip>
+Use `predict*Address()` functions before deploying to verify addresses off-chain and avoid unnecessary deployments.
+</Tip>
+
+---
+
+## CREATE2 Details
+
+### Salt Generation
+
+Each factory uses different salt strategies:
+
+**ArbitrationOperatorFactory:**
+```solidity
+bytes32 salt = keccak256(abi.encode(
+    arbiter,
+    config,
+    maxFeeBps,
+    protocolFeePct
+));
+```
+
+**EscrowPeriodConditionFactory:**
+```solidity
+bytes32 salt = keccak256(abi.encode(
+    escrowPeriod,
+    freezePolicy
+));
+```
+
+**FreezePolicyFactory:**
+```solidity
+bytes32 salt = keccak256(abi.encode(
+    freezeCondition,
+    unfreezeCondition,
+    freezeDuration
+));
+```
+
+### Cross-Chain Addresses
+
+Same configuration on different chains = same address:
+
+```typescript
+// Deploy on Base Sepolia
+const addressBaseSepolia = await factory.deploy(arbiter, config, 5, 25);
+
+// Deploy on Optimism Sepolia with identical params
+const addressOptimismSepolia = await factory.deploy(arbiter, config, 5, 25);
+
+// Addresses are identical!
+assert(addressBaseSepolia === addressOptimismSepolia);
+```
+
+This enables:
+- Consistent addressing across chains
+- Simplified multi-chain integrations
+- Predictable contract locations
+
+---
+
+## Best Practices
+
+### 1. Predict Before Deploy
+
+Always verify predicted address before deployment:
+
+```typescript
+const predicted = await factory.predictOperatorAddress(arbiter, config, 5, 25);
+const deployed = await factory.deploy(arbiter, config, 5, 25);
+assert(predicted === deployed);
+```
+
+### 2. Reuse Condition Singletons
+
+Don't deploy new PayerCondition/ReceiverCondition - use existing singletons:
+
+```typescript
+// ✅ Good: Reuse singleton
+const config = {
+  authorizeCondition: PAYER_CONDITION,  // Pre-deployed singleton
+  // ...
+};
+
+// ❌ Bad: Deploy new instance
+const payerCondition = await new PayerCondition();
+const config = {
+  authorizeCondition: payerCondition.address,  // Wastes gas
+  // ...
+};
+```
+
+### 3. Test Configuration First
+
+Deploy on testnet with same configuration before mainnet:
+
+```typescript
+// Test on Base Sepolia first
+const testOperator = await testnetFactory.deploy(arbiter, config, 5, 25);
+// ... test thoroughly ...
+
+// Deploy on mainnet with identical config (same address!)
+const mainnetOperator = await mainnetFactory.deploy(arbiter, config, 5, 25);
+```
+
+### 4. Document Your Config
+
+Keep a record of your deployed configurations:
+
+```typescript
+const deployments = {
+  "marketplace-arbiter": {
+    arbiter: "0x...",
+    operator: "0x...",
+    escrowPeriod: 7 * 24 * 60 * 60,
+    freezeDuration: 3 * 24 * 60 * 60,
+    maxFeeBps: 5,
+    protocolFeePct: 25,
+    network: "base-sepolia"
+  }
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Conditions" icon="filter" href="/contracts/conditions">
+    Learn about the pluggable condition system.
+  </Card>
+  <Card title="Examples" icon="code" href="/contracts/examples">
+    See real-world configuration examples.
+  </Card>
+  <Card title="Deploy Contracts" icon="rocket" href="/contract-deployment">
+    Deploy factories and instances to your network.
+  </Card>
+</CardGroup>
