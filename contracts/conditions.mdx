@@ -298,11 +298,11 @@ function isFrozen(uint40 frozenAt)
 
 **Example Configuration:**
 ```typescript
-// Payer can freeze for 3 days
+// Payer can freeze, arbiter can unfreeze
 const freezePolicy = await factory.deploy(
-  PAYER_CONDITION,      // freeze condition
-  PAYER_CONDITION,      // unfreeze condition
-  3 * 24 * 60 * 60      // 3 days
+  PAYER_CONDITION,      // freeze condition (payer protection)
+  ARBITER_CONDITION,    // unfreeze condition (dispute resolution)
+  3 * 24 * 60 * 60      // 3 days (auto-expires)
 );
 ```
 
@@ -310,7 +310,7 @@ const freezePolicy = await factory.deploy(
 - Payment frozen at time `T`
 - Freeze expires at `T + freezeDuration`
 - After expiry, payment automatically unfrozen
-- Can be manually unfrozen earlier if `unfreezeCondition` allows
+- Can be manually unfrozen earlier by arbiter (for dispute resolution)
 
 ---
 

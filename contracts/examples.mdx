@@ -13,11 +13,11 @@ icon: "code"
 <Steps>
   <Step title="Deploy Freeze Policy">
     ```typescript
-    // Payer can freeze for 3 days
+    // Payer can freeze, arbiter can unfreeze (or wait for expiry)
     const freezePolicy = await freezePolicyFactory.deploy(
       PAYER_CONDITION,      // Only payer can freeze
-      PAYER_CONDITION,      // Only payer can unfreeze
-      3 * 24 * 60 * 60      // 3 days
+      ARBITER_CONDITION,    // Only arbiter can unfreeze
+      3 * 24 * 60 * 60      // 3 days (auto-expires)
     );
     ```
   </Step>
@@ -88,7 +88,7 @@ Day 5: Buyer notices issue, freezes payment
 │
 Day 7: Escrow period ends (but payment still frozen)
 │
-Day 8: Freeze expires OR buyer unfreezes
+Day 8: Freeze expires automatically (or arbiter unfreezes early)
 │
 ├─ Seller can now release
 │
@@ -99,20 +99,20 @@ Day 9: Seller calls release()
 
 ---
 
-## Example 2: Instant Release (No Escrow)
+## Example 2: Instant Payment (Using Charge)
 
-**Use Case:** Trusted seller scenario or digital goods where buyer wants instant delivery.
+**Use Case:** Digital goods or services where immediate payment to seller is expected.
 
 ### Configuration
 
 ```typescript
 const config = {
   authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
-  authorizeRecorder: address(0),              // No time tracking
-  chargeCondition: address(0),                // Default allow
+  authorizeRecorder: address(0),              // No time tracking needed
+  chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
   chargeRecorder: address(0),
-  releaseCondition: RECEIVER_CONDITION,       // Only receiver
-  releaseRecorder: address(0),                // No tracking needed
+  releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
+  releaseRecorder: address(0),
   refundInEscrowCondition: ARBITER_CONDITION,
   refundInEscrowRecorder: address(0),
   refundPostEscrowCondition: ARBITER_CONDITION,
@@ -122,7 +122,7 @@ const config = {
 const operator = await operatorFactory.deploy(
   arbiterAddress,
   config,
-  10,   // 0.1% fee (higher for instant release)
+  10,   // 0.1% fee (higher for instant payment)
   50    // 50% to protocol
 );
 ```
@@ -130,15 +130,15 @@ const operator = await operatorFactory.deploy(
 ### Payment Flow
 
 ```
-Buyer authorizes → Seller immediately releases → Funds transferred
+Buyer authorizes → Seller immediately charges → Funds transferred
                    (no waiting period)
 ```
 
 **Trade-offs:**
-- ✅ Instant delivery
-- ✅ Better UX for digital goods
-- ❌ No buyer protection period
-- ❌ Refunds require arbiter intervention
+- ✅ Instant delivery for digital goods
+- ✅ Better UX - seller gets paid immediately
+- ❌ No buyer protection escrow period
+- ❌ Refunds require arbiter intervention (post-escrow only)
 
 ---
 
@@ -149,11 +149,11 @@ Buyer authorizes → Seller immediately releases → Funds transferred
 ### Configuration
 
 ```typescript
-// Receiver can freeze for 5 days (product inspection period)
+// Receiver can freeze for 5 days, arbiter can unfreeze
 const freezePolicy = await freezePolicyFactory.deploy(
-  RECEIVER_CONDITION,   // Receiver can freeze
-  RECEIVER_CONDITION,   // Receiver can unfreeze
-  5 * 24 * 60 * 60      // 5 days
+  RECEIVER_CONDITION,   // Receiver can freeze (product defect)
+  ARBITER_CONDITION,    // Arbiter can unfreeze (dispute resolution)
+  5 * 24 * 60 * 60      // 5 days (auto-expires)
 );
 
 // 14-day escrow (shipping + inspection)

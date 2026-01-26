@@ -287,25 +287,25 @@ Use these pre-deployed condition contracts:
 
 <Tabs>
   <Tab title="Payer Freeze">
-    Only payer can freeze/unfreeze for 3 days:
+    Payer can freeze, arbiter can unfreeze (or auto-expires after 3 days):
 
     ```typescript
     const freezePolicy = await freezePolicyFactory.deploy(
       PAYER_CONDITION,      // Only payer can freeze
-      PAYER_CONDITION,      // Only payer can unfreeze
-      3 * 24 * 60 * 60      // 3 days
+      ARBITER_CONDITION,    // Only arbiter can unfreeze
+      3 * 24 * 60 * 60      // 3 days (auto-expires)
     );
     ```
   </Tab>
 
   <Tab title="Receiver Freeze">
-    Only receiver can freeze/unfreeze for 5 days:
+    Receiver can freeze, arbiter can unfreeze (or auto-expires after 5 days):
 
     ```typescript
     const freezePolicy = await freezePolicyFactory.deploy(
       RECEIVER_CONDITION,   // Only receiver can freeze
-      RECEIVER_CONDITION,   // Only receiver can unfreeze
-      5 * 24 * 60 * 60      // 5 days
+      ARBITER_CONDITION,    // Only arbiter can unfreeze
+      5 * 24 * 60 * 60      // 5 days (auto-expires)
     );
     ```
   </Tab>
