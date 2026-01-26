@@ -360,50 +360,7 @@ Day 5: Buyer requests return
 
 ---
 
-## Example 7: Two-Party Approval Required
-
-**Use Case:** Both payer and receiver must agree to release (mutual consent).
-
-### Configuration
-
-```typescript
-// Both payer AND receiver must call to release
-const twoPartyApproval = await new AndCondition([
-  PAYER_CONDITION,      // Payer must approve
-  RECEIVER_CONDITION    // Receiver must approve
-]);
-
-// NOTE: This requires a custom recorder to track approvals
-// For simplicity, using arbiter as tie-breaker
-
-const releaseCondition = await new OrCondition([
-  twoPartyApproval,     // Both parties agree
-  ARBITER_CONDITION     // OR arbiter decides
-]);
-
-const config = {
-  authorizeCondition: PAYER_CONDITION,
-  authorizeRecorder: address(0),
-  chargeCondition: address(0),
-  chargeRecorder: address(0),
-  releaseCondition: releaseCondition,
-  releaseRecorder: address(0),
-  refundInEscrowCondition: ARBITER_CONDITION,
-  refundInEscrowRecorder: address(0),
-  refundPostEscrowCondition: ARBITER_CONDITION,
-  refundPostEscrowRecorder: address(0)
-};
-
-const operator = await operatorFactory.deploy(arbiterAddress, config, 5, 25);
-```
-
-<Warning>
-**Note:** This example requires BOTH payer and receiver to call `release()` simultaneously, which isn't practical. For real two-party approval, you'd need a custom condition that tracks approvals separately.
-</Warning>
-
----
-
-## Example 8: Subscription Payments
+## Example 7: Subscription Payments
 
 **Use Case:** Recurring payments with automatic charge capability.
 
@@ -456,10 +413,11 @@ Month 6: User disputes charge
 | Use Case | Max Fee (bps) | Protocol % | Arbiter % | Total on 1000 USDC |
 |----------|---------------|------------|-----------|-------------------|
 | Standard E-Commerce | 5 (0.05%) | 25% | 75% | 0.50 USDC |
-| Instant Release | 10 (0.1%) | 50% | 50% | 1.00 USDC |
+| Instant Payment | 10 (0.1%) | 50% | 50% | 1.00 USDC |
 | Physical Goods | 3 (0.03%) | 20% | 80% | 0.30 USDC |
 | Service/Milestone | 8 (0.08%) | 30% | 70% | 0.80 USDC |
 | Managed Escrow | 20 (0.2%) | 0% | 100% | 2.00 USDC |
+| Receiver Refunds | 5 (0.05%) | 25% | 75% | 0.50 USDC |
 | Subscription | 15 (0.15%) | 40% | 60% | 1.50 USDC |
 
 ---
