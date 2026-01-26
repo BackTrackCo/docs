@@ -107,8 +107,8 @@ Day 9: Seller calls release()
 
 ```typescript
 const config = {
-  authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
-  authorizeRecorder: address(0),              // No time tracking needed
+  authorizeCondition: address(0),             // Not used (charge handles auth)
+  authorizeRecorder: address(0),
   chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
   chargeRecorder: address(0),
   releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
@@ -130,11 +130,12 @@ const operator = await operatorFactory.deploy(
 ### Payment Flow
 
 ```
-Buyer authorizes → Seller immediately charges → Funds transferred
-                   (no waiting period)
+Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
+                        (authorizes + charges atomically)
 ```
 
 **Trade-offs:**
+- ✅ Single transaction - no separate authorize step
 - ✅ Instant delivery for digital goods
 - ✅ Better UX - seller gets paid immediately
 - ❌ No buyer protection escrow period
