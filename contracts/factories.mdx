@@ -452,13 +452,21 @@ Use `predict*Address()` functions before deploying to verify addresses off-chain
 
 Each factory uses different salt strategies:
 
-**ArbitrationOperatorFactory:**
+**PaymentOperatorFactory:**
 ```solidity
-bytes32 salt = keccak256(abi.encode(
-    arbiter,
-    config,
-    maxFeeBps,
-    protocolFeePct
+bytes32 key = keccak256(abi.encodePacked(
+    config.feeRecipient,
+    config.feeCalculator,
+    config.authorizeCondition,
+    config.authorizeRecorder,
+    config.chargeCondition,
+    config.chargeRecorder,
+    config.releaseCondition,
+    config.releaseRecorder,
+    config.refundInEscrowCondition,
+    config.refundInEscrowRecorder,
+    config.refundPostEscrowCondition,
+    config.refundPostEscrowRecorder
 ));
 ```
 

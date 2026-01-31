@@ -73,7 +73,7 @@ This deploys:
 1. **AuthCaptureEscrow** - Escrow contract for holding funds
 2. **ERC3009PaymentCollector** - Payment collector
 3. **EscrowPeriodConditionFactory** - Factory for time-based conditions
-4. **ArbitrationOperatorFactory** - Factory for operator instances
+4. **PaymentOperatorFactory** - Factory for operator instances
 5. **Condition Singletons** - PayerCondition, ReceiverCondition, ArbiterCondition, AlwaysTrueCondition
 6. **FreezePolicyFactory** - Factory for creating freeze policy instances
 7. **RefundRequest** - Refund request manager
@@ -159,7 +159,7 @@ forge script script/DeployArbitrationOperator.s.sol:DeployArbitrationOperator \
 ```
 
 <Tip>
-The ArbitrationOperatorFactory uses CREATE2 for deterministic addresses. Calling with the same configuration returns the existing operator instead of deploying a new one.
+The PaymentOperatorFactory uses CREATE2 for deterministic addresses. Calling with the same configuration returns the existing operator instead of deploying a new one.
 </Tip>
 
 ## Supported Networks
@@ -200,7 +200,7 @@ cast balance $DEPLOYER_ADDRESS --rpc-url $RPC_URL
 Manually verify contracts:
 ```bash
 forge verify-contract $CONTRACT_ADDRESS \
-  src/commerce-payments/operator/ArbitrationOperatorFactory.sol:ArbitrationOperatorFactory \
+  src/operator/PaymentOperatorFactory.sol:PaymentOperatorFactory \
   --chain-id 84532 \
   --watch
 ```
