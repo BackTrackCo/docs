@@ -136,13 +136,17 @@ struct RecordedInfo {
 }
 ```
 
-### Fee Distribution
+### Fee Distribution (Additive Model)
 
-For a 1000 USDC payment with 0.05% fee (5 basis points) and 25% protocol share:
+Fees are **additive**: `totalFee = protocolFee + operatorFee`
 
-<Frame>
-  <img src="/images/fee-distribution.svg" alt="Fee distribution showing payment split between receiver, protocol, and operator" />
-</Frame>
+For a 1000 USDC payment with 3 bps protocol fee + 2 bps operator fee:
+- **Protocol Fee:** 0.30 USDC (3 bps) → `protocolFeeRecipient` on ProtocolFeeConfig
+- **Operator Fee:** 0.20 USDC (2 bps) → `FEE_RECIPIENT` on operator
+- **Total Fee:** 0.50 USDC (5 bps)
+- **Receiver Gets:** 999.50 USDC
+
+Fees accumulate in the operator and are distributed via `distributeFees(token)`.
 
 **FEE_RECIPIENT** can be:
 - Arbiter address (marketplace with disputes)
@@ -157,7 +161,7 @@ For a 1000 USDC payment with 0.05% fee (5 basis points) and 25% protocol share:
 | **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
 | **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
 | **Designated Address** | Any action per conditions (e.g., `refundInEscrow()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
-| **Owner** | `queueFeesEnabled()`, `executeFeesEnabled()`, `rescueETH()` | 24-hour timelock on fee changes |
+| **Protocol Owner** | `queueCalculator()`, `executeCalculator()`, `queueRecipient()`, `executeRecipient()` | 7-day timelock on ProtocolFeeConfig changes |
 
 <Note>
 "Designated Address" is configured per operator via StaticAddressCondition. Can be:
@@ -179,29 +183,33 @@ All state-changing functions use `ReentrancyGuardTransient` (EIP-1153):
 
 ### Timelock Protection
 
-Fee changes require 24-hour delay:
+Protocol fee calculator changes require 7-day delay on `ProtocolFeeConfig`:
 
 ```typescript
-// Step 1: Queue change
-await operator.queueFeeUpdate(newMaxFee, newProtocolPct);
+// Step 1: Queue new calculator
+await protocolFeeConfig.queueCalculator(newCalculatorAddress);
 
-// Step 2: Wait 24 hours
+// Step 2: Wait 7 days
 
 // Step 3: Execute
-await operator.executeFeeUpdate();
+await protocolFeeConfig.executeCalculator();
 ```
 
-Emergency disable also requires timelock:
+Protocol fee recipient changes also require 7-day timelock:
 
 ```typescript
-// Step 1: Queue disable
-await operator.queueFeesEnabled(false);
+// Step 1: Queue new recipient
+await protocolFeeConfig.queueRecipient(newRecipientAddress);
 
-// Step 2: Wait 24 hours
+// Step 2: Wait 7 days
 
 // Step 3: Execute
-await operator.executeFeesEnabled();
+await protocolFeeConfig.executeRecipient();
 ```
+
+<Note>
+Operator fees are **immutable** - set at deploy time via `IFeeCalculator`. Only protocol fees can be changed (with 7-day timelock).
+</Note>
 
 ### Two-Step Ownership
 
@@ -235,7 +243,7 @@ event FeeUpdateQueued(uint256 newMaxFee, uint256 newProtocolPct, uint256 effecti
 event FeeUpdateExecuted(uint256 maxFee, uint256 protocolPct);
 ```
 
-These events enable off-chain monitoring and indexing. See [Monitoring](/monitoring) for implementation details.
+These events enable off-chain monitoring and indexing.
 
 ## Next Steps
 

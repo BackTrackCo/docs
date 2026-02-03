@@ -157,7 +157,7 @@ Most contracts are immutable to prevent rug pulls and ensure trustlessness:
 - **EscrowPeriodCondition** - Cannot modify escrow period
 - **FreezePolicy** - Cannot change freeze rules
 
-Only fee configuration is mutable (with 24-hour timelock).
+Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelock). Operator fees are immutable.
 </Accordion>
 
 <Accordion title="Gas Optimization">
@@ -176,7 +176,7 @@ Only fee configuration is mutable (with 24-hour timelock).
 
 <Accordion title="Security First">
 - Reentrancy guards on all state changes
-- 24-hour timelock on fee changes
+- 7-day timelock on protocol fee changes
 - Two-step ownership transfers
 - Comprehensive event logging for monitoring
 </Accordion>

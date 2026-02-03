@@ -32,14 +32,6 @@
               "contracts/conditions",
               "contracts/examples"
             ]
-          },
-          {
-            "group": "Operations",
-            "pages": [
-              "contract-deployment",
-              "monitoring",
-              "security"
-            ]
           }
         ]
       },

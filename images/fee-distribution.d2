@@ -1,6 +1,6 @@
 direction: down
 
-title: Fee Distribution Example - 1000 USDC Payment {
+title: Fee Distribution Example - 1000 USDC Payment (Additive Model) {
   near: top-center
   shape: text
   style: {
@@ -18,7 +18,7 @@ payment: Payment\n1000 USDC {
   }
 }
 
-total_fee: Total Fee\n0.5 USDC {
+total_fee: Total Fee\n0.50 USDC (5 bps) {
   style: {
     fill: "#8b5cf6"
     stroke: "#7c3aed"
@@ -27,7 +27,7 @@ total_fee: Total Fee\n0.5 USDC {
   }
 }
 
-receiver: Receiver Gets\n999.5 USDC {
+receiver: Receiver Gets\n999.50 USDC {
   style: {
     fill: "#10b981"
     stroke: "#059669"
@@ -36,7 +36,7 @@ receiver: Receiver Gets\n999.5 USDC {
   }
 }
 
-protocol_fee: Protocol Fee\n0.125 USDC\n(25% of fee) {
+protocol_fee: Protocol Fee\n0.30 USDC (3 bps)\nvia ProtocolFeeConfig {
   style: {
     fill: "#f59e0b"
     stroke: "#d97706"
@@ -45,7 +45,7 @@ protocol_fee: Protocol Fee\n0.125 USDC\n(25% of fee) {
   }
 }
 
-operator_fee: Operator Fee\n0.375 USDC\n(75% of fee) {
+operator_fee: Operator Fee\n0.20 USDC (2 bps)\nvia FEE_CALCULATOR {
   style: {
     fill: "#f59e0b"
     stroke: "#d97706"
@@ -54,7 +54,7 @@ operator_fee: Operator Fee\n0.375 USDC\n(75% of fee) {
   }
 }
 
-protocol_treasury: Protocol\nTreasury {
+protocol_treasury: protocolFeeRecipient\n(on ProtocolFeeConfig) {
   style: {
     fill: "#e5e7eb"
     stroke: "#9ca3af"
@@ -63,7 +63,7 @@ protocol_treasury: Protocol\nTreasury {
   }
 }
 
-fee_recipient: FEE_RECIPIENT\nArbiter/Provider/DAO {
+fee_recipient: FEE_RECIPIENT\n(on Operator) {
   style: {
     fill: "#e5e7eb"
     stroke: "#9ca3af"
@@ -72,9 +72,9 @@ fee_recipient: FEE_RECIPIENT\nArbiter/Provider/DAO {
   }
 }
 
-payment -> total_fee
+payment -> total_fee: splits into
 payment -> receiver
-total_fee -> protocol_fee
-total_fee -> operator_fee
+total_fee -> protocol_fee: +
+total_fee -> operator_fee: +
 protocol_fee -> protocol_treasury
 operator_fee -> fee_recipient

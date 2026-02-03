@@ -21,15 +21,18 @@ The main payment operator contract with pluggable conditions for flexible author
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
 address public immutable FEE_RECIPIENT;       // Operator fee recipient
-address public immutable PROTOCOL_FEE_RECIPIENT; // Protocol fee recipient
+ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG; // Shared protocol fee config
+IFeeCalculator public immutable FEE_CALCULATOR; // Operator fee calculator
 ```
 
-### Mutable Fields
+### State
 
 ```solidity
-uint16 public maxTotalFeeRate;               // Max fee in basis points
-uint8 public protocolFeePercentage;          // Protocol's share (0-100)
-mapping(bytes32 => PaymentInfo) public payments; // Payment data
+// Fee tracking for accurate distribution
+mapping(address token => uint256) public accumulatedProtocolFees;
+
+// Fees locked at authorization time
+mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ```
 
 ### 10-Slot Configuration
@@ -154,79 +157,86 @@ function refundPostEscrow(bytes32 paymentId) external nonReentrant
 **Most configurations:** address(0) - no post-escrow refunds
 </Note>
 
-### Fee Configuration
+### Fee System (Modular, Additive)
 
-Fees can be enabled/disabled and configured by the owner.
+Fees are additive and modular: `totalFee = protocolFee + operatorFee`
 
-#### Fee Structure
+#### Fee Architecture
 
 ```solidity
-uint16 public maxTotalFeeRate;        // e.g., 5 = 0.05% = 5 basis points
-uint8 public protocolFeePercentage;   // e.g., 25 = 25% to protocol, 75% to fee recipient
-address public immutable FEE_RECIPIENT; // Who receives operator share of fees
+// Shared protocol fee config (timelocked, swappable calculator)
+ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG;
+
+// Per-operator fee calculator (immutable, set at deploy)
+IFeeCalculator public immutable FEE_CALCULATOR;
+
+// Fee recipients
+address public immutable FEE_RECIPIENT;  // Operator fee recipient
+// Protocol fee recipient is on ProtocolFeeConfig
+
+// Fee tracking for accurate distribution
+mapping(address token => uint256) public accumulatedProtocolFees;
 ```
 
-**Example Fee Calculation:**
+**Example Fee Calculation (Additive):**
 
-<Frame>
-  <img src="/images/fee-distribution.png" alt="Fee distribution showing payment split between receiver, protocol, and operator" />
-</Frame>
+For a 1000 USDC payment:
+- **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC → goes to `protocolFeeRecipient`
+- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC → goes to `FEE_RECIPIENT`
+- **Total Fee:** 5 bps (0.05%) = 0.50 USDC
+- **Receiver Gets:** 999.50 USDC
 
-**Breakdown:**
-- **Payment:** 1000 USDC (100%)
-- **Total Fee:** 0.5 USDC (0.05% or 5 basis points)
-  - **Protocol Fee:** 0.125 USDC (25% of fee)
-  - **Operator Fee:** 0.375 USDC (75% of fee)
-- **Receiver Gets:** 999.5 USDC (99.95%)
-
-The FEE_RECIPIENT can be configured as:
-- Arbiter (marketplace with disputes)
-- Service Provider (subscriptions)
-- Platform Treasury (platform-controlled)
-- DAO Multisig (governance-controlled)
-
-**FEE_RECIPIENT examples:**
-- Arbiter (marketplace with disputes)
-- Service Provider (subscriptions)
-- Platform Treasury (platform-controlled)
-- DAO Multisig (governance-controlled)
-
-#### Updating Fees (24-hour Timelock)
+**Fee Locking:**
+Fees are calculated and stored at `authorize()` time in `authorizedFees[hash]`. This prevents protocol fee changes from breaking capture of already-authorized payments.
 
 ```solidity
-// Step 1: Queue new fees
-operator.queueFeeUpdate(
-    10,  // New max fee: 10 basis points (0.1%)
-    30   // New protocol %: 30%
-);
+struct AuthorizedFees {
+    uint16 totalFeeBps;
+    uint16 protocolFeeBps;
+}
+mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
+```
 
-// Step 2: Wait 24 hours
+**FEE_RECIPIENT** can be:
+- Arbiter (marketplace with disputes)
+- Service Provider (subscriptions)
+- Platform Treasury (platform-controlled)
+- DAO Multisig (governance-controlled)
+
+#### Fee Distribution
+
+Fees accumulate in the operator contract and are distributed via `distributeFees(token)`:
+
+```solidity
+// Anyone can call to distribute fees for a token
+operator.distributeFees(usdcAddress);
+// Protocol share → protocolFeeRecipient
+// Operator share → FEE_RECIPIENT
+```
+
+#### Protocol Fee Changes (7-day Timelock)
+
+Protocol fee calculator changes require a 7-day timelock on `ProtocolFeeConfig`:
+
+```solidity
+// Step 1: Queue new calculator
+protocolFeeConfig.queueCalculator(newCalculatorAddress);
+
+// Step 2: Wait 7 days
 
 // Step 3: Execute
-operator.executeFeeUpdate();
-```
-
-#### Emergency Fee Disable
-
-```solidity
-// Queue disable
-operator.queueFeesEnabled(false);
-
-// Wait 24 hours
-
-// Execute
-operator.executeFeesEnabled();
+protocolFeeConfig.executeCalculator();
 ```
 
 <Warning>
-Fee changes require 24-hour timelock. Plan ahead for fee updates. Consider pre-queuing emergency actions.
+Protocol fee changes require 7-day timelock. Operator fees are immutable (set at deploy time).
 </Warning>
 
 ### Security Features
 
 - **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
 - **Ownership** - Solady's Ownable with 2-step transfer
-- **Timelock** - 24-hour delay on all fee changes
+- **Timelock** - 7-day delay on protocol fee changes (operator fees are immutable)
 - **Immutable Core** - Escrow and arbiter cannot be changed
 
 ---
@@ -543,8 +553,5 @@ Safe token transfer utilities from commerce-payments.
   </Card>
   <Card title="Examples" icon="code" href="/contracts/examples">
     See real-world configuration examples.
-  </Card>
-  <Card title="Deploy Contracts" icon="rocket" href="/contract-deployment">
-    Deploy contracts to your network.
   </Card>
 </CardGroup>
