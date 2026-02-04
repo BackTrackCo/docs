@@ -29,28 +29,39 @@ icon: "code"
     ```
   </Step>
 
-  <Step title="Deploy Escrow Period Condition">
+  <Step title="Deploy EscrowPeriod and Freeze">
     ```typescript
-    // 7-day escrow with freeze support
-    const [escrowCondition, escrowRecorder] =
-      await escrowPeriodFactory.deploy(
-        7 * 24 * 60 * 60,    // 7 days
-        freezePolicy
-      );
+    // 7-day escrow period (combined recorder + condition)
+    const escrowPeriod = await escrowPeriodFactory.deploy(
+      7 * 24 * 60 * 60,    // 7 days
+      zeroHash             // bytes32(0) = operator-only
+    );
+
+    // Freeze condition linked to escrow period
+    const freeze = await freezeFactory.deploy(
+      freezePolicy,
+      escrowPeriod         // Link to escrow period for time constraint
+    );
     ```
   </Step>
 
   <Step title="Create Release Condition">
     ```typescript
-    // (Receiver OR Arbiter) AND EscrowPassed
+    // (Receiver OR Arbiter) AND (EscrowPassed AND NotFrozen)
     const receiverOrArbiter = await new OrCondition([
       RECEIVER_CONDITION,
       arbiterCondition.address
     ]);
 
+    // Compose escrow period and freeze checks
+    const escrowAndFreeze = await new AndCondition([
+      escrowPeriod,        // Escrow period passed
+      freeze               // Not frozen
+    ]);
+
     const releaseCondition = await new AndCondition([
       receiverOrArbiter,
-      escrowCondition
+      escrowAndFreeze
     ]);
     ```
   </Step>
@@ -59,12 +70,13 @@ icon: "code"
     ```typescript
     const config = {
       feeRecipient: arbiterAddress,         // Arbiter earns fees for dispute resolution
+      feeCalculator: feeCalculatorAddress,  // Operator fee calculator
       authorizeCondition: ALWAYS_TRUE_CONDITION,
-      authorizeRecorder: escrowRecorder,
+      authorizeRecorder: escrowPeriod,      // Same address for recording auth time
       chargeCondition: RECEIVER_CONDITION,
       chargeRecorder: '0x0000000000000000000000000000000000000000',
       releaseCondition: releaseCondition,
-      releaseRecorder: escrowRecorder,
+      releaseRecorder: '0x0000000000000000000000000000000000000000',
       refundInEscrowCondition: arbiterCondition.address,
       refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
       refundPostEscrowCondition: arbiterCondition.address,
@@ -121,6 +133,7 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
@@ -170,26 +183,29 @@ const freezePolicy = await freezePolicyFactory.deploy(
 );
 
 // 14-day escrow (shipping + inspection)
-const [escrowCondition, escrowRecorder] =
-  await escrowPeriodFactory.deploy(
-    14 * 24 * 60 * 60,   // 14 days
-    freezePolicy
-  );
+const escrowPeriod = await escrowPeriodFactory.deploy(
+  14 * 24 * 60 * 60,   // 14 days
+  zeroHash             // bytes32(0) = operator-only
+);
+
+// Deploy Freeze linked to escrow period
+const freeze = await freezeFactory.deploy(freezePolicy, escrowPeriod);
 
 // Receiver OR Arbiter can release (after escrow + not frozen)
 const releaseCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
-  escrowCondition
+  await new AndCondition([escrowPeriod, freeze])
 ]);
 
 const config = {
   feeRecipient: arbiterAddress,         // Arbiter earns fees
+  feeCalculator: feeCalculatorAddress,  // Operator fee calculator
   authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowRecorder,
+  authorizeRecorder: escrowPeriod,      // Same address for recording auth time
   chargeCondition: '0x0000000000000000000000000000000000000000',
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
-  releaseRecorder: escrowRecorder,
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: arbiterCondition.address,
   refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
@@ -245,27 +261,27 @@ sequenceDiagram
 // Deploy arbiter condition for disputes
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
-// No freeze policy (service-based)
-const [escrowCondition, escrowRecorder] =
-  await escrowPeriodFactory.deploy(
-    3 * 24 * 60 * 60,     // 3 days per milestone
-    '0x0000000000000000000000000000000000000000'            // No freeze
-  );
+// 3-day escrow per milestone (no freeze)
+const escrowPeriod = await escrowPeriodFactory.deploy(
+  3 * 24 * 60 * 60,     // 3 days per milestone
+  zeroHash              // bytes32(0) = operator-only
+);
 
 // Receiver can release after short escrow
 const releaseCondition = await new AndCondition([
   RECEIVER_CONDITION,    // Only receiver
-  escrowCondition
+  escrowPeriod           // Escrow period passed
 ]);
 
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
-  authorizeRecorder: escrowRecorder,
+  authorizeRecorder: escrowPeriod,            // Record auth time
   chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
-  releaseRecorder: escrowRecorder,
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: arbiterCondition.address,
   refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: arbiterCondition.address,
@@ -322,6 +338,7 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns all fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: arbiterCondition.address,      // Arbiter creates payments
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: arbiterCondition.address,         // Arbiter charges
@@ -358,17 +375,16 @@ Factory-level fees still apply (MAX_TOTAL_FEE_RATE and PROTOCOL_FEE_PERCENTAGE).
 // Deploy arbiter condition
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
-// 7-day escrow
-const [escrowCondition, escrowRecorder] =
-  await escrowPeriodFactory.deploy(
-    7 * 24 * 60 * 60,
-    '0x0000000000000000000000000000000000000000'            // No freeze
-  );
+// 7-day escrow (no freeze)
+const escrowPeriod = await escrowPeriodFactory.deploy(
+  7 * 24 * 60 * 60,
+  zeroHash              // bytes32(0) = operator-only
+);
 
 // Receiver OR Arbiter can release
 const releaseCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
-  escrowCondition
+  escrowPeriod          // Escrow period passed
 ]);
 
 // Receiver OR Arbiter can refund
@@ -379,12 +395,13 @@ const refundCondition = await new OrCondition([
 
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowRecorder,
+  authorizeRecorder: escrowPeriod,            // Record auth time
   chargeCondition: '0x0000000000000000000000000000000000000000',
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
-  releaseRecorder: escrowRecorder,
+  releaseRecorder: '0x0000000000000000000000000000000000000000',
   refundInEscrowCondition: refundCondition,    // Receiver OR Arbiter
   refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
   refundPostEscrowCondition: RECEIVER_CONDITION, // Only receiver post-escrow
@@ -436,6 +453,7 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 // Receiver can charge immediately (no escrow)
 const config = {
   feeRecipient: serviceProviderAddress,       // Service provider earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: providerCondition.address, // Provider charges monthly
@@ -507,6 +525,7 @@ const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
 
 const config = {
   feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: daoCondition.address,   // DAO authorizes grants
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: '0x0000000000000000000000000000000000000000',
@@ -575,6 +594,7 @@ const timeProportionalCondition = await new TimeProportionalCondition();
 
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: PAYER_CONDITION,        // Payer authorizes stream
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: new AndCondition([
@@ -647,6 +667,7 @@ const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizeCondition: PAYER_CONDITION,        // Payer creates invoice payment
   authorizeRecorder: '0x0000000000000000000000000000000000000000',
   chargeCondition: RECEIVER_CONDITION,        // Receiver charges on delivery

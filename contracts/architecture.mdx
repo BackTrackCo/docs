@@ -17,29 +17,29 @@ For detailed visual architecture diagrams, see the [x402r-contracts repository](
 
 ### Standard Payment (Happy Path)
 
-1. **Payer** calls `operator.authorize(paymentId, receiver, amount, token)`
+1. **Payer** calls `operator.authorize(paymentInfo, amount, tokenCollector, collectorData)`
 2. **Operator** checks `AUTHORIZE_CONDITION` (if set)
-3. **Operator** calls `escrow.authorize()` to lock funds
-4. **Operator** stores payment info in mapping
+3. **Operator** validates fee bounds and stores fees at authorization time
+4. **Operator** calls `escrow.authorize()` to lock funds
 5. **Operator** calls `AUTHORIZE_RECORDER` to record timestamp
 6. **Escrow period** begins (e.g., 7 days) - if configured
-7. After escrow period: **Authorized address(es)** call `operator.release(paymentId)` (e.g., receiver, designated address, or both)
+7. After escrow period: **Authorized address(es)** call `operator.release(paymentInfo, amount)` (e.g., receiver, designated address, or both)
 8. **Operator** checks `RELEASE_CONDITION` (configurable - can include time checks, role checks, etc.)
-9. **Operator** calls `escrow.release()` to transfer funds to receiver
-10. **Operator** distributes fees to protocol and fee recipient (if enabled)
+9. **Operator** calls `escrow.capture()` to transfer funds to receiver
+10. **Operator** accumulates protocol fees for later distribution
 11. **Operator** calls `RELEASE_RECORDER` to update state
 
 ### Refund Flow (In-Escrow)
 
 **Example: Marketplace with arbiter dispute resolution**
 
-1. **Payer** calls `refundRequest.requestRefund(paymentId, operator)`
+1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount, nonce)`
 2. **RefundRequest** creates request with status `Pending`
 3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
-4. **Designated address** calls `refundRequest.updateStatus(paymentId, operator, Approved)`
-5. **Designated address** calls `operator.refundInEscrow(paymentId)`
+4. **Designated address** calls `refundRequest.updateStatus(paymentInfo, nonce, Approved)`
+5. **Designated address** calls `operator.refundInEscrow(paymentInfo, amount)`
 6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (configured per operator)
-7. **Operator** calls `escrow.void()` to return funds to payer
+7. **Operator** calls `escrow.partialVoid()` to return funds to payer
 8. **Operator** calls `REFUND_IN_ESCROW_RECORDER`
 9. Funds transferred back to payer
 
@@ -75,13 +75,13 @@ Freeze policies are optional and configurable. Define who can freeze, who can un
 When an action is called (e.g., `release()`):
 
 1. **Load Condition** - Get the condition address from operator slot
-2. **Evaluate Condition** - Call `condition.check(paymentInfo, caller)`
+2. **Evaluate Condition** - Call `condition.check(paymentInfo, amount, caller)`
    - Check if caller matches required role (e.g., receiver, arbiter)
    - Check state (e.g., escrow period passed, not frozen)
    - Check other requirements (e.g., time constraints)
 3. **Result:**
    - `true` → Proceed to execute action
-   - `false` → Revert with `NotAuthorized` error
+   - `false` → Revert with `ConditionNotMet` error
 4. **Execute Action** - Call escrow method
 5. **Call Recorder** - Update state after successful execution
 
@@ -92,9 +92,9 @@ When an action is called (e.g., `release()`):
 - If not receiver, checks if caller is arbiter: Yes → PASS
 - If neither: FAIL
 
-**AndCondition([OrCondition(...), EscrowPeriodCondition])**
+**AndCondition([OrCondition(...), EscrowPeriod])**
 - First checks OrCondition: PASS (caller is receiver or arbiter)
-- Then checks EscrowPeriodCondition: PASS (escrow period elapsed, not frozen)
+- Then checks EscrowPeriod: PASS (escrow period elapsed)
 - Both passed → PASS (action allowed)
 
 <Note>
@@ -103,13 +103,11 @@ This example shows marketplace configuration. For subscriptions, you might use `
 
 ## Data Flow
 
-### Payment Information Storage
+### Payment Information
 
 ```solidity
-// In PaymentOperator
-mapping(bytes32 => PaymentInfo) public paymentInfos;
-
 // PaymentInfo is from base commerce-payments (AuthCaptureEscrow)
+// Passed as calldata to operator methods - not stored in operator
 struct PaymentInfo {
     address payer;
     address receiver;
@@ -123,17 +121,31 @@ struct PaymentInfo {
 }
 ```
 
-### Escrow Period Recording
+### Operator State (Minimal)
 
 ```solidity
-// In EscrowPeriodRecorder
-mapping(bytes32 => RecordedInfo) public recordedInfo;
+// PaymentOperator stores only fee-related state
+// Payment state is queried directly from escrow
 
-struct RecordedInfo {
-    uint40 authorizedAt;  // Block timestamp when authorized
-    bool frozen;          // Is payment currently frozen
-    uint40 frozenAt;      // When payment was frozen
-}
+// Fees locked at authorization time
+mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
+
+// Protocol fees pending distribution
+mapping(address token => uint256) public accumulatedProtocolFees;
+```
+
+### EscrowPeriod Recording
+
+```solidity
+// In EscrowPeriod (extends AuthorizationTimeRecorder)
+mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTimes;
+```
+
+### Freeze State (Separate Contract)
+
+```solidity
+// In Freeze contract
+mapping(bytes32 paymentInfoHash => uint256 frozenUntil) public frozenUntil;
 ```
 
 ### Fee Distribution (Additive Model)
