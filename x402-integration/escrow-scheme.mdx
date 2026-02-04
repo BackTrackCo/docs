@@ -36,9 +36,40 @@ The escrow scheme provides four primitives:
 
 ## Visual Flow
 
-<Frame>
-  <img src="/images/escrow-vs-exact.svg" alt="Comparison of exact payment (immediate settlement) vs escrow payment (deferred settlement with operator control)" />
-</Frame>
+### Exact Payment (Immediate Settlement)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Receiver
+
+    Client->>Server: 1. Payment + Signature
+    Server->>Receiver: 2. Immediate Transfer
+    Server->>Client: 3. Deliver Resource
+
+    Note over Client,Receiver: ⚠️ No recourse after payment - Payment is final
+```
+
+### Escrow Payment (Deferred Settlement)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Escrow as Escrow Contract
+    participant Operator
+    participant Server
+    participant Receiver
+
+    Client->>Escrow: 1. Authorize (Lock funds)
+    Server->>Client: 2. Deliver Resource
+    Note over Escrow,Operator: 3. Hold until conditions met
+    Operator->>Escrow: 4. release()
+    Escrow->>Receiver: 5. Transfer funds
+
+    Note over Client,Escrow: Alt: Client can reclaim after expiry
+    Note over Client,Receiver: ✓ Protected until conditions met - Funds held safely, refundable
+```
 
 ### Key Differences
 
