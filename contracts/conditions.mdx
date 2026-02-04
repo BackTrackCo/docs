@@ -15,9 +15,10 @@ Conditions and recorders enable flexible authorization and state tracking withou
 ```solidity
 interface ICondition {
     function check(
-        PaymentInfo calldata payment,
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
         address caller
-    ) external view returns (bool);
+    ) external view returns (bool allowed);
 }
 ```
 
@@ -25,13 +26,20 @@ interface ICondition {
 
 **When Called:** Before operator actions (authorize, charge, release, refund)
 
+**Parameters:**
+- `paymentInfo` - The payment information struct
+- `amount` - The amount involved in the action (0 for authorization-only checks like refund request status updates)
+- `caller` - The address attempting the action
+
 **Example:**
 ```solidity
 // Check if caller is the payment receiver
-function check(PaymentInfo calldata payment, address caller)
-    external view returns (bool)
-{
-    return caller == payment.receiver;
+function check(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address caller
+) external view returns (bool) {
+    return caller == paymentInfo.receiver;
 }
 ```
 
@@ -40,7 +48,7 @@ function check(PaymentInfo calldata payment, address caller)
 ```solidity
 interface IRecorder {
     function record(
-        PaymentInfo calldata payment,
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
         address caller
     ) external;
@@ -51,13 +59,21 @@ interface IRecorder {
 
 **When Called:** After operator actions complete
 
+**Parameters:**
+- `paymentInfo` - The payment information struct
+- `amount` - The amount involved in the action
+- `caller` - The address that executed the action (msg.sender on operator)
+
 **Example:**
 ```solidity
 // Record authorization timestamp
-function record(PaymentInfo calldata payment, uint256 amount, address caller)
-    external
-{
-    authorizedAt[payment.paymentId] = uint40(block.timestamp);
+function record(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address caller
+) external {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    authorizationTimes[hash] = uint40(block.timestamp);
 }
 ```
 
@@ -276,65 +292,114 @@ flowchart TD
 
 ## Time-Based Conditions
 
-### EscrowPeriodCondition
+### EscrowPeriod
 
-Checks if escrow period has elapsed and payment is not frozen.
+Combined recorder and condition contract that tracks authorization time and enforces escrow period.
 
-**Deployment:** Via EscrowPeriodConditionFactory
+**Deployment:** Via EscrowPeriodFactory
+
+**Architecture:**
+- Extends `AuthorizationTimeRecorder` (implements `IRecorder`)
+- Implements `ICondition`
+- Use the SAME address for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
-    external view returns (bool)
-{
-    RecordedInfo memory info = recorder.getInfo(payment.paymentId);
+// ICondition implementation - check() returns true when escrow period has passed
+function check(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256,
+    address
+) external view returns (bool allowed) {
+    return !isDuringEscrowPeriod(paymentInfo);
+}
 
-    // Must be authorized
-    if (info.authorizedAt == 0) return false;
-
-    // Must not be frozen
-    if (info.frozen) return false;
-
-    // Escrow period must have passed
-    return block.timestamp >= info.authorizedAt + escrowPeriod;
+// View function to check if still in escrow period
+function isDuringEscrowPeriod(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) public view returns (bool) {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    uint256 authTime = authorizationTimes[hash];
+    if (authTime == 0) return false;
+    return block.timestamp < authTime + ESCROW_PERIOD;
 }
 ```
 
 **Checks:**
 1. Payment was authorized (has timestamp)
-2. Payment is not currently frozen
-3. Current time ≥ authorization time + escrow period
+2. Current time ≥ authorization time + escrow period
 
 **Use cases:**
 - Time-lock releases (7-day escrow)
 - Delayed fund access
 - Grace periods before actions
 
-### Freeze Policy
+<Note>
+For freeze functionality, deploy a separate `Freeze` condition and compose both via `AndCondition([escrowPeriod, freeze])`.
+</Note>
 
-Determines who can freeze/unfreeze and for how long.
+### Freeze
+
+Standalone condition that blocks release when a payment is frozen. Manages freeze/unfreeze state with optional escrow period time constraint.
+
+**Deployment:** Via FreezeFactory
+
+**Architecture:**
+- Implements `ICondition`
+- Uses a `FreezePolicy` to determine who can freeze/unfreeze
+- Optionally linked to `EscrowPeriod` to restrict freezing to during the escrow period
+
+**Logic:**
+```solidity
+// ICondition implementation - returns false when frozen (blocks release)
+function check(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256,
+    address
+) external view returns (bool allowed) {
+    return !isFrozen(paymentInfo);
+}
+```
+
+**Composition Pattern:**
+```solidity
+// Escrow period only:  releaseCondition = escrowPeriod
+// Freeze only:         releaseCondition = freeze
+// Both:                releaseCondition = AndCondition([escrowPeriod, freeze])
+```
+
+### FreezePolicy
+
+Determines who can freeze/unfreeze payments. Delegates authorization to `ICondition` contracts.
 
 **Deployment:** Via FreezePolicyFactory
 
 **Methods:**
 ```solidity
-function canFreeze(PaymentInfo calldata payment, address caller)
-    external view returns (bool);
+function canFreeze(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    address caller
+) external view returns (bool allowed, uint256 duration);
 
-function canUnfreeze(PaymentInfo calldata payment, address caller)
-    external view returns (bool);
-
-function isFrozen(uint40 frozenAt)
-    external view returns (bool);
+function canUnfreeze(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    address caller
+) external view returns (bool);
 ```
 
 **Example Configuration:**
 ```typescript
-// Payer can freeze, arbiter can unfreeze
-const freezePolicy = await factory.deploy(
+// Payer can freeze, arbiter can unfreeze, 3-day freeze duration
+const freezePolicy = await freezePolicyFactory.deploy(
   PAYER_CONDITION,      // freeze condition (payer protection)
   ARBITER_CONDITION,    // unfreeze condition (dispute resolution)
-  3 * 24 * 60 * 60      // 3 days (auto-expires)
+  3 * 24 * 60 * 60      // 3 days (auto-expires, 0 = permanent)
+);
+
+// Then deploy Freeze condition using this policy
+const freeze = await freezeFactory.deploy(
+  freezePolicy,         // freeze policy address
+  escrowPeriod          // optional: link to EscrowPeriod (address(0) = unconstrained)
 );
 ```
 
@@ -342,60 +407,86 @@ const freezePolicy = await factory.deploy(
 - Payment frozen at time `T`
 - Freeze expires at `T + freezeDuration`
 - After expiry, payment automatically unfrozen
-- Can be manually unfrozen earlier by arbiter (for dispute resolution)
+- Can be manually unfrozen earlier by authorized party
+- Duration of `0` means permanent freeze (until manually unfrozen)
 
 ---
 
 ## Recorders
 
-### EscrowPeriodRecorder
+### AuthorizationTimeRecorder
 
-Records authorization time and freeze state for time-based conditions.
-
-**Deployment:** Via EscrowPeriodConditionFactory (paired with EscrowPeriodCondition)
+Records authorization timestamp for time-based conditions.
 
 **State:**
 ```solidity
-struct RecordedInfo {
-    uint40 authorizedAt;  // When payment was authorized
-    bool frozen;          // Is payment currently frozen
-    uint40 frozenAt;      // When payment was frozen
-}
-
-mapping(bytes32 => RecordedInfo) public recordedInfo;
+mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTimes;
 ```
 
 **Methods:**
 ```solidity
 // Called after authorize()
-function record(PaymentInfo calldata payment, uint256 amount, address caller)
-    external
-{
-    recordedInfo[payment.paymentId].authorizedAt = uint40(block.timestamp);
+function record(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address caller
+) external {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    authorizationTimes[hash] = block.timestamp;
 }
 
-// Freeze payment
-function freeze(bytes32 paymentId, PaymentInfo calldata payment)
-    external
-{
-    require(freezePolicy.canFreeze(payment, msg.sender));
-    recordedInfo[paymentId].frozen = true;
-    recordedInfo[paymentId].frozenAt = uint40(block.timestamp);
-}
-
-// Unfreeze payment
-function unfreeze(bytes32 paymentId, PaymentInfo calldata payment)
-    external
-{
-    require(freezePolicy.canUnfreeze(payment, msg.sender));
-    recordedInfo[paymentId].frozen = false;
+// View function
+function getAuthorizationTime(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) external view returns (uint256) {
+    return authorizationTimes[escrow.getHash(paymentInfo)];
 }
 ```
 
+<Note>
+`EscrowPeriod` extends `AuthorizationTimeRecorder` and adds `ICondition` implementation. Use `EscrowPeriod` directly instead of deploying `AuthorizationTimeRecorder` separately.
+</Note>
+
+### PaymentIndexRecorder
+
+Records a sequential index for each payment action, enabling multiple refund requests per payment.
+
+**State:**
+```solidity
+mapping(bytes32 paymentInfoHash => uint256 count) public paymentIndex;
+```
+
+**Methods:**
+```solidity
+function record(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address caller
+) external {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    paymentIndex[hash]++;
+}
+
+function getPaymentIndex(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) external view returns (uint256) {
+    return paymentIndex[escrow.getHash(paymentInfo)];
+}
+```
+
+### RecorderCombinator
+
+Combines multiple recorders into one, calling each in sequence.
+
 **Usage:**
-1. Pair with EscrowPeriodCondition
-2. Set as `authorizeRecorder` and `releaseRecorder`
-3. Condition reads state from recorder
+```solidity
+RecorderCombinator combo = new RecorderCombinator([
+    escrowPeriod,           // Records authorization time
+    paymentIndexRecorder    // Records payment index
+]);
+
+config.authorizeRecorder = address(combo);
+```
 
 ### Custom Recorders
 

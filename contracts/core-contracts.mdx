@@ -65,19 +65,26 @@ Authorizes a payment and locks funds in escrow.
 
 ```solidity
 function authorize(
-    bytes32 paymentId,
-    address receiver,
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256 amount,
-    address token
+    address tokenCollector,
+    bytes calldata collectorData
 ) external nonReentrant
 ```
 
+**Parameters:**
+- `paymentInfo` - Payment info struct (must have `operator == address(this)`, `feeReceiver == address(this)`)
+- `amount` - Amount to authorize
+- `tokenCollector` - Address of the token collector contract
+- `collectorData` - Data to pass to the token collector
+
 **Flow:**
 1. Check `AUTHORIZE_CONDITION` (if set)
-2. Call `escrow.authorize()`
-3. Store payment info in mapping
-4. Call `AUTHORIZE_RECORDER` (if set)
-5. Emit `PaymentAuthorized`
+2. Validate fee bounds compatibility
+3. Store fees at authorization time (prevents protocol fee changes from breaking capture)
+4. Call `escrow.authorize()`
+5. Call `AUTHORIZE_RECORDER` (if set)
+6. Emit `AuthorizationCreated`
 
 **Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
 
@@ -85,21 +92,61 @@ function authorize(
 **Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
 </Tip>
 
-#### release()
+#### charge()
 
-Releases funds from escrow to receiver.
+Direct charge - collects payment and immediately transfers to receiver (no escrow hold).
 
 ```solidity
-function release(bytes32 paymentId) external nonReentrant
+function charge(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address tokenCollector,
+    bytes calldata collectorData
+) external nonReentrant
 ```
 
+**Parameters:**
+- `paymentInfo` - Payment info struct (must have `operator == address(this)`, `feeReceiver == address(this)`)
+- `amount` - Amount to charge
+- `tokenCollector` - Address of the token collector contract
+- `collectorData` - Data to pass to the token collector
+
 **Flow:**
-1. Check payment exists and is in escrow
-2. Check `RELEASE_CONDITION` (typically requires escrow period passed)
-3. Call `escrow.release()`
-4. Distribute fees (if enabled)
-5. Call `RELEASE_RECORDER`
-6. Emit `PaymentReleased`
+1. Check `CHARGE_CONDITION` (if set)
+2. Validate fee bounds compatibility
+3. Call `escrow.charge()` - funds go directly to receiver
+4. Accumulate protocol fees for later distribution
+5. Call `CHARGE_RECORDER` (if set)
+6. Emit `ChargeExecuted`
+
+**Access:** Controlled by `CHARGE_CONDITION` (default: anyone)
+
+<Note>
+Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refundPostEscrow()`.
+</Note>
+
+#### release()
+
+Releases funds from escrow to receiver (capture).
+
+```solidity
+function release(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount
+) external nonReentrant
+```
+
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `amount` - Amount to release
+
+**Flow:**
+1. Check `RELEASE_CONDITION` (if set)
+2. Use fees stored at authorization time
+3. Call `escrow.capture()`
+4. Accumulate protocol fees for later distribution
+5. Call `RELEASE_RECORDER` (if set)
+6. Emit `ReleaseExecuted`
 
 **Access:** Controlled by `RELEASE_CONDITION`
 
@@ -111,18 +158,24 @@ function release(bytes32 paymentId) external nonReentrant
 
 #### refundInEscrow()
 
-Refunds payment while still in escrow.
+Refunds payment while still in escrow (partial void).
 
 ```solidity
-function refundInEscrow(bytes32 paymentId) external nonReentrant
+function refundInEscrow(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint120 amount
+) external nonReentrant
 ```
 
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `amount` - Amount to return to payer
+
 **Flow:**
-1. Check payment is in escrow
-2. Check `REFUND_IN_ESCROW_CONDITION` (configurable per operator)
-3. Call `escrow.void()` to return funds to payer
-4. Call `REFUND_IN_ESCROW_RECORDER`
-5. Emit `PaymentRefunded`
+1. Check `REFUND_IN_ESCROW_CONDITION` (if set)
+2. Call `escrow.partialVoid()` to return funds to payer
+3. Call `REFUND_IN_ESCROW_RECORDER` (if set)
+4. Emit `RefundInEscrowExecuted`
 
 **Access:** Controlled by `REFUND_IN_ESCROW_CONDITION`
 
@@ -135,21 +188,30 @@ function refundInEscrow(bytes32 paymentId) external nonReentrant
 
 #### refundPostEscrow()
 
-Refunds payment after it has been released.
+Refunds payment after it has been released (captured).
 
 ```solidity
-function refundPostEscrow(bytes32 paymentId) external nonReentrant
+function refundPostEscrow(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address tokenCollector,
+    bytes calldata collectorData
+) external nonReentrant
 ```
 
-**Flow:**
-1. Check payment has been released
-2. Check `REFUND_POST_ESCROW_CONDITION` (configurable per operator)
-3. Call `escrow.reclaim()` to take back funds from receiver
-4. Transfer to payer
-5. Call `REFUND_POST_ESCROW_RECORDER`
-6. Emit `PaymentRefunded`
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `amount` - Amount to refund to payer
+- `tokenCollector` - Address of the token collector that will source the refund
+- `collectorData` - Data to pass to the token collector (e.g., signatures)
 
-**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`
+**Flow:**
+1. Check `REFUND_POST_ESCROW_CONDITION` (if set)
+2. Call `escrow.refund()` - token collector enforces permission
+3. Call `REFUND_POST_ESCROW_RECORDER` (if set)
+4. Emit `RefundPostEscrowExecuted`
+
+**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`. Permission is also enforced by the token collector (e.g., receiver must have approved it, or collectorData contains receiver's signature).
 
 <Note>
 **Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
@@ -310,28 +372,41 @@ Creates a new refund request.
 
 ```solidity
 function requestRefund(
-    bytes32 paymentId,
-    address operator
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint120 amount,
+    uint256 nonce
 ) external
 ```
 
-**Access Control:**
-- In-escrow: Payer, Receiver, or Arbiter
-- Post-escrow: Receiver only
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `amount` - Amount being requested for refund
+- `nonce` - Record index (from PaymentIndexRecorder) identifying which charge/action
+
+**Access Control:** Only the payer who made the authorization can request
+
+<Note>
+Each refund request is keyed by `(paymentInfoHash, nonce)` where nonce is the record index. This allows multiple refund requests per payment (one per charge/action).
+</Note>
 
 #### updateStatus()
 
-Arbiter approves or denies a refund request.
+Approve or deny a refund request.
 
 ```solidity
 function updateStatus(
-    bytes32 paymentId,
-    address operator,
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 nonce,
     RequestStatus newStatus
 ) external
 ```
 
-**Access:** Arbiter only
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `nonce` - Record index identifying which refund request
+- `newStatus` - The new status (`Approved` or `Denied`)
+
+**Access:** Receiver can always approve/deny. While in escrow, anyone passing the operator's `REFUND_IN_ESCROW_CONDITION` can also approve/deny.
 
 **Valid transitions:**
 - `Pending` → `Approved`
@@ -339,16 +414,20 @@ function updateStatus(
 
 #### cancelRefundRequest()
 
-Requester cancels their own request.
+Payer cancels their own request.
 
 ```solidity
 function cancelRefundRequest(
-    bytes32 paymentId,
-    address operator
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 nonce
 ) external
 ```
 
-**Access:** Original requester only
+**Parameters:**
+- `paymentInfo` - Payment info struct
+- `nonce` - Record index identifying which refund request
+
+**Access:** Only the payer who created the request
 
 **Valid transition:**
 - `Pending` → `Cancelled`
@@ -356,25 +435,25 @@ function cancelRefundRequest(
 ### Usage Example
 
 ```typescript
-// 1. Payer requests refund
-await refundRequest.requestRefund(paymentId, operatorAddress);
+// 1. Payer requests refund (nonce 0 = first action on this payment)
+await refundRequest.requestRefund(paymentInfo, requestedAmount, 0);
 // Status: Pending
 
-// 2. Arbiter reviews and approves
+// 2. Receiver (or arbiter) reviews and approves
 await refundRequest.updateStatus(
-  paymentId,
-  operatorAddress,
+  paymentInfo,
+  0,  // nonce
   RequestStatus.Approved
 );
 // Status: Approved
 
-// 3. Arbiter executes refund via operator
-await operator.refundInEscrow(paymentId);
+// 3. Execute refund via operator (separate transaction)
+await operator.refundInEscrow(paymentInfo, refundAmount);
 // Funds returned to payer
 ```
 
 <Note>
-RefundRequest is **advisory only**. Approval does not automatically execute refunds - the arbiter must call the operator's refund function.
+RefundRequest is **advisory only**. Approval does not automatically execute refunds - the authorized party must call the operator's refund function.
 </Note>
 
 ---

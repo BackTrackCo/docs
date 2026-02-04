@@ -53,6 +53,7 @@ Deploys PaymentOperator instances with deterministic addresses.
 ```solidity
 struct OperatorConfig {
     address feeRecipient;             // Who receives operator fees
+    address feeCalculator;            // Operator fee calculator (IFeeCalculator)
     address authorizeCondition;
     address authorizeRecorder;
     address chargeCondition;
@@ -194,88 +195,84 @@ If you call `deployOperator()` with the same configuration twice, the factory re
 
 ---
 
-## Escrow Period Condition Factory
+## Escrow Period Factory
 
-Deploys EscrowPeriodCondition and EscrowPeriodRecorder pairs for time-based release logic.
+Deploys `EscrowPeriod` contracts - combined recorder and condition for time-based release logic.
 
 ### Contract Address
 
-**Base Sepolia:** [`0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178`](https://sepolia.basescan.org/address/0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178)
+**Base Sepolia:** TBD
 
 ### Deployment Method
 
 ```solidity
 function deploy(
-    uint40 escrowPeriod,
-    address freezePolicy
-) external returns (address condition, address recorder)
+    uint256 escrowPeriod,
+    bytes32 authorizedCodehash
+) external returns (address escrowPeriodAddr)
 ```
 
 **Parameters:**
 - `escrowPeriod` - Duration in seconds (e.g., `7 * 24 * 60 * 60` for 7 days)
-- `freezePolicy` - Address of FreezePolicy contract (or `address(0)` for no freezing)
+- `authorizedCodehash` - Runtime codehash of authorized caller (`bytes32(0)` = operator-only)
 
-**Returns:** Tuple of (condition, recorder) addresses
+**Returns:** Address of deployed EscrowPeriod contract
 
 ### How It Works
 
-The factory deploys two contracts:
+The factory deploys a single **EscrowPeriod** contract that:
+- Extends `AuthorizationTimeRecorder` (implements `IRecorder`)
+- Implements `ICondition`
+- Records authorization timestamp when used as recorder
+- Checks if escrow period has passed when used as condition
 
-1. **EscrowPeriodCondition** (stateless)
-   - Checks if escrow period has elapsed
-   - Checks if payment is frozen
-   - Returns true/false for authorization
-
-2. **EscrowPeriodRecorder** (stateful)
-   - Records authorization timestamp
-   - Tracks freeze state
-   - Provides data to condition
-
-**Relationship:**
+**Architecture:**
 
 ```mermaid
 flowchart LR
-    Condition[EscrowPeriodCondition] -->|reads state| Recorder[EscrowPeriodRecorder]
-    Recorder -->|references| Policy[FreezePolicy]
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP -->|implements| IC[ICondition]
+    ATR -->|implements| IR[IRecorder]
 
-    style Condition fill:#4f46e5,stroke:#4338ca,color:#fff
-    style Recorder fill:#8b5cf6,stroke:#7c3aed,color:#fff
-    style Policy fill:#f59e0b,stroke:#d97706,color:#fff
+    style EP fill:#4f46e5,stroke:#4338ca,color:#fff
+    style ATR fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style IC fill:#10b981,stroke:#059669,color:#fff
+    style IR fill:#f59e0b,stroke:#d97706,color:#fff
 ```
+
+<Note>
+Use the SAME `EscrowPeriod` address for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots on the operator. For freeze functionality, deploy a separate `Freeze` condition and compose via `AndCondition([escrowPeriod, freeze])`.
+</Note>
 
 ### Example Deployment
 
 ```typescript
-import { getContract } from 'viem';
-
-const ESCROW_PERIOD_FACTORY_ADDRESS = '0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178';
+import { getContract, zeroHash } from 'viem';
 
 const factory = getContract({
   address: ESCROW_PERIOD_FACTORY_ADDRESS,
-  abi: EscrowPeriodConditionFactory.abi,
+  abi: EscrowPeriodFactory.abi,
   client: walletClient
 });
 
-// Deploy 7-day escrow with 3-day payer freeze
+// Deploy 7-day escrow (operator-only access)
 const hash = await factory.write.deploy([
   7 * 24 * 60 * 60,    // 7 days
-  payerFreezePolicyAddress
+  zeroHash             // bytes32(0) = operator-only
 ]);
 
 const receipt = await walletClient.waitForTransactionReceipt({ hash });
-// Extract condition and recorder addresses from event logs
-const [conditionAddress, recorderAddress] = receipt.logs[0].topics;
+const escrowPeriodAddress = receipt.logs[0].address;
 
-console.log("Condition:", conditionAddress);
-console.log("Recorder:", recorderAddress);
+console.log("EscrowPeriod:", escrowPeriodAddress);
 
-// Use in operator config
+// Use SAME address for both recorder and condition
 const config = {
   authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: recorderAddress,        // Record auth time
+  authorizeRecorder: escrowPeriodAddress,     // Record auth time
   // ...
-  releaseCondition: conditionAddress,        // Check escrow passed
-  releaseRecorder: recorderAddress,          // Update state
+  releaseCondition: escrowPeriodAddress,      // Check escrow passed
+  releaseRecorder: zeroAddress,               // No additional recording needed
   // ...
 };
 ```
@@ -294,11 +291,11 @@ const config = {
 
 ## Freeze Policy Factory
 
-Deploys FreezePolicy instances with custom freeze/unfreeze conditions.
+Deploys `FreezePolicy` instances that define who can freeze/unfreeze and for how long.
 
 ### Contract Address
 
-**Base Sepolia:** [`0x536439b00002CB3c0141391A92aFBB3e1E3f8604`](https://sepolia.basescan.org/address/0x536439b00002CB3c0141391A92aFBB3e1E3f8604)
+**Base Sepolia:** TBD
 
 ### Deployment Method
 
@@ -306,16 +303,70 @@ Deploys FreezePolicy instances with custom freeze/unfreeze conditions.
 function deploy(
     address freezeCondition,
     address unfreezeCondition,
-    uint40 freezeDuration
-) external returns (address freezePolicy)
+    uint256 freezeDuration
+) external returns (address policy)
 ```
 
 **Parameters:**
-- `freezeCondition` - Who can freeze (e.g., PayerCondition, ReceiverCondition, OrCondition)
-- `unfreezeCondition` - Who can unfreeze (typically same as freezeCondition)
-- `freezeDuration` - How long freeze lasts in seconds (e.g., `3 * 24 * 60 * 60` for 3 days)
+- `freezeCondition` - ICondition that authorizes freeze calls (e.g., PayerCondition)
+- `unfreezeCondition` - ICondition that authorizes unfreeze calls (e.g., ArbiterCondition)
+- `freezeDuration` - How long freeze lasts in seconds (`0` = permanent until unfrozen)
 
 **Returns:** Address of deployed FreezePolicy
+
+---
+
+## Freeze Factory
+
+Deploys `Freeze` condition contracts that block release when a payment is frozen.
+
+### Contract Address
+
+**Base Sepolia:** TBD
+
+### Deployment Method
+
+```solidity
+function deploy(
+    address freezePolicy,
+    address escrowPeriodContract
+) external returns (address freezeAddr)
+```
+
+**Parameters:**
+- `freezePolicy` - Address of the FreezePolicy contract (required)
+- `escrowPeriodContract` - Address of EscrowPeriod contract (`address(0)` = freeze unconstrained by time)
+
+**Returns:** Address of deployed Freeze condition
+
+### Full Freeze Deployment Example
+
+```typescript
+// Step 1: Deploy FreezePolicy
+const freezePolicy = await freezePolicyFactory.write.deploy([
+  PAYER_CONDITION,      // Only payer can freeze
+  ARBITER_CONDITION,    // Only arbiter can unfreeze
+  3 * 24 * 60 * 60      // 3 days (auto-expires)
+]);
+
+// Step 2: Deploy Freeze condition (linked to EscrowPeriod)
+const freeze = await freezeFactory.write.deploy([
+  freezePolicy,         // Use the policy we just deployed
+  escrowPeriodAddress   // Link to EscrowPeriod (or zeroAddress for unconstrained)
+]);
+
+// Step 3: Compose with EscrowPeriod for release condition
+const releaseCondition = await andConditionFactory.write.deploy([
+  [escrowPeriodAddress, freeze]
+]);
+
+// Use in operator config
+const config = {
+  // ...
+  releaseCondition: releaseCondition,
+  // ...
+};
+```
 
 ### Condition Singletons
 
@@ -323,10 +374,9 @@ Use these pre-deployed condition contracts:
 
 | Condition | Address (Base Sepolia) | Description |
 |-----------|------------------------|-------------|
-| PayerCondition | `0xDc0D800007ceACFf1299b926Ce22B4d4edCE6Ce7` | Only payer can call |
-| ReceiverCondition | `0x138Bf828643350AA3692aedDE8b2254eDF4D07EF` | Only receiver can call |
-| ArbiterCondition | `0x32471D31910a009273A812dE0894d9f0ADef4834` | Only arbiter can call |
-| AlwaysTrueCondition | `0xe2659dc0d716B1226DF6a09A5f47862cd1ff6733` | Anyone can call |
+| PayerCondition | TBD | Only payer can call |
+| ReceiverCondition | TBD | Only receiver can call |
+| AlwaysTrueCondition | TBD | Anyone can call |
 
 ### Example Deployments
 
@@ -470,21 +520,22 @@ bytes32 key = keccak256(abi.encodePacked(
 ));
 ```
 
-**EscrowPeriodConditionFactory:**
+**EscrowPeriodFactory:**
 ```solidity
-bytes32 salt = keccak256(abi.encode(
-    escrowPeriod,
-    freezePolicy
-));
+bytes32 key = keccak256(abi.encodePacked(escrowPeriod, authorizedCodehash));
+bytes32 salt = keccak256(abi.encodePacked("escrowPeriod", key));
 ```
 
 **FreezePolicyFactory:**
 ```solidity
-bytes32 salt = keccak256(abi.encode(
-    freezeCondition,
-    unfreezeCondition,
-    freezeDuration
-));
+bytes32 key = keccak256(abi.encodePacked(freezeCondition, unfreezeCondition, freezeDuration));
+bytes32 salt = keccak256(abi.encodePacked("freezePolicy", key));
+```
+
+**FreezeFactory:**
+```solidity
+bytes32 key = keccak256(abi.encodePacked(freezePolicy, escrowPeriodContract));
+bytes32 salt = keccak256(abi.encodePacked("freeze", key));
 ```
 
 ### Cross-Chain Addresses

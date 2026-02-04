@@ -95,9 +95,9 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 ### 3. Time-Based Escrow & Freeze Policies
 
-**EscrowPeriodCondition** - Checks if escrow period has elapsed
+**EscrowPeriod** - Combined recorder and condition that tracks authorization time and enforces escrow period
 
-**EscrowPeriodRecorder** - Tracks authorization time and freeze state
+**Freeze** - Standalone condition that blocks release when payment is frozen
 
 **FreezePolicy** - Defines who can freeze/unfreeze and for how long
 
@@ -106,14 +106,17 @@ x402r extends commerce-payments with flexible payment capabilities:
 - Payer-initiated freezes to stop suspicious releases
 - Time-limited freeze durations (e.g., 3 days)
 - MEV protection via private mempool support
+- Composable via `AndCondition([escrowPeriod, freeze])`
 
 ### 4. Factory Pattern
 
 **PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
 
-**EscrowPeriodConditionFactory** - Deploys condition/recorder pairs
+**EscrowPeriodFactory** - Deploys EscrowPeriod contracts
 
 **FreezePolicyFactory** - Deploys freeze policy instances
+
+**FreezeFactory** - Deploys Freeze condition contracts
 
 **Benefits:**
 - Predictable addresses for off-chain address generation
