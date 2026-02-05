@@ -153,7 +153,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 <Accordion title="Immutability by Default">
 Most contracts are immutable to prevent rug pulls and ensure trustlessness:
 - **PaymentOperator** - Cannot pause or upgrade
-- **EscrowPeriodCondition** - Cannot modify escrow period
+- **EscrowPeriod** - Cannot modify escrow period
 - **Freeze** - Cannot change freeze rules after deployment
 
 Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelock). Operator fees are immutable.
@@ -195,7 +195,7 @@ For factory deployment patterns, see [Factories](/contracts/factories).
     View system architecture diagrams and payment flows.
   </Card>
   <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
-    Learn about ArbitrationOperator, RefundRequest, and other core contracts.
+    Learn about PaymentOperator, RefundRequest, and other core contracts.
   </Card>
   <Card title="Factories" icon="industry" href="/contracts/factories">
     Understand factory patterns and CREATE2 deployments.

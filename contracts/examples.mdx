@@ -4,6 +4,10 @@ description: "Complete configuration examples for common x402r use cases"
 icon: "code"
 ---
 
+<Note>
+The configuration examples below use simplified pseudo-code (e.g., `new StaticAddressCondition(...)`, `new AndCondition(...)`) to illustrate the logical composition of conditions. In practice, deploy conditions via their respective [factory contracts](/contracts/factories) using viem. See the [SDK quickstart](/sdk/client/quickstart) for executable code.
+</Note>
+
 ## Example 1: Standard E-Commerce with 7-Day Escrow
 
 **Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can release after escrow.
@@ -231,7 +235,7 @@ sequenceDiagram
 
     Note over Buyer,Escrow: Day 10 - Product Arrives
     Note over Buyer: Inspects and finds defect
-    Buyer->>Operator: freeze(paymentId)
+    Seller->>Operator: freeze(paymentId)
     Note over Operator: Payment frozen for 5 days
 
     Note over Buyer,Escrow: Day 14 - Escrow Ends
@@ -491,19 +495,20 @@ sequenceDiagram
     Operator->>Escrow: capture partial
     Escrow->>Provider: 100 USDC
 
-    Note over User,Escrow: Months 2-5 - Continues
+    Note over User,Escrow: Months 2-11 - Continues
     Provider->>Operator: charge(100 USDC)
     Operator->>Escrow: capture partial
     Escrow->>Provider: 100 USDC
 
-    Note over User,Escrow: Month 6 - Dispute
-    User->>Operator: Disputes charge
-    Operator->>Escrow: Partial refund
-    Escrow->>User: Refund
+    Note over User,Escrow: Month 12 - Subscription Ends
+    Provider->>Operator: release(paymentId)
+    Operator->>Escrow: release remaining
+    Escrow->>Provider: Remaining funds
 
-    Note over User,Escrow: Month 12 - Expiry
-    User->>Escrow: reclaim(paymentId)
-    Escrow->>User: Remaining funds
+    Note over User,Escrow: Alt: If cancelled early
+    Note over User: Payer reclaims after authorizationExpiry
+    User->>Escrow: void(paymentId)
+    Escrow->>User: Unused funds
 ```
 
 ---
@@ -583,7 +588,8 @@ sequenceDiagram
 // Deploy condition for platform address
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
-// Time-proportional charge condition (custom)
+// Time-proportional charge condition (custom — not provided out of the box,
+// this is a hypothetical custom condition you would implement yourself)
 const timeProportionalCondition = await new TimeProportionalCondition();
 
 const config = {
@@ -746,38 +752,51 @@ Before deploying, verify:
 ## Testing Your Configuration
 
 ```typescript
-// Deploy on Base Sepolia first
-const testOperator = await testnetFactory.deploy(
-  testArbiter,
-  config,
-  5,
-  25
-);
+import { createTestClient, http, parseUnits, keccak256, toHex } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { PaymentOperatorABI } from '@x402r/core/abis';
 
-// Test payment flow
-const paymentId = ethers.utils.keccak256(
-  ethers.utils.toUtf8Bytes("test-payment-1")
-);
+// Deploy on Base Sepolia first
+const operatorAddress = await factory.write.deployOperator([config]);
+
+const testClient = createTestClient({
+  chain: baseSepolia,
+  transport: http(),
+  mode: 'anvil',
+});
 
 // 1. Authorize
-await testOperator.connect(payer).authorize(
-  paymentId,
-  receiver.address,
-  ethers.utils.parseUnits("100", 6),  // 100 USDC
-  USDC_ADDRESS
-);
+await walletClient.writeContract({
+  address: operatorAddress,
+  abi: PaymentOperatorABI,
+  functionName: 'authorize',
+  args: [paymentInfo, parseUnits('100', 6), tokenCollectorAddress, collectorData],
+});
 
 // 2. Try to release immediately (should fail if escrow configured)
-await expect(
-  testOperator.connect(receiver).release(paymentId)
-).to.be.revertedWith("EscrowPeriodNotPassed");
+// Expect revert with ConditionNotMet
+try {
+  await walletClient.writeContract({
+    address: operatorAddress,
+    abi: PaymentOperatorABI,
+    functionName: 'release',
+    args: [paymentInfo, parseUnits('100', 6)],
+  });
+} catch (e) {
+  console.log('Expected revert: escrow period not passed');
+}
 
-// 3. Fast forward time
-await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
-await ethers.provider.send("evm_mine", []);
+// 3. Fast forward time (requires Anvil/Hardhat test node)
+await testClient.increaseTime({ seconds: 7 * 24 * 60 * 60 });
+await testClient.mine({ blocks: 1 });
 
 // 4. Release after escrow
-await testOperator.connect(receiver).release(paymentId);
+await walletClient.writeContract({
+  address: operatorAddress,
+  abi: PaymentOperatorABI,
+  functionName: 'release',
+  args: [paymentInfo, parseUnits('100', 6)],
+});
 
 // Verify funds transferred correctly
 ```

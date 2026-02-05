@@ -299,7 +299,7 @@ Protocol fee changes require 7-day timelock. Operator fees are immutable (set at
 - **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
 - **Ownership** - Solady's Ownable with 2-step transfer
 - **Timelock** - 7-day delay on protocol fee changes (operator fees are immutable)
-- **Immutable Core** - Escrow and arbiter cannot be changed
+- **Immutable Core** - Escrow, conditions, and fee configuration cannot be changed
 
 ---
 
@@ -481,8 +481,7 @@ stateDiagram-v2
     NonExistent --> InEscrow: authorize()
     InEscrow --> Released: release()
     InEscrow --> Settled: void() / refundInEscrow()
-    Released --> Settled: (settled)
-    InEscrow --> Settled: reclaim() / refundPostEscrow()
+    Released --> Settled: reclaim() / refundPostEscrow()
     Settled --> [*]
 
     note right of InEscrow
@@ -519,6 +518,10 @@ function authorize(
 ```
 
 **Requires:** Payer has approved escrow contract for `amount` of `token`
+
+<Note>
+The base escrow contract uses individual parameters (paymentId, payer, receiver, etc.) while the PaymentOperator wraps them in a `PaymentInfo` struct. The operator translates between the two formats internally.
+</Note>
 
 #### release()
 
