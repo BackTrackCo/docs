@@ -1,0 +1,128 @@
+---
+title: "Examples"
+description: "Working examples for deploying operators, building merchants, clients, and arbiters"
+icon: "code"
+---
+
+The SDK includes 7 working examples in the `x402r-sdk/examples/` directory. Each example is a standalone project that demonstrates a specific integration pattern.
+
+## Available Examples
+
+<CardGroup cols={2}>
+  <Card title="deploy-operator" icon="rocket">
+    Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
+
+    **Key concepts:** `deployMarketplaceOperator()`, factory pattern, CREATE2
+  </Card>
+  <Card title="merchant-server" icon="server">
+    HTTP server that accepts escrow payments and handles refunds.
+
+    **Key concepts:** `refundable()`, payment verification, release flow
+  </Card>
+  <Card title="merchant-cli" icon="terminal">
+    CLI tool for merchants to release payments, approve/deny refunds, and query state.
+
+    **Key concepts:** `X402rMerchant`, `release()`, `approveRefundRequest()`
+  </Card>
+  <Card title="client-cli" icon="user">
+    CLI tool for payers to request refunds, freeze payments, and check status.
+
+    **Key concepts:** `X402rClient`, `requestRefund()`, `freezePayment()`
+  </Card>
+  <Card title="arbiter-cli" icon="gavel">
+    CLI tool for arbiters to review cases, make decisions, and manage registry.
+
+    **Key concepts:** `X402rArbiter`, `approveRefundRequest()`, `registerArbiter()`
+  </Card>
+  <Card title="e2e-dispute" icon="shield-check">
+    End-to-end dispute resolution flow: deploy operator, create payment, freeze, request refund, arbiter resolves.
+
+    **Key concepts:** Full lifecycle, `createFacilitatorSigner()`, `getPaymentInfoFromEvents()`
+  </Card>
+  <Card title="shared" icon="share-nodes">
+    Shared utilities used by the CLI examples (display helpers, PaymentInfo formatting).
+  </Card>
+</CardGroup>
+
+## Running Examples
+
+Each example is a standalone project. To run one:
+
+```bash
+cd x402r-sdk/examples/<example-name>
+
+# Install dependencies
+pnpm install
+
+# Set environment variables
+export PRIVATE_KEY=0x...
+export RPC_URL=https://sepolia.base.org
+
+# Run
+pnpm start
+```
+
+<Warning>
+All examples require a private key with Base Sepolia ETH and USDC. Get testnet USDC from the [Base Sepolia Faucet](https://www.base.org/faucet).
+</Warning>
+
+## deploy-operator
+
+Deploys a complete marketplace operator using `deployMarketplaceOperator()`:
+
+```typescript
+import { deployMarketplaceOperator } from '@x402r/core/deploy';
+
+const result = await deployMarketplaceOperator(
+  walletClient,
+  publicClient,
+  'eip155:84532',
+  {
+    feeRecipient: account.address,
+    arbiter: arbiterAddress,
+    escrowPeriodSeconds: 604800n, // 7 days
+    operatorFeeBps: 100n,         // 1%
+  }
+);
+```
+
+See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
+
+## e2e-dispute
+
+The most comprehensive example — runs through the entire dispute lifecycle:
+
+1. Deploys a fresh operator
+2. Creates a payment with ERC-3009 authorization
+3. Payer freezes the payment
+4. Payer requests a refund
+5. Arbiter reviews and approves
+6. Arbiter executes the refund
+
+This example uses `createFacilitatorSigner()` from `@x402r/evm` and `getPaymentInfoFromEvents()` from `@x402r/arbiter` to reconstruct PaymentInfo from on-chain events.
+
+## merchant-server
+
+Demonstrates a minimal HTTP server that:
+
+1. Returns 402 with `refundable()` payment options
+2. Verifies incoming payments via the facilitator
+3. Watches for refund requests
+4. Auto-approves or requires manual review
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Quickstart" icon="user" href="/sdk/client/quickstart">
+    Build a payer integration.
+  </Card>
+  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant/quickstart">
+    Build a merchant integration.
+  </Card>
+  <Card title="Arbiter Quickstart" icon="gavel" href="/sdk/arbiter/quickstart">
+    Build an arbiter integration.
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples">
+    Browse all examples on GitHub.
+  </Card>
+</CardGroup>

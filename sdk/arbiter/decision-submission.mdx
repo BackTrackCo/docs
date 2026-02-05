@@ -1,71 +1,99 @@
 ---
 title: "Decision Submission"
-description: "Submit decisions on refund requests with the Arbiter SDK"
+description: "Submit decisions on refund requests and execute refunds with the Arbiter SDK"
 icon: "gavel"
 ---
 
-The Arbiter SDK provides methods for making and executing decisions on disputed refund requests.
+The Arbiter SDK provides methods for reviewing refund requests, making decisions, and executing refunds for disputed payments.
 
-## Approve a Refund
+## Approve a Refund Request
 
-Approve a refund request:
+Approve a pending refund request. This updates the on-chain status but does not transfer funds.
 
 ```typescript
-const { txHash } = await arbiter.approveRefund(paymentInfo);
+const { txHash } = await arbiter.approveRefundRequest(paymentInfo, 0n);
 console.log('Refund approved:', txHash);
 ```
 
 <Note>
-Approving updates the request status but doesn't transfer funds. Use `executeRefundInEscrow()` to actually refund.
+Approving a refund request updates the request status to `Approved` but does not transfer funds. You must call `executeRefundInEscrow()` separately to move funds back to the payer.
 </Note>
 
-## Deny a Refund
+## Deny a Refund Request
 
-Deny a refund request:
+Deny a pending refund request:
 
 ```typescript
-const { txHash } = await arbiter.denyRefund(paymentInfo);
+const { txHash } = await arbiter.denyRefundRequest(paymentInfo, 0n);
 console.log('Refund denied:', txHash);
 ```
 
 ## Execute Refund in Escrow
 
-After approving, execute the actual fund transfer:
+After approving a refund request, execute the actual fund transfer back to the payer:
 
 ```typescript
-// Full refund
+// Full refund (defaults to paymentInfo.maxAmount)
 const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
 console.log('Full refund executed:', txHash);
 
 // Partial refund
 const partialAmount = BigInt('500000'); // 0.5 USDC
-const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo, partialAmount);
-console.log('Partial refund executed:', txHash);
+const { txHash: partialTx } = await arbiter.executeRefundInEscrow(paymentInfo, partialAmount);
+console.log('Partial refund executed:', partialTx);
 ```
 
-## Check Payment State
+<Tip>
+When no `amount` is provided, `executeRefundInEscrow` defaults to `paymentInfo.maxAmount`, issuing a full refund.
+</Tip>
 
-Verify the payment state before making decisions:
+## Check If a Refund Request Exists
+
+Verify whether a refund request has been submitted for a given payment and nonce:
 
 ```typescript
-import { PaymentState } from '@x402r/core';
+const hasRequest = await arbiter.hasRefundRequest(paymentInfo, 0n);
 
-const state = await arbiter.getPaymentState(paymentInfo);
-
-if (state !== PaymentState.InEscrow) {
-  console.log('Payment not in escrow, cannot process refund');
+if (!hasRequest) {
+  console.log('No refund request found for this payment');
   return;
 }
 ```
 
-## Check Refund Request Status
+## Get Refund Request Data
 
-Query the current status of a refund request:
+Retrieve the full refund request data, including amount and status:
 
 ```typescript
 import { RequestStatus } from '@x402r/core';
 
-const status = await arbiter.getRefundStatus(paymentInfo);
+const request = await arbiter.getRefundRequest(paymentInfo, 0n);
+
+console.log('Payment hash:', request.paymentInfoHash);
+console.log('Nonce:', request.nonce);
+console.log('Refund amount:', request.amount);
+console.log('Status:', RequestStatus[request.status]);
+```
+
+The `RefundRequestData` type contains:
+
+```typescript
+interface RefundRequestData {
+  paymentInfoHash: `0x${string}`;
+  nonce: bigint;
+  amount: bigint;
+  status: RequestStatus;
+}
+```
+
+## Get Refund Request Status
+
+Query the current status of a specific refund request:
+
+```typescript
+import { RequestStatus } from '@x402r/core';
+
+const status = await arbiter.getRefundStatus(paymentInfo, 0n);
 
 switch (status) {
   case RequestStatus.Pending:
@@ -77,60 +105,117 @@ switch (status) {
   case RequestStatus.Denied:
     console.log('Already denied');
     break;
+  case RequestStatus.Cancelled:
+    console.log('Cancelled by payer');
+    break;
 }
 ```
 
-## Check If Request Exists
+## Get Pending Refund Requests (Paginated)
 
-Verify a refund request exists before processing:
+Retrieve a paginated list of refund request keys for a receiver. You can optionally filter by receiver address:
 
 ```typescript
-const hasRequest = await arbiter.hasRefundRequest(paymentInfo);
+// Get the first 10 pending requests for a specific receiver
+const { keys, total } = await arbiter.getPendingRefundRequests(
+  0n,    // offset
+  10n,   // count
+  '0xReceiverAddress...' // optional: defaults to the arbiter's wallet address
+);
 
-if (!hasRequest) {
-  console.log('No refund request found');
-  return;
+console.log(`${total} total cases, showing first ${keys.length}`);
+
+// Look up each request by its composite key
+for (const key of keys) {
+  const request = await arbiter.getRefundRequestByKey(key);
+  console.log(`Amount: ${request.amount}, Status: ${RequestStatus[request.status]}`);
 }
 ```
 
-## Complete Decision Flow
+## Get Refund Request Count
+
+Get the total number of refund requests for a receiver:
+
+```typescript
+const count = await arbiter.getRefundRequestCount('0xReceiverAddress...');
+console.log(`Total refund requests: ${count}`);
+
+// Defaults to the arbiter's wallet address if not specified
+const myCount = await arbiter.getRefundRequestCount();
+console.log(`My refund requests: ${myCount}`);
+```
+
+## Get Refund Request by Composite Key
+
+Look up a specific refund request using its `keccak256(paymentInfoHash, nonce)` composite key:
+
+```typescript
+const request = await arbiter.getRefundRequestByKey(compositeKey);
+
+console.log('Payment hash:', request.paymentInfoHash);
+console.log('Amount:', request.amount);
+console.log('Status:', RequestStatus[request.status]);
+```
+
+## Check If a Payment Is Frozen
+
+Verify whether a payment is currently frozen by a Freeze condition contract:
+
+```typescript
+const frozen = await arbiter.isFrozen(paymentInfo, freezeAddress);
+
+if (frozen) {
+  console.log('Payment is frozen - dispute in progress');
+} else {
+  console.log('Payment is not frozen');
+}
+```
+
+## Complete Decision Workflow
+
+This example shows the full arbiter workflow: fetching pending cases, reviewing them, making a decision, and executing the refund.
 
 ```typescript
 import { X402rArbiter } from '@x402r/arbiter';
-import { PaymentState, RequestStatus } from '@x402r/core';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo } from '@x402r/core';
 
-async function processCase(
-  arbiter: X402rArbiter,
-  paymentInfo: PaymentInfo,
-  approve: boolean
-) {
-  // Verify payment is in escrow
-  const state = await arbiter.getPaymentState(paymentInfo);
-  if (state !== PaymentState.InEscrow) {
-    throw new Error('Payment not in escrow');
-  }
+async function processAllPendingCases(arbiter: X402rArbiter, receiverAddress: `0x${string}`) {
+  // Step 1: Get all pending refund requests
+  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 50n, receiverAddress);
+  console.log(`Found ${total} pending cases`);
 
-  // Verify request is pending
-  const status = await arbiter.getRefundStatus(paymentInfo);
-  if (status !== RequestStatus.Pending) {
-    throw new Error('Request not pending');
-  }
+  for (const key of keys) {
+    // Step 2: Retrieve request details
+    const request = await arbiter.getRefundRequestByKey(key);
 
-  if (approve) {
-    // Approve and execute
-    const { txHash: approveTx } = await arbiter.approveRefund(paymentInfo);
-    console.log('Approved:', approveTx);
+    // Step 3: Skip if already decided
+    if (request.status !== RequestStatus.Pending) {
+      console.log(`Skipping ${request.paymentInfoHash} - already ${RequestStatus[request.status]}`);
+      continue;
+    }
 
-    const { txHash: executeTx } = await arbiter.executeRefundInEscrow(paymentInfo);
-    console.log('Executed:', executeTx);
+    // Step 4: Apply your decision logic
+    const shouldApprove = await evaluateCase(request);
 
-    return { decision: 'approved', approveTx, executeTx };
-  } else {
-    // Deny
-    const { txHash } = await arbiter.denyRefund(paymentInfo);
-    console.log('Denied:', txHash);
+    if (shouldApprove) {
+      // Step 5a: Approve and execute the refund
+      // NOTE: You need the full PaymentInfo struct to call these methods.
+      // Retrieve it from your application's database or event logs.
+      const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
 
-    return { decision: 'denied', denyTx: txHash };
+      const { txHash: approveTx } = await arbiter.approveRefundRequest(paymentInfo, request.nonce);
+      console.log(`Approved: ${approveTx}`);
+
+      const { txHash: executeTx } = await arbiter.executeRefundInEscrow(paymentInfo);
+      console.log(`Refund executed: ${executeTx}`);
+    } else {
+      // Step 5b: Deny the refund
+      const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
+
+      const { txHash } = await arbiter.denyRefundRequest(paymentInfo, request.nonce);
+      console.log(`Denied: ${txHash}`);
+    }
   }
 }
 ```
@@ -139,50 +224,51 @@ async function processCase(
 
 ```mermaid
 flowchart TD
-    A[Receive Case] --> B{Payment in Escrow?}
-    B -->|No| C[Cannot Process]
-    B -->|Yes| D{Request Pending?}
-    D -->|No| E[Already Decided]
-    D -->|Yes| F[Review Evidence]
-    F --> G{Decision}
-    G -->|Approve| H[approveRefund]
-    G -->|Deny| I[denyRefund]
-    H --> J[executeRefundInEscrow]
-    J --> K[Funds Returned to Payer]
-    I --> L[Merchant Keeps Funds]
+    A[Get Pending Requests] --> B[getRefundRequestByKey]
+    B --> C{Status Pending?}
+    C -->|No| D[Skip - Already Decided]
+    C -->|Yes| E[Evaluate Case]
+    E --> F{Decision}
+    F -->|Approve| G[approveRefundRequest]
+    F -->|Deny| H[denyRefundRequest]
+    G --> I[executeRefundInEscrow]
+    I --> J[Funds Returned to Payer]
+    H --> K[Merchant Keeps Funds]
 ```
 
 ## Error Handling
 
 ```typescript
+import { X402rArbiter } from '@x402r/arbiter';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo } from '@x402r/core';
+
 async function safeProcessCase(
   arbiter: X402rArbiter,
-  paymentInfo: PaymentInfo
+  paymentInfo: PaymentInfo,
+  nonce: bigint
 ) {
   try {
-    // Check prerequisites
-    const state = await arbiter.getPaymentState(paymentInfo);
-    if (state !== PaymentState.InEscrow) {
-      return { error: 'Payment not in escrow' };
-    }
-
-    const hasRequest = await arbiter.hasRefundRequest(paymentInfo);
+    // Check that a refund request exists
+    const hasRequest = await arbiter.hasRefundRequest(paymentInfo, nonce);
     if (!hasRequest) {
-      return { error: 'No refund request' };
+      return { error: 'No refund request found' };
     }
 
-    const status = await arbiter.getRefundStatus(paymentInfo);
+    // Check that it is still pending
+    const status = await arbiter.getRefundStatus(paymentInfo, nonce);
     if (status !== RequestStatus.Pending) {
       return { error: `Request already ${RequestStatus[status]}` };
     }
 
-    // Make decision
-    const { txHash } = await arbiter.approveRefund(paymentInfo);
-    return { success: true, txHash };
+    // Approve and execute
+    const { txHash: approveTx } = await arbiter.approveRefundRequest(paymentInfo, nonce);
+    const { txHash: executeTx } = await arbiter.executeRefundInEscrow(paymentInfo);
 
+    return { success: true, approveTx, executeTx };
   } catch (error) {
     console.error('Failed to process case:', error);
-    return { error: error.message };
+    return { error: (error as Error).message };
   }
 }
 ```
@@ -194,6 +280,12 @@ async function safeProcessCase(
     Process multiple cases at once.
   </Card>
   <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
-    Automate decisions with AI.
+    Automate decisions with AI evaluation hooks.
+  </Card>
+  <Card title="Registry" icon="clipboard-list" href="/sdk/arbiter/registry">
+    Register as an arbiter for on-chain discovery.
+  </Card>
+  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
+    RefundRequest contract and state machine details.
   </Card>
 </CardGroup>

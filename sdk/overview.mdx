@@ -8,22 +8,26 @@ The X402r SDK provides a complete TypeScript implementation for integrating with
 
 ## Packages
 
-The SDK is organized into four packages, each designed for a specific role in the payment ecosystem:
+The SDK is organized into five packages, each designed for a specific role in the payment ecosystem:
 
 <CardGroup cols={2}>
-  <Card title="@x402r/core" icon="box" href="https://backtrackco.github.io/x402r-sdk/modules/core_src.html">
-    Shared types, ABIs, and utilities used by all other packages.
+  <Card title="@x402r/core" icon="box" href="/sdk/concepts">
+    Shared types, ABIs, network config, deploy utilities, and condition builders.
   </Card>
   <Card title="@x402r/client" icon="user" href="/sdk/client/quickstart">
-    SDK for payers to query payments, request refunds, and manage escrow.
+    SDK for payers to request refunds, freeze payments, and manage escrow.
   </Card>
   <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
-    SDK for merchants to release payments, handle refunds, and configure servers.
+    SDK for merchants to release payments, charge, and handle refunds.
   </Card>
   <Card title="@x402r/arbiter" icon="scale-balanced" href="/sdk/arbiter/quickstart">
-    SDK for arbiters to resolve disputes and automate decisions with AI.
+    SDK for arbiters to resolve disputes, manage registry, and automate decisions with AI.
   </Card>
 </CardGroup>
+
+<Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
+  Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
+</Card>
 
 ## Key Features
 
@@ -37,8 +41,11 @@ The SDK is organized into four packages, each designed for a specific role in th
   <Accordion title="AI-ready arbiter SDK" icon="robot">
     Built-in hooks for integrating AI models into dispute resolution workflows with structured evaluation contexts.
   </Accordion>
-  <Accordion title="Server helpers" icon="server">
-    Express middleware and route helpers for merchants to easily add refund support to existing x402 servers.
+  <Accordion title="One-command deployment" icon="rocket">
+    `deployMarketplaceOperator()` deploys all necessary contracts (operator, escrow period, freeze, conditions) in a single call.
+  </Accordion>
+  <Accordion title="Arbiter registry" icon="clipboard-list">
+    On-chain registry for arbiters to register, update metadata, and be discovered by merchants and clients.
   </Accordion>
 </AccordionGroup>
 
@@ -51,34 +58,38 @@ flowchart BT
         types[Types]
         abis[ABIs]
         config[Network Config]
-        utils[Utilities]
-        cond[Conditions]
+        deploy[Deploy]
+    end
+
+    subgraph helpers[@x402r/helpers]
+        ref[refundable]
     end
 
     subgraph client[@x402r/client]
         direction LR
-        pq[Payment Query]
         rr[Refund Request]
-        eo[Escrow Ops]
+        eo[Escrow/Freeze]
+        cs[Subscriptions]
     end
 
     subgraph merchant[@x402r/merchant]
         direction LR
-        rf[Release/Refund]
-        sh[Server Helpers]
-        ew[Event Watch]
+        rf[Release/Charge]
+        rh[Refund Handling]
+        ms[Subscriptions]
     end
 
     subgraph arbiter[@x402r/arbiter]
         direction LR
         ad[Approve/Deny]
-        ai[AI Hooks]
+        reg[Registry]
         bo[Batch Ops]
     end
 
     client --> core
     merchant --> core
     arbiter --> core
+    helpers --> core
 ```
 
 ## Network Support
@@ -86,11 +97,7 @@ flowchart BT
 | Network | Chain ID | Status |
 |---------|----------|--------|
 | Base Sepolia | 84532 | Supported |
-| Base Mainnet | 8453 | Pending |
-
-<Note>
-Base Mainnet support is pending contract deployment. The v1 SDK currently targets Base Sepolia for development and testing. See the [limitations page](/sdk/limitations) for details on v1 constraints.
-</Note>
+| Base Mainnet | 8453 | Supported |
 
 ## Next Steps
 
@@ -101,8 +108,8 @@ Base Mainnet support is pending contract deployment. The v1 SDK currently target
   <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
     Understand the payment lifecycle and key concepts.
   </Card>
-  <Card title="API Reference" icon="code" href="https://backtrackco.github.io/x402r-sdk">
-    Auto-generated TypeScript API documentation.
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy a PaymentOperator with one function call.
   </Card>
   <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk">
     Source code and examples.

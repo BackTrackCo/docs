@@ -1,19 +1,27 @@
 ---
 title: "Batch Operations"
-description: "Process multiple cases efficiently with the Arbiter SDK"
+description: "Process multiple refund decisions efficiently with the Arbiter SDK"
 icon: "layer-group"
 ---
 
-The Arbiter SDK provides batch operations for efficiently processing multiple refund requests at once.
+The Arbiter SDK provides batch operations for processing multiple refund requests in a single call. Both `batchApprove` and `batchDeny` accept an array of `{ paymentInfo, nonce }` objects.
+
+<Warning>
+Batch items are processed **sequentially**, not atomically. If one item fails mid-batch, all previously processed items will **not** be rolled back. Design your error handling accordingly.
+</Warning>
 
 ## Batch Approve
 
-Approve multiple refund requests in one operation:
+Approve multiple refund requests in one call:
 
 ```typescript
-const paymentInfos = [paymentInfo1, paymentInfo2, paymentInfo3];
+const items = [
+  { paymentInfo: paymentInfo1, nonce: 0n },
+  { paymentInfo: paymentInfo2, nonce: 0n },
+  { paymentInfo: paymentInfo3, nonce: 1n },
+];
 
-const results = await arbiter.batchApprove(paymentInfos);
+const results = await arbiter.batchApprove(items);
 
 for (const { txHash } of results) {
   console.log('Approved:', txHash);
@@ -22,12 +30,15 @@ for (const { txHash } of results) {
 
 ## Batch Deny
 
-Deny multiple refund requests:
+Deny multiple refund requests in one call:
 
 ```typescript
-const paymentInfos = [paymentInfo1, paymentInfo2];
+const items = [
+  { paymentInfo: paymentInfo4, nonce: 0n },
+  { paymentInfo: paymentInfo5, nonce: 0n },
+];
 
-const results = await arbiter.batchDeny(paymentInfos);
+const results = await arbiter.batchDeny(items);
 
 for (const { txHash } of results) {
   console.log('Denied:', txHash);
@@ -36,82 +47,111 @@ for (const { txHash } of results) {
 
 ## Empty Batch Handling
 
-Batch operations safely handle empty arrays:
+Both batch methods safely handle empty arrays and return an empty results array:
 
 ```typescript
 const results = await arbiter.batchApprove([]);
 console.log(results.length); // 0
 ```
 
-## Example: Process All Pending Cases
+## Item Format
+
+Each item in the batch array must include both the `paymentInfo` struct and the `nonce`:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { PaymentState, RequestStatus } from '@x402r/core';
-
-interface CaseDecision {
+interface BatchItem {
+  /** The full PaymentInfo struct identifying the payment */
   paymentInfo: PaymentInfo;
-  decision: 'approve' | 'deny';
-  reason?: string;
-}
-
-async function processPendingCases(
-  arbiter: X402rArbiter,
-  evaluator: (paymentInfo: PaymentInfo) => Promise<CaseDecision>
-) {
-  // Get all pending cases
-  const pendingHashes = await arbiter.getPendingCases();
-  console.log(`Processing ${pendingHashes.length} cases`);
-
-  const toApprove: PaymentInfo[] = [];
-  const toDeny: PaymentInfo[] = [];
-
-  // Evaluate each case
-  for (const hash of pendingHashes) {
-    const details = await arbiter.getPaymentDetails(hash);
-    const decision = await evaluator(details);
-
-    if (decision.decision === 'approve') {
-      toApprove.push(decision.paymentInfo);
-    } else {
-      toDeny.push(decision.paymentInfo);
-    }
-  }
-
-  // Process in batches
-  const approveResults = await arbiter.batchApprove(toApprove);
-  const denyResults = await arbiter.batchDeny(toDeny);
-
-  console.log(`Approved: ${approveResults.length}`);
-  console.log(`Denied: ${denyResults.length}`);
-
-  return {
-    approved: approveResults,
-    denied: denyResults,
-  };
+  /** The record index (nonce) from PaymentIndexRecorder */
+  nonce: bigint;
 }
 ```
 
-## Example: Batch with Execution
+<Info>
+The `nonce` identifies which specific charge record the refund request targets. For most single-charge payments, this is `0n`.
+</Info>
 
-Approve and execute refunds in batch:
+## Example: Triage and Batch Process Pending Cases
+
+Fetch all pending cases, evaluate each one, then batch approve and deny:
 
 ```typescript
+import { X402rArbiter } from '@x402r/arbiter';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo, RefundRequestData } from '@x402r/core';
+
+async function triageAndProcess(
+  arbiter: X402rArbiter,
+  receiverAddress: `0x${string}`,
+  lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>
+) {
+  // Step 1: Fetch pending cases
+  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 100n, receiverAddress);
+  console.log(`Processing ${total} pending cases`);
+
+  const toApprove: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
+  const toDeny: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
+
+  // Step 2: Evaluate each case
+  for (const key of keys) {
+    const request = await arbiter.getRefundRequestByKey(key);
+
+    if (request.status !== RequestStatus.Pending) {
+      continue;
+    }
+
+    const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
+    const item = { paymentInfo, nonce: request.nonce };
+
+    if (shouldApprove(request)) {
+      toApprove.push(item);
+    } else {
+      toDeny.push(item);
+    }
+  }
+
+  // Step 3: Batch process decisions
+  const approveResults = await arbiter.batchApprove(toApprove);
+  const denyResults = await arbiter.batchDeny(toDeny);
+
+  console.log(`Approved: ${approveResults.length}, Denied: ${denyResults.length}`);
+
+  return { approved: approveResults, denied: denyResults };
+}
+
+function shouldApprove(request: RefundRequestData): boolean {
+  // Your decision logic here
+  return request.amount < BigInt('10000000'); // Auto-approve < 10 USDC
+}
+```
+
+## Example: Batch Approve with Refund Execution
+
+After batch approving, execute refunds individually for each approved payment:
+
+```typescript
+import { X402rArbiter } from '@x402r/arbiter';
+import type { PaymentInfo } from '@x402r/core';
+
 async function batchApproveAndExecute(
   arbiter: X402rArbiter,
-  paymentInfos: PaymentInfo[]
+  items: Array<{ paymentInfo: PaymentInfo; nonce: bigint }>
 ) {
-  // First, batch approve
-  const approveResults = await arbiter.batchApprove(paymentInfos);
-  console.log(`Approved ${approveResults.length} refunds`);
+  // Step 1: Batch approve all items
+  const approveResults = await arbiter.batchApprove(items);
+  console.log(`Approved ${approveResults.length} refund requests`);
 
-  // Then execute each one
-  const executeResults: { txHash: `0x${string}` }[] = [];
+  // Step 2: Execute refunds individually
+  const executeResults: Array<{ txHash: `0x${string}` }> = [];
 
-  for (const paymentInfo of paymentInfos) {
-    const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
-    executeResults.push({ txHash });
-    console.log('Executed refund:', txHash);
+  for (const { paymentInfo } of items) {
+    try {
+      const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
+      executeResults.push({ txHash });
+      console.log('Refund executed:', txHash);
+    } catch (error) {
+      console.error(`Failed to execute refund for ${paymentInfo.payer}:`, error);
+    }
   }
 
   return {
@@ -123,24 +163,31 @@ async function batchApproveAndExecute(
 
 ## Example: Scheduled Batch Processing
 
-Run batch processing on a schedule:
+Run batch processing on a recurring schedule:
 
 ```typescript
 import { X402rArbiter } from '@x402r/arbiter';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo } from '@x402r/core';
 
 class BatchProcessor {
   private arbiter: X402rArbiter;
+  private receiverAddress: `0x${string}`;
   private intervalId?: NodeJS.Timeout;
+  private lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>;
 
-  constructor(arbiter: X402rArbiter) {
+  constructor(
+    arbiter: X402rArbiter,
+    receiverAddress: `0x${string}`,
+    lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>
+  ) {
     this.arbiter = arbiter;
+    this.receiverAddress = receiverAddress;
+    this.lookupPaymentInfo = lookupPaymentInfo;
   }
 
-  start(intervalMs: number = 60000) {
-    this.intervalId = setInterval(
-      () => this.processBatch(),
-      intervalMs
-    );
+  start(intervalMs: number = 60_000) {
+    this.intervalId = setInterval(() => this.processBatch(), intervalMs);
     console.log(`Batch processor started (interval: ${intervalMs}ms)`);
   }
 
@@ -154,22 +201,32 @@ class BatchProcessor {
 
   private async processBatch() {
     try {
-      const pending = await this.arbiter.getPendingCases();
+      const { keys, total } = await this.arbiter.getPendingRefundRequests(
+        0n, 50n, this.receiverAddress
+      );
 
-      if (pending.length === 0) {
+      if (keys.length === 0) {
         return;
       }
 
-      console.log(`Processing ${pending.length} pending cases`);
+      console.log(`Processing ${keys.length} of ${total} pending cases`);
 
-      // Get details for all pending cases
-      const details = await Promise.all(
-        pending.map(hash => this.arbiter.getPaymentDetails(hash))
-      );
+      const toApprove: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
+      const toDeny: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
 
-      // Apply your decision logic
-      const toApprove = details.filter(d => this.shouldApprove(d));
-      const toDeny = details.filter(d => !this.shouldApprove(d));
+      for (const key of keys) {
+        const request = await this.arbiter.getRefundRequestByKey(key);
+        if (request.status !== RequestStatus.Pending) continue;
+
+        const paymentInfo = await this.lookupPaymentInfo(request.paymentInfoHash);
+        const item = { paymentInfo, nonce: request.nonce };
+
+        if (this.shouldApprove(request.amount)) {
+          toApprove.push(item);
+        } else {
+          toDeny.push(item);
+        }
+      }
 
       if (toApprove.length > 0) {
         await this.arbiter.batchApprove(toApprove);
@@ -180,23 +237,21 @@ class BatchProcessor {
         await this.arbiter.batchDeny(toDeny);
         console.log(`Batch denied: ${toDeny.length}`);
       }
-
     } catch (error) {
       console.error('Batch processing error:', error);
     }
   }
 
-  private shouldApprove(paymentInfo: PaymentInfo): boolean {
-    // Your approval logic here
-    return paymentInfo.maxAmount < BigInt('10000000'); // Auto-approve < 10 USDC
+  private shouldApprove(amount: bigint): boolean {
+    return amount < BigInt('10000000'); // Auto-approve < 10 USDC
   }
 }
 
 // Usage
-const processor = new BatchProcessor(arbiter);
-processor.start(60000); // Process every minute
+const processor = new BatchProcessor(arbiter, '0xReceiver...', lookupPaymentInfo);
+processor.start(60_000); // Process every minute
 
-// On shutdown
+// Graceful shutdown
 process.on('SIGINT', () => {
   processor.stop();
   process.exit();
@@ -205,31 +260,30 @@ process.on('SIGINT', () => {
 
 ## Performance Considerations
 
-<AccordionGroup>
-  <Accordion title="Transaction ordering" icon="list-ol">
-    Batch operations process transactions sequentially. Each transaction must complete before the next begins.
-  </Accordion>
+<Note>
+Each item in a batch results in a separate on-chain transaction. Gas costs scale linearly with the number of items. Plan batch sizes around your RPC provider's rate limits.
+</Note>
 
-  <Accordion title="Gas costs" icon="gas-pump">
-    While batch operations are processed sequentially, they save on overhead compared to individual calls. Consider batching similar operations together.
-  </Accordion>
-
-  <Accordion title="Error handling" icon="triangle-exclamation">
-    If one transaction in a batch fails, the remaining transactions will still be attempted. Handle partial failures appropriately.
-  </Accordion>
-
-  <Accordion title="Rate limiting" icon="gauge">
-    Be mindful of RPC rate limits when processing large batches. Consider adding delays between transactions if needed.
-  </Accordion>
-</AccordionGroup>
+| Factor | Detail |
+|--------|--------|
+| **Transaction ordering** | Items are processed sequentially to ensure correct nonce ordering. |
+| **Gas costs** | Each item is a separate transaction. Batch methods save on SDK overhead, not gas. |
+| **Partial failures** | If one transaction fails, previous ones remain on-chain. Handle partial failures in your logic. |
+| **Rate limiting** | Large batches may hit RPC rate limits. Consider adding delays for 50+ item batches. |
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
-    Automate decisions with AI.
+    Automate decisions with AI evaluation hooks.
   </Card>
   <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
     Watch for new cases in real-time.
+  </Card>
+  <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
+    Individual approve/deny methods and executeRefundInEscrow.
+  </Card>
+  <Card title="Arbiter Quickstart" icon="rocket" href="/sdk/arbiter/quickstart">
+    Review the complete arbiter setup guide.
   </Card>
 </CardGroup>

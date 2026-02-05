@@ -1,95 +1,45 @@
 ---
-title: "v1 Limitations"
-description: "Current SDK limitations, workarounds, and roadmap for upcoming features"
+title: "Current Limitations"
+description: "Known limitations in the current SDK and what's coming next"
 icon: "circle-info"
 ---
 
-The v1 SDK focuses on core payment flows. Some features are intentionally deferred to allow the API to stabilize before adding complexity.
+The SDK provides full coverage of core payment flows including authorization, release, charge, refund, and dispute resolution. This page documents the known limitations and planned improvements.
 
-## Network Support
+## Stubbed Methods (Pending Subgraph)
 
-| Network | Chain ID | Status |
-|---------|----------|--------|
-| Base Sepolia | 84532 | Supported |
-| Base Mainnet | 8453 | Pending contract deployment |
+Several payment query methods exist in the SDK but throw `NotImplementedError` because they require a subgraph/indexer for efficient querying. The on-chain contracts don't store payment listings — state is derived from events.
 
 <Warning>
-The v1 SDK only supports Base Sepolia (testnet). Base Mainnet support will be added once contracts are deployed and audited.
+The following methods are defined but will throw `NotImplementedError` when called. They are planned for implementation once a subgraph is deployed.
 </Warning>
 
-## Deferred Features
+### Client SDK (5 stubbed)
 
-### No `charge()` Function
+| Method | Description | Workaround |
+|--------|-------------|------------|
+| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
+| `paymentExists(paymentInfoHash)` | Check if payment exists | Use `getPaymentAmounts()` on merchant SDK |
+| `isInEscrow(paymentInfoHash)` | Check if in escrow | Use `getPaymentAmounts()` on merchant SDK |
+| `getPaymentDetails(paymentInfoHash)` | Get stored PaymentInfo | Reconstruct from `AuthorizationCreated` events |
+| `getMyPayments()` | List payer's payments | Watch `AuthorizationCreated` events via subscriptions |
 
-**What it means:** There's no single function to authorize and release a payment in one transaction.
+### Merchant SDK (2 stubbed)
 
-**Workaround:** Call `authorize()` followed by `release()` separately:
+| Method | Description | Workaround |
+|--------|-------------|------------|
+| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
+| `getReceiverPayments()` | List receiver's payments | Watch `AuthorizationCreated` events via subscriptions |
 
-```typescript
-// v1: Two separate transactions
-await operator.authorize(paymentInfo);
-await merchant.release(paymentInfo, amount);
+### Arbiter SDK (1 stubbed)
 
-// v1.1 (planned): Single transaction
-// await operator.charge(paymentInfo, amount);
-```
+| Method | Description | Workaround |
+|--------|-------------|------------|
+| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
 
-**Expected in:** v1.1
-
-### No `refundPostEscrow()`
-
-**What it means:** Once funds are released to the merchant, refunds require the merchant to manually transfer funds back.
-
-**Workaround:** Refunds must happen while funds are still in escrow:
-
-```typescript
-// v1: Only works while InEscrow
-if (state === PaymentState.InEscrow) {
-  await merchant.refundInEscrow(paymentInfo);
-}
-
-// v1.1 (planned): Works after release too
-// await merchant.refundPostEscrow(paymentInfo, amount);
-```
-
-**Expected in:** v1.1
-
-### Basic Fee Management
-
-**What it means:** The SDK provides `distributeFees()` but no utilities for tracking fee history or managing multi-token fees.
-
-**Workaround:** Track fees manually or query events:
-
-```typescript
-// v1: Manual fee tracking via events
-const feeEvents = await publicClient.getLogs({
-  address: operatorAddress,
-  event: parseAbiItem('event FeesDistributed(address indexed receiver, uint256 amount)'),
-});
-
-// v1.1 (planned): Built-in fee management
-// const feeHistory = await operator.getFeeHistory();
-// const accumulated = await operator.getAccumulatedFees();
-```
-
-**Expected in:** v1.1
-
-### No Evidence/Metadata System
-
-**What it means:** The SDK doesn't provide built-in support for attaching evidence to refund requests or disputes.
-
-**Workaround:** Use external storage (IPFS, database) and reference it off-chain:
-
-```typescript
-// v1: Store evidence externally
-const evidenceHash = await uploadToIPFS(evidence);
-// Store evidenceHash in your database linked to paymentInfoHash
-
-// v2 (planned): Built-in evidence system
-// await client.requestRefund(paymentInfo, { evidence: { ... } });
-```
-
-**Expected in:** v2.0
+<Tip>
+All working refund, release, charge, freeze, and subscription methods function correctly. Only the payment **listing and state query** methods are stubbed.
+</Tip>
 
 ## API Constraints
 
@@ -110,37 +60,38 @@ const config = getNetworkConfig(84532);
 All SDK methods require a complete `PaymentInfo` object. You cannot query by hash alone:
 
 ```typescript
-// v1: Need full PaymentInfo
-const state = await client.getPaymentState(paymentInfo);
+// Works - full PaymentInfo
+const status = await client.getRefundStatus(paymentInfo, 0n);
 
-// Not supported in v1
+// Not supported - hash-only queries require subgraph
 // const state = await client.getPaymentStateByHash(hash);
 ```
 
+### No Evidence/Metadata System
+
+The SDK doesn't provide built-in support for attaching evidence to refund requests or disputes. Use external storage (IPFS, database) and reference it off-chain.
+
+### No Express/Hono Middleware
+
+The `refundable()` helper in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware — use `refundable()` directly when constructing payment options.
+
 ## Roadmap
 
-### v1.1 (Next Release)
-
-- `charge()` for immediate settlement
-- `refundPostEscrow()` for post-release refunds
-- Fee accumulation queries and history
-- Base Mainnet support
-
-### v2.0 (Future)
-
-- Evidence/metadata system with pluggable backends (IPFS, XMTP, Arweave)
-- Encrypted communication channels
-- Partial refund negotiations
-- Multi-arbiter support
-- Session-based billing patterns
+See the [Roadmap](/roadmap) page for planned features and timeline.
 
 ## Getting Updates
 
 <CardGroup cols={2}>
-  <Card title="GitHub Releases" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/releases">
-    Watch for new SDK releases.
+  <Card title="Roadmap" icon="map" href="/roadmap">
+    See what's planned next for the SDK and protocol.
   </Card>
   <Card title="SDK Overview" icon="cube" href="/sdk/overview">
     Return to SDK documentation.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Working examples for each role.
+  </Card>
+  <Card title="GitHub Releases" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/releases">
+    Watch for new SDK releases.
   </Card>
 </CardGroup>

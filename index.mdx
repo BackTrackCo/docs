@@ -38,6 +38,20 @@ sequenceDiagram
     end
 ```
 
+## Who Is This For?
+
+<CardGroup cols={3}>
+  <Card title="Clients (Payers)" icon="user" href="/sdk/client/quickstart">
+    Request refunds, freeze suspicious payments, and track payment state.
+  </Card>
+  <Card title="Merchants (Receivers)" icon="store" href="/sdk/merchant/quickstart">
+    Release funds, process refunds, and manage escrow periods.
+  </Card>
+  <Card title="Arbiters" icon="gavel" href="/sdk/arbiter/quickstart">
+    Resolve disputes, approve/deny refund requests, and integrate AI decision-making.
+  </Card>
+</CardGroup>
+
 ## Get Started
 
 <CardGroup cols={2}>
@@ -50,6 +64,9 @@ sequenceDiagram
   <Card title="SDK Quickstart" icon="code" href="/sdk/overview">
     Start building with the TypeScript SDK.
   </Card>
+  <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy your own PaymentOperator on Base.
+  </Card>
 </CardGroup>
 
 ## Architecture
@@ -58,16 +75,16 @@ x402r consists of three main components:
 
 | Component | Purpose |
 |-----------|---------|
-| **PaymentOperator** | Manages payment authorization, release, and refunds |
+| **PaymentOperator** | Manages payment authorization, release, charge, and refunds |
 | **RefundRequest** | Handles refund request lifecycle and approvals |
-| **EscrowPeriodRecorder** | Tracks escrow timing and freeze states |
+| **EscrowPeriod** | Tracks escrow timing for time-based release conditions |
 
 ## Supported Networks
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
 | Base Sepolia | 84532 | Supported |
-| Base Mainnet | 8453 | Pending |
+| Base Mainnet | 8453 | Supported |
 
 ## Resources
 
@@ -75,8 +92,8 @@ x402r consists of three main components:
   <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo">
     Source code and examples.
   </Card>
-  <Card title="SDK Reference" icon="book" href="https://backtrackco.github.io/x402r-sdk">
-    TypeDoc API documentation.
+  <Card title="SDK Reference" icon="book" href="/sdk/overview">
+    SDK documentation and API reference.
   </Card>
   <Card title="Support" icon="envelope" href="mailto:hi@x402r.org">
     Get help with integration.

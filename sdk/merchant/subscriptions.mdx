@@ -1,228 +1,385 @@
 ---
-title: "Merchant Event Subscriptions"
-description: "Subscribe to real-time refund and release events as a merchant"
+title: "Event Subscriptions"
+description: "Subscribe to real-time refund, release, and freeze events with the Merchant SDK"
 icon: "bell"
 ---
 
-The Merchant SDK provides methods to subscribe to relevant blockchain events in real-time.
+The `X402rMerchant` class provides three subscription methods for watching blockchain events in real-time. Each returns an object with an `unsubscribe` function for cleanup.
 
 ## Watch Refund Requests
 
-Subscribe to new refund requests for your payments:
+Use `watchRefundRequests()` to subscribe to `RefundRequested` events emitted by the RefundRequest contract. The callback receives a `RefundRequestEventLog` object for each event.
 
 ```typescript
 const { unsubscribe } = merchant.watchRefundRequests((event) => {
-  console.log('New refund request received!');
+  console.log('Event:', event.eventName);
   console.log('Payment hash:', event.args.paymentInfoHash);
-  console.log('Requester:', event.args.requester);
-
-  // Handle the request
-  handleRefundRequest(event);
+  console.log('Payer:', event.args.payer);
+  console.log('Receiver:', event.args.receiver);
+  console.log('Amount:', event.args.amount);
+  console.log('Nonce:', event.args.nonce);
+  console.log('Block:', event.blockNumber);
+  console.log('Tx hash:', event.transactionHash);
 });
 
 // Later: stop watching
 unsubscribe();
 ```
 
-## Watch Releases
-
-Subscribe to payment release events:
+The `RefundRequestEventLog` type has the following shape:
 
 ```typescript
-const { unsubscribe } = merchant.watchReleases((event) => {
-  console.log('Payment released!');
-  console.log('Payment hash:', event.args.paymentInfoHash);
-  console.log('Amount:', event.args.amount);
-  console.log('Receiver:', event.args.receiver);
-});
+interface RefundRequestEventLog {
+  eventName: 'RefundRequested' | 'RefundRequestStatusUpdated' | 'RefundRequestCancelled';
+  args: {
+    paymentInfoHash?: `0x${string}`;
+    payer?: `0x${string}`;
+    receiver?: `0x${string}`;
+    amount?: bigint;
+    nonce?: bigint;
+    status?: number;
+  };
+  address: `0x${string}`;
+  blockNumber: bigint;
+  transactionHash: `0x${string}`;
+  logIndex: number;
+}
 ```
 
-## Watch Freeze Events
+<Note>
+`watchRefundRequests()` requires the `refundRequestAddress` to be configured when creating the `X402rMerchant` instance.
+</Note>
 
-Subscribe to freeze/unfreeze events:
-
-```typescript
-const { unsubscribe } = merchant.watchFreezeEvents(
-  recorderAddress,
-  (event) => {
-    if (event.eventName === 'PaymentFrozen') {
-      console.log('Payment frozen:', event.args.paymentInfoHash);
-      // May indicate a dispute
-    } else if (event.eventName === 'PaymentUnfrozen') {
-      console.log('Payment unfrozen:', event.args.paymentInfoHash);
-    }
-  }
-);
-```
-
-## Example: Refund Request Handler
+### Example: Auto-respond to Small Refund Requests
 
 ```typescript
 import { X402rMerchant } from '@x402r/merchant';
 import { RequestStatus } from '@x402r/core';
 
-class RefundRequestHandler {
-  private merchant: X402rMerchant;
-  private unsubscribe?: () => void;
+const AUTO_APPROVE_THRESHOLD = BigInt('5000000'); // 5 USDC
 
-  constructor(merchant: X402rMerchant) {
-    this.merchant = merchant;
+const { unsubscribe } = merchant.watchRefundRequests(async (event) => {
+  const amount = event.args.amount;
+  const paymentHash = event.args.paymentInfoHash;
+
+  console.log(`New refund request: ${paymentHash}, amount: ${amount}`);
+
+  if (amount && amount < AUTO_APPROVE_THRESHOLD) {
+    console.log('Auto-approving small refund request');
+    // You would look up the paymentInfo from your database
+    // and call merchant.approveRefundRequest(paymentInfo, nonce)
+  } else {
+    console.log('Queuing for manual review');
   }
+});
+```
+
+## Watch Releases
+
+Use `watchReleases()` to subscribe to `ReleaseExecuted` events emitted by the PaymentOperator contract. The callback receives a `PaymentOperatorEventLog` object for each event.
+
+```typescript
+const { unsubscribe } = merchant.watchReleases((event) => {
+  console.log('Release executed!');
+  console.log('Payment hash:', event.args.paymentInfoHash);
+  console.log('Amount:', event.args.amount);
+  console.log('Payer:', event.args.payer);
+  console.log('Receiver:', event.args.receiver);
+  console.log('Block:', event.blockNumber);
+  console.log('Tx hash:', event.transactionHash);
+});
+
+// Later: stop watching
+unsubscribe();
+```
+
+The `PaymentOperatorEventLog` type has the following shape:
+
+```typescript
+interface PaymentOperatorEventLog {
+  eventName: 'ReleaseExecuted' | 'RefundInEscrowExecuted' | 'RefundPostEscrowExecuted'
+    | 'AuthorizationCreated' | 'ChargeExecuted';
+  args: {
+    paymentInfoHash?: `0x${string}`;
+    payer?: `0x${string}`;
+    receiver?: `0x${string}`;
+    amount?: bigint;
+  };
+  address: `0x${string}`;
+  blockNumber: bigint;
+  transactionHash: `0x${string}`;
+  logIndex: number;
+}
+```
+
+### Example: Revenue Tracking
+
+```typescript
+let totalReleased = 0n;
+
+const { unsubscribe } = merchant.watchReleases((event) => {
+  const amount = event.args.amount ?? 0n;
+  totalReleased += amount;
+
+  console.log(`Release: +${amount} tokens`);
+  console.log(`Total released: ${totalReleased}`);
+});
+```
+
+## Watch Freeze Events
+
+Use `watchFreezeEvents()` to subscribe to `PaymentFrozen` and `PaymentUnfrozen` events from a specific Freeze contract. You must provide the Freeze contract address as the first argument.
+
+```typescript
+const freezeAddress: `0x${string}` = '0xFreezeContract...';
+
+const { unsubscribe } = merchant.watchFreezeEvents(
+  freezeAddress,
+  (event) => {
+    if (event.eventName === 'PaymentFrozen') {
+      console.log('Payment FROZEN:', event.args.paymentInfoHash);
+      console.log('Frozen by:', event.args.caller);
+      // Alert: a dispute may be in progress
+    } else if (event.eventName === 'PaymentUnfrozen') {
+      console.log('Payment UNFROZEN:', event.args.paymentInfoHash);
+      console.log('Unfrozen by:', event.args.caller);
+      // The payment can now be released
+    }
+  }
+);
+
+// Later: stop watching
+unsubscribe();
+```
+
+The `FreezeEventLog` type has the following shape:
+
+```typescript
+interface FreezeEventLog {
+  eventName: 'PaymentFrozen' | 'PaymentUnfrozen';
+  args: {
+    paymentInfoHash?: `0x${string}`;
+    caller?: `0x${string}`;
+  };
+  address: `0x${string}`;
+  blockNumber: bigint;
+  transactionHash: `0x${string}`;
+  logIndex: number;
+}
+```
+
+<Warning>
+The `freezeAddress` parameter is the address of the Freeze condition contract, not the PaymentOperator. You can retrieve it from your operator config via `merchant.getOperatorConfig()`.
+</Warning>
+
+## Combining Multiple Watchers
+
+You can run all three watchers simultaneously to build a comprehensive monitoring system. Store all `unsubscribe` functions for coordinated cleanup.
+
+```typescript
+import { X402rMerchant } from '@x402r/merchant';
+
+class MerchantEventMonitor {
+  private unsubscribers: (() => void)[] = [];
+
+  constructor(
+    private merchant: X402rMerchant,
+    private freezeAddress: `0x${string}`
+  ) {}
 
   start() {
-    const { unsubscribe } = this.merchant.watchRefundRequests(
-      async (event) => {
-        await this.handleRequest(event);
+    // Watch for new refund requests
+    const { unsubscribe: unwatchRefunds } = this.merchant.watchRefundRequests(
+      (event) => {
+        console.log('[REFUND REQUEST]', event.args.paymentInfoHash);
+        console.log('  Amount:', event.args.amount);
+        console.log('  Payer:', event.args.payer);
       }
     );
-    this.unsubscribe = unsubscribe;
-    console.log('Refund request handler started');
+    this.unsubscribers.push(unwatchRefunds);
+
+    // Watch for releases
+    const { unsubscribe: unwatchReleases } = this.merchant.watchReleases(
+      (event) => {
+        console.log('[RELEASE]', event.args.paymentInfoHash);
+        console.log('  Amount:', event.args.amount);
+      }
+    );
+    this.unsubscribers.push(unwatchReleases);
+
+    // Watch for freeze/unfreeze events
+    const { unsubscribe: unwatchFreezes } = this.merchant.watchFreezeEvents(
+      this.freezeAddress,
+      (event) => {
+        console.log(`[${event.eventName.toUpperCase()}]`, event.args.paymentInfoHash);
+        console.log('  Caller:', event.args.caller);
+      }
+    );
+    this.unsubscribers.push(unwatchFreezes);
+
+    console.log('Merchant event monitor started (3 watchers active)');
   }
 
   stop() {
-    this.unsubscribe?.();
-    console.log('Refund request handler stopped');
-  }
-
-  private async handleRequest(event: unknown) {
-    const paymentHash = event.args.paymentInfoHash;
-    console.log(`Processing refund request: ${paymentHash}`);
-
-    try {
-      const details = await this.merchant.getPaymentDetails(paymentHash);
-      const amounts = await this.merchant.getPaymentAmounts(details);
-
-      // Example policy: auto-approve small amounts
-      if (amounts.refundable < BigInt('5000000')) { // < 5 USDC
-        await this.merchant.approveRefundRequest(details);
-        await this.merchant.refundInEscrow(details);
-        console.log(`Auto-approved refund: ${paymentHash}`);
-      } else {
-        console.log(`Manual review required: ${paymentHash}`);
-        // Send notification to admin...
-      }
-    } catch (error) {
-      console.error(`Error processing refund: ${error}`);
+    for (const unsub of this.unsubscribers) {
+      unsub();
     }
+    this.unsubscribers = [];
+    console.log('Merchant event monitor stopped');
   }
 }
 
 // Usage
-const handler = new RefundRequestHandler(merchant);
-handler.start();
+const monitor = new MerchantEventMonitor(merchant, freezeAddress);
+monitor.start();
 
-// On shutdown
+// Graceful shutdown
 process.on('SIGINT', () => {
-  handler.stop();
-  process.exit();
+  monitor.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  monitor.stop();
+  process.exit(0);
 });
 ```
 
-## Example: Payment Dashboard Server
+## Dashboard Server Example
+
+This example integrates all three watchers into an Express server that exposes a real-time dashboard API.
 
 ```typescript
 import express from 'express';
 import { X402rMerchant } from '@x402r/merchant';
-import { PaymentState, RequestStatus } from '@x402r/core';
+import { getNetworkConfig } from '@x402r/core';
 
 const app = express();
 
-// In-memory state for demo (use a database in production)
-const dashboardState = {
-  totalReceived: 0,
+// In-memory state (use a database in production)
+const state = {
   pendingRefunds: [] as string[],
   recentReleases: [] as { hash: string; amount: bigint; timestamp: number }[],
   frozenPayments: new Set<string>(),
 };
 
-// Setup merchant and subscriptions
-const merchant = new X402rMerchant({
-  publicClient,
-  walletClient,
-  operatorAddress,
-  refundRequestAddress,
-});
-
-// Watch refund requests
-merchant.watchRefundRequests((event) => {
+// Set up watchers
+const { unsubscribe: unwatchRefunds } = merchant.watchRefundRequests((event) => {
   const hash = event.args.paymentInfoHash;
-  if (!dashboardState.pendingRefunds.includes(hash)) {
-    dashboardState.pendingRefunds.push(hash);
+  if (hash && !state.pendingRefunds.includes(hash)) {
+    state.pendingRefunds.push(hash);
   }
 });
 
-// Watch releases
-merchant.watchReleases((event) => {
-  dashboardState.recentReleases.push({
-    hash: event.args.paymentInfoHash,
-    amount: event.args.amount,
-    timestamp: Date.now(),
-  });
+const { unsubscribe: unwatchReleases } = merchant.watchReleases((event) => {
+  if (event.args.paymentInfoHash && event.args.amount) {
+    state.recentReleases.push({
+      hash: event.args.paymentInfoHash,
+      amount: event.args.amount,
+      timestamp: Date.now(),
+    });
 
-  // Keep only last 100 releases
-  if (dashboardState.recentReleases.length > 100) {
-    dashboardState.recentReleases.shift();
+    // Keep only last 100
+    if (state.recentReleases.length > 100) {
+      state.recentReleases.shift();
+    }
   }
 });
 
-// Watch freeze events (recorderAddress from getNetworkConfig)
-const recorderAddress = config.escrowPeriodRecorder;
-merchant.watchFreezeEvents(recorderAddress, (event) => {
-  const hash = event.args.paymentInfoHash;
-  if (event.eventName === 'PaymentFrozen') {
-    dashboardState.frozenPayments.add(hash);
-  } else {
-    dashboardState.frozenPayments.delete(hash);
-  }
-});
+const freezeAddress: `0x${string}` = '0xFreezeContract...';
+const { unsubscribe: unwatchFreezes } = merchant.watchFreezeEvents(
+  freezeAddress,
+  (event) => {
+    const hash = event.args.paymentInfoHash;
+    if (!hash) return;
 
-// Dashboard API
-app.get('/api/dashboard', (req, res) => {
+    if (event.eventName === 'PaymentFrozen') {
+      state.frozenPayments.add(hash);
+    } else {
+      state.frozenPayments.delete(hash);
+    }
+  }
+);
+
+// API endpoint
+app.get('/api/dashboard', (_req, res) => {
   res.json({
-    pendingRefunds: dashboardState.pendingRefunds.length,
-    frozenPayments: dashboardState.frozenPayments.size,
-    recentReleases: dashboardState.recentReleases.slice(-10),
+    pendingRefundCount: state.pendingRefunds.length,
+    frozenPaymentCount: state.frozenPayments.size,
+    recentReleases: state.recentReleases
+      .slice(-10)
+      .map((r) => ({
+        hash: r.hash,
+        amount: r.amount.toString(),
+        timestamp: r.timestamp,
+      })),
   });
 });
 
-app.listen(3000);
+// Cleanup on shutdown
+function cleanup() {
+  unwatchRefunds();
+  unwatchReleases();
+  unwatchFreezes();
+}
+
+process.on('SIGINT', () => { cleanup(); process.exit(0); });
+process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+
+app.listen(3000, () => {
+  console.log('Merchant dashboard running on port 3000');
+});
 ```
 
 ## Event Types Reference
 
-| Method | Events | Use Case |
-|--------|--------|----------|
-| `watchRefundRequests` | New refund requests | Refund handling |
-| `watchReleases` | Payment releases | Revenue tracking |
-| `watchFreezeEvents` | Freeze/Unfreeze | Dispute monitoring |
+| Method | Event Name | Callback Type | Use Case |
+|--------|-----------|---------------|----------|
+| `watchRefundRequests` | `RefundRequested` | `RefundRequestEventLog` | Detect incoming refund requests |
+| `watchReleases` | `ReleaseExecuted` | `PaymentOperatorEventLog` | Track revenue and release confirmations |
+| `watchFreezeEvents` | `PaymentFrozen` / `PaymentUnfrozen` | `FreezeEventLog` | Monitor dispute-related freezes |
 
-## Best Practices
+<Tip>
+All three watchers use viem's `watchContractEvent` under the hood, which maintains a WebSocket connection to the RPC provider. Make sure your provider supports WebSocket subscriptions for real-time event delivery.
+</Tip>
 
-<AccordionGroup>
-  <Accordion title="Use persistent connections" icon="link">
-    Event subscriptions use WebSockets. Ensure your server maintains persistent connections and handles reconnection.
-  </Accordion>
+## Cleanup Best Practices
 
-  <Accordion title="Store events durably" icon="database">
-    Don't rely solely on in-memory state. Persist events to a database to handle server restarts.
-  </Accordion>
+Always unsubscribe from watchers when they are no longer needed. Failing to unsubscribe leads to memory leaks and orphaned WebSocket connections.
 
-  <Accordion title="Set up alerting" icon="bell">
-    Configure alerts for important events like new refund requests or frozen payments.
-  </Accordion>
+```typescript
+// Store references for later cleanup
+const watchers = {
+  refunds: merchant.watchRefundRequests((e) => { /* ... */ }),
+  releases: merchant.watchReleases((e) => { /* ... */ }),
+  freezes: merchant.watchFreezeEvents(freezeAddress, (e) => { /* ... */ }),
+};
 
-  <Accordion title="Clean up subscriptions" icon="broom">
-    Always unsubscribe when shutting down to prevent memory leaks and orphaned connections.
-  </Accordion>
-</AccordionGroup>
+// Clean up all watchers
+function cleanupAll() {
+  watchers.refunds.unsubscribe();
+  watchers.releases.unsubscribe();
+  watchers.freezes.unsubscribe();
+}
+```
+
+<Info>
+If your server restarts, you will miss events that occurred while the watchers were inactive. Consider supplementing real-time subscriptions with periodic polling via `getPendingRefundRequests()` to catch any missed events.
+</Info>
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Merchant Quickstart" icon="rocket" href="/sdk/merchant/quickstart">
-    Review the complete merchant setup.
+    Review the complete merchant setup and initialization.
   </Card>
   <Card title="Arbiter SDK" icon="scale-balanced" href="/sdk/arbiter/quickstart">
-    Learn about dispute resolution.
+    Learn about dispute resolution from the arbiter perspective.
+  </Card>
+  <Card title="Refund Handling" icon="rotate-left" href="/sdk/merchant/refund-handling">
+    Process refund requests with approve/deny workflows.
+  </Card>
+  <Card title="Client Subscriptions" icon="user" href="/sdk/client/subscriptions">
+    See how clients subscribe to the same events.
   </Card>
 </CardGroup>

@@ -4,13 +4,13 @@ description: "Get started with the X402r Client SDK for payer integrations"
 icon: "rocket"
 ---
 
-The `@x402r/client` package provides everything payers need to interact with X402r payments: querying payment states, requesting refunds, and managing escrow.
+The `@x402r/client` package provides everything payers need to interact with X402r payments: requesting refunds, freezing payments, and managing escrow.
 
 ## Prerequisites
 
 <Note>
 Before starting, ensure you have:
-- Node.js 18+
+- Node.js 20+
 - A funded wallet on Base Sepolia
 - Basic understanding of [viem](https://viem.sh)
 </Note>
@@ -32,7 +32,6 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { X402rClient } from '@x402r/client';
 import { getNetworkConfig } from '@x402r/core';
 
-// Setup viem clients
 const publicClient = createPublicClient({
   chain: baseSepolia,
   transport: http(),
@@ -45,10 +44,8 @@ const walletClient = createWalletClient({
   transport: http(),
 });
 
-// Get network configuration
-const networkConfig = getNetworkConfig('eip155:84532');
+const networkConfig = getNetworkConfig('eip155:84532')!;
 
-// Create X402rClient
 const client = new X402rClient({
   publicClient,
   walletClient,
@@ -58,61 +55,59 @@ const client = new X402rClient({
 });
 ```
 
-## Query Payment State
-
-Check the current state of any payment:
-
-```typescript
-import { PaymentState } from '@x402r/core';
-
-const paymentInfo = {
-  operator: '0x...', // PaymentOperator address
-  payer: '0x...',    // Payer address
-  receiver: '0x...', // Merchant address
-  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
-  maxAmount: BigInt('1000000'), // 1 USDC
-  preApprovalExpiry: 0n,
-  authorizationExpiry: BigInt(Math.floor(Date.now() / 1000) + 3600),
-  refundExpiry: BigInt(Math.floor(Date.now() / 1000) + 86400),
-  minFeeBps: 0,
-  maxFeeBps: 0,
-  feeReceiver: '0x...',
-  salt: BigInt('0x123456'),
-};
-
-const state = await client.getPaymentState(paymentInfo);
-
-switch (state) {
-  case PaymentState.NonExistent:
-    console.log('Payment does not exist');
-    break;
-  case PaymentState.InEscrow:
-    console.log('Payment is in escrow - refundable');
-    break;
-  case PaymentState.Released:
-    console.log('Payment released to merchant');
-    break;
-  case PaymentState.Settled:
-    console.log('Payment fully settled');
-    break;
-  case PaymentState.Expired:
-    console.log('Payment expired');
-    break;
-}
-```
-
 ## Request a Refund
 
-If a payment is in escrow, you can request a refund:
+Submit a refund request for a payment that is in escrow:
 
 ```typescript
-// Request refund
-const { txHash, paymentInfoHash } = await client.requestRefund(paymentInfo);
+// Request refund for the first charge (nonce = 0n)
+const { txHash } = await client.requestRefund(
+  paymentInfo,
+  BigInt('1000000'), // amount to refund (e.g., 1 USDC)
+  0n                 // nonce: identifies which charge
+);
 console.log(`Refund requested: ${txHash}`);
 
 // Check refund status
-const status = await client.getRefundStatus(paymentInfo);
+const status = await client.getRefundStatus(paymentInfo, 0n);
 console.log(`Refund status: ${status}`);
+// 0 = Pending, 1 = Approved, 2 = Denied, 3 = Cancelled
+```
+
+## Check Escrow Period
+
+Query whether the payment is still within its escrow period:
+
+```typescript
+const escrowPeriodAddress = '0x...'; // EscrowPeriod contract address
+
+// Check if still within escrow period
+const inEscrow = await client.isDuringEscrowPeriod(paymentInfo, escrowPeriodAddress);
+if (inEscrow) {
+  console.log('Still in escrow period - can request refund');
+} else {
+  console.log('Escrow period passed - funds can be released');
+}
+
+// Get when the payment was authorized
+const authTime = await client.getAuthorizationTime(paymentInfo, escrowPeriodAddress);
+console.log(`Authorized at: ${new Date(Number(authTime) * 1000)}`);
+```
+
+## Freeze a Payment
+
+Freeze a payment to prevent release while a dispute is resolved:
+
+```typescript
+const freezeAddress = '0x...'; // Freeze contract address
+
+// Freeze the payment (only payer can do this)
+const { txHash } = await client.freezePayment(paymentInfo, freezeAddress);
+console.log(`Payment frozen: ${txHash}`);
+
+// Check if payment is frozen
+const frozen = await client.isFrozen(paymentInfo, freezeAddress);
+console.log(`Frozen: ${frozen}`);
 ```
 
 ## Watch for Updates
@@ -120,16 +115,22 @@ console.log(`Refund status: ${status}`);
 Subscribe to real-time events:
 
 ```typescript
-// Watch payment state changes
+// Watch payment state changes (releases, refunds)
 const { unsubscribe } = client.watchPaymentState(
   paymentInfoHash,
-  (newState) => {
-    console.log('Payment state changed:', PaymentState[newState]);
+  (event) => {
+    console.log('Payment event:', event.eventName);
   }
 );
 
+// Watch for refund request updates
+const { unsubscribe: unsubRefunds } = client.watchRefundRequests((event) => {
+  console.log('Refund event:', event.eventName);
+});
+
 // Later: stop watching
 unsubscribe();
+unsubRefunds();
 ```
 
 ## Complete Example
@@ -139,10 +140,9 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { X402rClient } from '@x402r/client';
-import { PaymentState, getNetworkConfig } from '@x402r/core';
+import { getNetworkConfig, RequestStatus } from '@x402r/core';
 
 async function main() {
-  // Setup
   const publicClient = createPublicClient({
     chain: baseSepolia,
     transport: http(),
@@ -155,10 +155,7 @@ async function main() {
     transport: http(),
   });
 
-  const config = getNetworkConfig('eip155:84532');
-  if (!config) {
-    throw new Error('Network not supported');
-  }
+  const config = getNetworkConfig('eip155:84532')!;
 
   const client = new X402rClient({
     publicClient,
@@ -167,43 +164,43 @@ async function main() {
     refundRequestAddress: config.refundRequest,
   });
 
-  try {
-    // Query my payments
-    const { hashes } = await client.getMyPayments();
-    console.log(`Found ${hashes.length} payments`);
+  // Check if a refund request already exists
+  const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
 
-    // For each payment in escrow, check if we can request a refund
-    for (const hash of hashes) {
-      const details = await client.getPaymentDetails(hash);
-      const state = await client.getPaymentState(details);
+  if (!hasRequest) {
+    // Request a refund
+    const { txHash } = await client.requestRefund(
+      paymentInfo,
+      paymentInfo.maxAmount, // full refund
+      0n
+    );
+    console.log(`Refund requested: ${txHash}`);
+  }
 
-      if (state === PaymentState.InEscrow) {
-        const hasRequest = await client.hasRefundRequest(details);
-        if (!hasRequest) {
-          console.log(`Payment ${hash} can request refund`);
-        }
-      }
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Operation failed:', error.message);
-    }
-    throw error;
+  // Check status
+  const status = await client.getRefundStatus(paymentInfo, 0n);
+  if (status === RequestStatus.Approved) {
+    console.log('Refund was approved!');
+  }
+
+  // List my refund requests (paginated)
+  const { keys, total } = await client.getMyRefundRequests(0n, 10n);
+  console.log(`${total} total refund requests`);
+
+  for (const key of keys) {
+    const request = await client.getRefundRequestByKey(key);
+    console.log(`Amount: ${request.amount}, Status: ${request.status}`);
   }
 }
 
 main().catch(console.error);
 ```
 
-<Tip>
-Always wrap SDK operations in try-catch blocks. The SDK throws descriptive errors for contract reverts and invalid inputs.
-</Tip>
-
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Payment Queries" icon="magnifying-glass" href="/sdk/client/payment-queries">
-    Learn all payment query methods.
+    Learn about payment query methods (including stubbed methods pending subgraph).
   </Card>
   <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">
     Deep dive into refund workflows.
