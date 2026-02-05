@@ -4,13 +4,13 @@ description: "Get started with the X402r Arbiter SDK for dispute resolution"
 icon: "rocket"
 ---
 
-The `@x402r/arbiter` package provides everything arbiters need to resolve disputes: reviewing cases, making decisions, and integrating AI for automated resolution.
+The `@x402r/arbiter` package provides everything arbiters need to resolve disputes: reviewing cases, making decisions, executing refunds, and integrating AI for automated resolution.
 
 ## Prerequisites
 
 <Note>
 Before starting, ensure you have:
-- Node.js 18+
+- Node.js 20+
 - A funded wallet on Base Sepolia designated as an arbiter
 - Understanding of the X402r refund lifecycle
 </Note>
@@ -32,7 +32,6 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { X402rArbiter } from '@x402r/arbiter';
 import { getNetworkConfig } from '@x402r/core';
 
-// Setup viem clients
 const publicClient = createPublicClient({
   chain: baseSepolia,
   transport: http(),
@@ -45,29 +44,34 @@ const walletClient = createWalletClient({
   transport: http(),
 });
 
-// Get network configuration
-const config = getNetworkConfig('eip155:84532');
+const config = getNetworkConfig('eip155:84532')!;
 
-// Create X402rArbiter
 const arbiter = new X402rArbiter({
   publicClient,
   walletClient,
-  operatorAddress: '0x...', // PaymentOperator address
+  operatorAddress: '0x...',
   refundRequestAddress: config.refundRequest,
+  arbiterRegistryAddress: config.arbiterRegistry,
 });
 ```
 
 ## Review Pending Cases
 
-Get all cases awaiting your decision:
+Get refund requests awaiting your decision:
 
 ```typescript
-const pendingCases = await arbiter.getPendingCases();
-console.log(`${pendingCases.length} cases to review`);
+// Get paginated refund requests for a receiver
+const { keys, total } = await arbiter.getPendingRefundRequests(
+  0n,   // offset
+  10n,  // count
+  '0xReceiverAddress...' // optional: defaults to wallet account
+);
+console.log(`${total} cases to review, showing first ${keys.length}`);
 
-for (const hash of pendingCases) {
-  const status = await arbiter.getRefundStatus(paymentInfo);
-  console.log(`Case ${hash}: ${RequestStatus[status]}`);
+// Review each case
+for (const key of keys) {
+  const request = await arbiter.getRefundRequestByKey(key);
+  console.log(`Amount: ${request.amount}, Status: ${request.status}`);
 }
 ```
 
@@ -76,26 +80,32 @@ for (const hash of pendingCases) {
 Approve or deny refund requests:
 
 ```typescript
-// Approve a refund
-const { txHash: approveTx } = await arbiter.approveRefund(paymentInfo);
+// Approve a refund request
+const { txHash: approveTx } = await arbiter.approveRefundRequest(paymentInfo, 0n);
 console.log('Approved:', approveTx);
 
-// Deny a refund
-const { txHash: denyTx } = await arbiter.denyRefund(paymentInfo);
+// Deny a refund request
+const { txHash: denyTx } = await arbiter.denyRefundRequest(paymentInfo, 0n);
 console.log('Denied:', denyTx);
 ```
 
 ## Execute Approved Refunds
 
-After approving, execute the refund to transfer funds:
+After approving, execute the refund to transfer funds back to the payer:
 
 ```typescript
-// Approve the request
-await arbiter.approveRefund(paymentInfo);
+// Approve the request first
+await arbiter.approveRefundRequest(paymentInfo, 0n);
 
-// Execute the refund
+// Execute the refund (defaults to paymentInfo.maxAmount if no amount specified)
 const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
 console.log('Refund executed:', txHash);
+
+// Or specify a partial refund amount
+const { txHash: partialTx } = await arbiter.executeRefundInEscrow(
+  paymentInfo,
+  BigInt('500000') // partial amount
+);
 ```
 
 ## Batch Operations
@@ -103,40 +113,46 @@ console.log('Refund executed:', txHash);
 Process multiple cases efficiently:
 
 ```typescript
-// Approve multiple refunds at once
+// Approve multiple refunds
 const results = await arbiter.batchApprove([
-  paymentInfo1,
-  paymentInfo2,
-  paymentInfo3,
+  { paymentInfo: paymentInfo1, nonce: 0n },
+  { paymentInfo: paymentInfo2, nonce: 0n },
 ]);
-
 console.log(`Approved ${results.length} refunds`);
+
+// Deny multiple refunds
+const denyResults = await arbiter.batchDeny([
+  { paymentInfo: paymentInfo3, nonce: 0n },
+]);
 ```
 
-## AI Integration
+## Register as an Arbiter
 
-Automate decisions with AI hooks:
+Register yourself in the on-chain ArbiterRegistry:
 
 ```typescript
-import { createWebhookHandler, type CaseEvaluationContext } from '@x402r/arbiter';
+// Register with your API endpoint
+const { txHash } = await arbiter.registerArbiter('https://arbiter.example.com/api/disputes');
+console.log('Registered:', txHash);
 
-const handler = createWebhookHandler({
-  arbiter,
-  evaluationHook: async (context: CaseEvaluationContext) => {
-    // Your AI logic here
-    const shouldApprove = await evaluateWithAI(context);
+// Check registration
+const isRegistered = await arbiter.isArbiterRegistered(account.address);
+console.log('Is registered:', isRegistered);
+```
 
-    return {
-      decision: shouldApprove ? 'approve' : 'deny',
-      reasoning: 'AI evaluation based on payment history',
-      confidence: 0.95,
-    };
-  },
-  autoExecute: true, // Automatically execute approved refunds
+## Watch for New Cases
+
+Subscribe to incoming refund requests:
+
+```typescript
+const { unsubscribe } = arbiter.watchNewCases((event) => {
+  console.log('New case:', event);
 });
 
-// Use with your event system
-arbiter.watchNewCases(handler);
+// Watch for decisions (status updates)
+const { unsubscribe: unsubDecisions } = arbiter.watchDecisions((event) => {
+  console.log('Decision made:', event);
+});
 ```
 
 ## Complete Example
@@ -146,10 +162,9 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { X402rArbiter } from '@x402r/arbiter';
-import { RequestStatus, getNetworkConfig } from '@x402r/core';
+import { getNetworkConfig, RequestStatus } from '@x402r/core';
 
 async function main() {
-  // Setup
   const publicClient = createPublicClient({
     chain: baseSepolia,
     transport: http(),
@@ -162,58 +177,47 @@ async function main() {
     transport: http(),
   });
 
-  const config = getNetworkConfig('eip155:84532');
-  if (!config) {
-    throw new Error('Network not supported');
-  }
+  const config = getNetworkConfig('eip155:84532')!;
 
   const arbiter = new X402rArbiter({
     publicClient,
     walletClient,
     operatorAddress: '0x...',
     refundRequestAddress: config.refundRequest,
+    arbiterRegistryAddress: config.arbiterRegistry,
   });
 
-  try {
-    // Get pending cases
-    const cases = await arbiter.getPendingCases();
-    console.log(`Reviewing ${cases.length} cases`);
+  // Register as an arbiter
+  await arbiter.registerArbiter('https://arbiter.example.com/api');
 
-    // Watch for new cases
-    const { unsubscribe } = arbiter.watchNewCases(async (event) => {
-      console.log('New case to review:', event);
-      // Process the new case...
-    });
+  // Get pending cases
+  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 10n, '0xReceiver...');
+  console.log(`${total} pending cases`);
 
-    console.log('Arbiter is now watching for new cases...');
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Arbiter operation failed:', error.message);
-    }
-    throw error;
-  }
+  // Watch for new cases
+  arbiter.watchNewCases(async (event) => {
+    console.log('New case to review:', event);
+  });
+
+  console.log('Arbiter is watching for new cases...');
 }
 
 main().catch(console.error);
 ```
 
-<Tip>
-Always wrap SDK operations in try-catch blocks. The SDK throws descriptive errors for contract reverts and unauthorized actions.
-</Tip>
-
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
-    Learn all decision methods.
+    Learn all decision methods including executeRefundInEscrow.
+  </Card>
+  <Card title="Registry" icon="clipboard-list" href="/sdk/arbiter/registry">
+    Manage your arbiter registration and discover other arbiters.
   </Card>
   <Card title="Batch Operations" icon="layer-group" href="/sdk/arbiter/batch-operations">
     Process multiple cases efficiently.
   </Card>
   <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
     Automate with AI hooks.
-  </Card>
-  <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
-    Watch for new cases.
   </Card>
 </CardGroup>

@@ -1,131 +1,226 @@
 ---
 title: "Payment Operations"
-description: "Release payments and process refunds with the Merchant SDK"
+description: "Release funds, charge payments, process refunds, and query escrow state with the Merchant SDK"
 icon: "coins"
 ---
 
-The Merchant SDK provides methods for managing payment releases and refunds.
+The `X402rMerchant` class provides methods for managing the full payment lifecycle: releasing escrowed funds, charging directly for subscriptions, processing refunds, and querying operator configuration.
 
-## Release a Payment
+## Payment Operations
 
-Release funds from escrow to your merchant wallet:
+### Release Funds from Escrow
 
-```typescript
-// Release full amount
-const { txHash } = await merchant.release(paymentInfo);
-console.log('Full release:', txHash);
-```
-
-### Partial Release
-
-Release a specific amount:
-
-```typescript
-// Release 5 USDC (with 6 decimals)
-const amount = BigInt('5000000');
-const { txHash } = await merchant.release(paymentInfo, amount);
-console.log('Partial release:', txHash);
-```
-
-<Note>
-The remaining funds stay in escrow and can still be refunded or released later.
-</Note>
-
-## Refund in Escrow
-
-Return funds to the payer while payment is still in escrow:
-
-```typescript
-// Refund full amount
-const { txHash } = await merchant.refundInEscrow(paymentInfo);
-console.log('Full refund:', txHash);
-
-// Refund partial amount
-const { txHash } = await merchant.refundInEscrow(paymentInfo, BigInt('500000'));
-console.log('Partial refund:', txHash);
-```
-
-## Get Payment State
-
-Check the current state of a payment:
-
-```typescript
-import { PaymentState } from '@x402r/core';
-
-const state = await merchant.getPaymentState(paymentInfo);
-
-if (state === PaymentState.InEscrow) {
-  console.log('Payment is in escrow - can release or refund');
-} else if (state === PaymentState.Released) {
-  console.log('Payment already released');
-}
-```
-
-## Get Received Payments
-
-List all payments received by your merchant address:
-
-```typescript
-const { hashes } = await merchant.getReceiverPayments();
-
-console.log(`Received ${hashes.length} payments`);
-
-for (const hash of hashes) {
-  const details = await merchant.getPaymentDetails(hash);
-  console.log(`Payment: ${hash}`);
-  console.log(`  Payer: ${details.payer}`);
-  console.log(`  Amount: ${details.maxAmount}`);
-}
-```
-
-## Get Payment Amounts
-
-Query the available amounts for a payment:
-
-```typescript
-const amounts = await merchant.getPaymentAmounts(paymentInfo);
-
-console.log('Capturable:', amounts.capturable);  // Can be released
-console.log('Refundable:', amounts.refundable);  // Can be refunded
-```
-
-## Example: Batch Release
-
-Release all eligible payments:
+Use `release()` to transfer escrowed funds to the receiver (merchant). The `amount` parameter is **required** and specifies the exact amount to release in token units.
 
 ```typescript
 import { X402rMerchant } from '@x402r/merchant';
-import { PaymentState } from '@x402r/core';
 
-async function releaseAllEligible(
-  merchant: X402rMerchant,
-  recorderAddress: `0x${string}`
-) {
-  const { hashes } = await merchant.getReceiverPayments();
-  const released: string[] = [];
+// Release 10 USDC (6 decimals) from escrow
+const { txHash } = await merchant.release(paymentInfo, BigInt('10000000'));
+console.log('Released:', txHash);
+```
 
-  for (const hash of hashes) {
-    const details = await merchant.getPaymentDetails(hash);
-    const state = await merchant.getPaymentState(details);
+For partial releases, specify a smaller amount. The remaining funds stay in escrow and can be released or refunded later.
 
-    // Only release payments in escrow
-    if (state === PaymentState.InEscrow) {
-      // Check if escrow period passed (no refund risk)
-      const isPassed = await merchant.isEscrowPeriodPassed(
-        details,
-        recorderAddress
-      );
+```typescript
+// Release 3 USDC of a 10 USDC escrow
+const { txHash } = await merchant.release(paymentInfo, BigInt('3000000'));
+console.log('Partial release:', txHash);
 
-      if (isPassed) {
-        const { txHash } = await merchant.release(details);
-        released.push(txHash);
-        console.log(`Released: ${hash}`);
-      }
+// Check what remains
+const { capturableAmount } = await merchant.getPaymentAmounts(paymentInfo);
+console.log('Remaining in escrow:', capturableAmount); // 7000000n
+```
+
+<Note>
+The `amount` parameter is always required. There is no default "release all" behavior. Always query `getPaymentAmounts()` first to determine the available capturable amount.
+</Note>
+
+### Refund While in Escrow
+
+Use `refundInEscrow()` to return escrowed funds to the payer before release. The `amount` parameter is **required**.
+
+```typescript
+// Full refund of 10 USDC
+const { txHash } = await merchant.refundInEscrow(paymentInfo, BigInt('10000000'));
+console.log('Refunded from escrow:', txHash);
+```
+
+```typescript
+// Partial refund: return 2 USDC, keep 8 USDC in escrow
+const { txHash } = await merchant.refundInEscrow(paymentInfo, BigInt('2000000'));
+console.log('Partial refund:', txHash);
+```
+
+### Charge Directly
+
+Use `charge()` for non-escrow flows such as subscriptions or session-based payments. This pulls funds directly from the payer via a token collector (e.g., ERC-3009 `transferWithAuthorization`).
+
+```typescript
+const tokenCollectorAddress: `0x${string}` = '0xTokenCollector...';
+const collectorData: `0x${string}` = '0xSignatureOrCalldata...';
+
+const { txHash } = await merchant.charge(
+  paymentInfo,
+  BigInt('5000000'),       // 5 USDC
+  tokenCollectorAddress,   // token collector contract
+  collectorData            // authorization data (e.g., ERC-3009 signature)
+);
+console.log('Charged:', txHash);
+```
+
+<Tip>
+The `charge()` method is designed for recurring payments and session-based billing where funds are not pre-escrowed. The token collector contract handles the actual token transfer.
+</Tip>
+
+### Refund After Release (Post-Escrow)
+
+Use `refundPostEscrow()` to refund funds that have already been released to the receiver. This requires a token collector to source the refund from the merchant's balance.
+
+```typescript
+const tokenCollectorAddress: `0x${string}` = '0xTokenCollector...';
+const collectorData: `0x${string}` = '0xSignatureOrCalldata...';
+
+const { txHash } = await merchant.refundPostEscrow(
+  paymentInfo,
+  BigInt('5000000'),       // 5 USDC to refund
+  tokenCollectorAddress,   // token collector that sources the refund
+  collectorData            // authorization data
+);
+console.log('Post-escrow refund:', txHash);
+```
+
+<Warning>
+Post-escrow refunds require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
+</Warning>
+
+## Query Methods
+
+### Get Payment Amounts
+
+Use `getPaymentAmounts()` to query the current capturable and refundable amounts for a payment. This method reads directly from the escrow contract and is fully functional (not stubbed).
+
+```typescript
+const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
+
+console.log('Capturable:', capturableAmount);  // Funds available to release
+console.log('Refundable:', refundableAmount);  // Funds available to refund
+
+if (capturableAmount > 0n) {
+  // Release available funds
+  const { txHash } = await merchant.release(paymentInfo, capturableAmount);
+  console.log('Released all capturable funds:', txHash);
+}
+```
+
+<Info>
+`getPaymentAmounts()` requires the `escrowAddress` to be configured when creating the `X402rMerchant` instance.
+</Info>
+
+### Get Operator Configuration
+
+Use `getOperatorConfig()` to retrieve all 14 immutable slot addresses from the PaymentOperator contract. This includes the escrow address, fee configuration, all 5 condition slots, and all 5 recorder slots.
+
+```typescript
+const config = await merchant.getOperatorConfig();
+
+// Core state
+console.log('Escrow:', config.escrow);
+console.log('Fee recipient:', config.feeRecipient);
+console.log('Fee calculator:', config.feeCalculator);
+console.log('Protocol fee config:', config.protocolFeeConfig);
+
+// Condition slots (address(0) = always allow)
+console.log('Authorize condition:', config.authorizeCondition);
+console.log('Charge condition:', config.chargeCondition);
+console.log('Release condition:', config.releaseCondition);
+console.log('Refund in-escrow condition:', config.refundInEscrowCondition);
+console.log('Refund post-escrow condition:', config.refundPostEscrowCondition);
+
+// Recorder slots (address(0) = no-op)
+console.log('Authorize recorder:', config.authorizeRecorder);
+console.log('Charge recorder:', config.chargeRecorder);
+console.log('Release recorder:', config.releaseRecorder);
+console.log('Refund in-escrow recorder:', config.refundInEscrowRecorder);
+console.log('Refund post-escrow recorder:', config.refundPostEscrowRecorder);
+```
+
+### Get Fee Structure
+
+Use `getFeeStructure()` to retrieve the fee-related addresses for the operator. This is a lighter alternative to `getOperatorConfig()` when you only need fee information.
+
+```typescript
+const fees = await merchant.getFeeStructure();
+
+console.log('Fee calculator:', fees.feeCalculator);
+console.log('Protocol fee config:', fees.protocolFeeConfig);
+console.log('Fee recipient:', fees.feeRecipient);
+```
+
+The returned `FeeStructure` contains three fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `feeCalculator` | `0x${string}` | Contract that computes fee amounts |
+| `protocolFeeConfig` | `0x${string}` | Protocol-level fee configuration |
+| `feeRecipient` | `0x${string}` | Address that receives the operator's fee share |
+
+### Get Release Conditions
+
+Use `getReleaseConditions()` to check which condition contract governs release operations. A zero address means releases are always allowed.
+
+```typescript
+const releaseCondition = await merchant.getReleaseConditions();
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+if (releaseCondition === ZERO_ADDRESS) {
+  console.log('No release conditions configured - releases always allowed');
+} else {
+  console.log('Release condition contract:', releaseCondition);
+}
+```
+
+## Stubbed Methods
+
+The following methods are defined but not yet implemented. They throw a `NotImplementedError` when called and will be available once subgraph/indexer integration is complete.
+
+<Warning>
+These methods throw `NotImplementedError` at runtime. Do not call them in production code until they are implemented.
+</Warning>
+
+### getPaymentState
+
+Returns the lifecycle state of a payment (NonExistent, InEscrow, Released, Settled, Expired). Requires subgraph integration.
+
+```typescript
+import { PaymentState, NotImplementedError } from '@x402r/core';
+
+try {
+  const state = await merchant.getPaymentState(paymentInfo);
+} catch (error) {
+  if (error instanceof NotImplementedError) {
+    console.log('getPaymentState requires subgraph integration');
+    // Use getPaymentAmounts() as an alternative to infer state
+    const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
+    if (capturableAmount > 0n) {
+      console.log('Payment has funds in escrow');
     }
   }
+}
+```
 
-  console.log(`Released ${released.length} payments`);
-  return released;
+### getReceiverPayments
+
+Returns all payment hashes where the current wallet is the receiver. Requires subgraph integration.
+
+```typescript
+try {
+  const { hashes } = await merchant.getReceiverPayments();
+} catch (error) {
+  if (error instanceof NotImplementedError) {
+    console.log('getReceiverPayments requires subgraph integration');
+    // Use event subscriptions as an alternative to track payments
+  }
 }
 ```
 
@@ -133,54 +228,86 @@ async function releaseAllEligible(
 
 ```mermaid
 flowchart TD
-    A[Payment in Escrow] --> B{Has refund request?}
-    B -->|No| C{Escrow period passed?}
-    B -->|Yes| D{Approve refund?}
-    C -->|Yes| E[Safe to release full amount]
-    C -->|No| F[Can release, but refund still possible]
-    D -->|Yes| G[Execute refundInEscrow]
-    D -->|No| H[Deny request, then release]
+    A[Payment in Escrow] --> B{Check getPaymentAmounts}
+    B --> C{capturableAmount > 0?}
+    C -->|Yes| D{Has refund request?}
+    C -->|No| E[Nothing to release]
+    D -->|No| F[Safe to release]
+    D -->|Yes| G{Approve refund?}
+    F --> H["release(paymentInfo, amount)"]
+    G -->|Yes| I["refundInEscrow(paymentInfo, amount)"]
+    G -->|No| J[Deny request, then release]
+    J --> H
 ```
 
-## Best Practices
+## Complete Example
 
-<AccordionGroup>
-  <Accordion title="Wait for escrow period" icon="clock">
-    If possible, wait for the escrow period to pass before releasing. This eliminates refund risk.
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { X402rMerchant } from '@x402r/merchant';
+import { getNetworkConfig } from '@x402r/core';
 
-    ```typescript
-    const isPassed = await merchant.isEscrowPeriodPassed(paymentInfo, recorder);
-    if (isPassed) {
-      await merchant.release(paymentInfo);
-    }
-    ```
-  </Accordion>
+async function main() {
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(),
+  });
 
-  <Accordion title="Handle partial releases carefully" icon="chart-pie">
-    Track partial releases to avoid over-releasing:
+  const account = privateKeyToAccount(process.env.MERCHANT_KEY as `0x${string}`);
+  const walletClient = createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  });
 
-    ```typescript
-    const amounts = await merchant.getPaymentAmounts(paymentInfo);
-    const toRelease = amounts.capturable;
+  const config = getNetworkConfig('eip155:84532')!;
 
-    if (toRelease > 0n) {
-      await merchant.release(paymentInfo, toRelease);
-    }
-    ```
-  </Accordion>
+  const merchant = new X402rMerchant({
+    publicClient,
+    walletClient,
+    operatorAddress: '0xYourOperator...',
+    escrowAddress: config.authCaptureEscrow,
+    refundRequestAddress: config.refundRequest,
+  });
 
-  <Accordion title="Process refunds promptly" icon="bolt">
-    Quick refund processing improves customer satisfaction and reduces dispute escalation.
-  </Accordion>
-</AccordionGroup>
+  // 1. Query available amounts
+  const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
+  console.log(`Capturable: ${capturableAmount}, Refundable: ${refundableAmount}`);
+
+  // 2. Release if funds are available
+  if (capturableAmount > 0n) {
+    const { txHash } = await merchant.release(paymentInfo, capturableAmount);
+    console.log('Released:', txHash);
+  }
+
+  // 3. Inspect operator configuration
+  const operatorConfig = await merchant.getOperatorConfig();
+  console.log('Escrow contract:', operatorConfig.escrow);
+  console.log('Release condition:', operatorConfig.releaseCondition);
+
+  // 4. Check fee structure
+  const fees = await merchant.getFeeStructure();
+  console.log('Fee calculator:', fees.feeCalculator);
+}
+
+main().catch(console.error);
+```
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Refund Handling" icon="rotate-left" href="/sdk/merchant/refund-handling">
-    Process incoming refund requests.
+    Process incoming refund requests with approve/deny workflows.
   </Card>
-  <Card title="Server Helpers" icon="server" href="/sdk/merchant/server-helpers">
-    Integrate with x402 servers.
+  <Card title="Event Subscriptions" icon="bell" href="/sdk/merchant/subscriptions">
+    Watch for real-time payment and refund events.
+  </Card>
+  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
+    Understand the underlying PaymentOperator contract methods.
+  </Card>
+  <Card title="Helpers" icon="wrench" href="/sdk/helpers/refundable">
+    Mark payment options as refundable with your operator.
   </Card>
 </CardGroup>

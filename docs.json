@@ -11,10 +11,10 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Protocol",
         "groups": [
           {
-            "group": "X402r Protocol",
+            "group": "Getting Started",
             "pages": [
               "index",
               "x402-integration/overview",
@@ -32,6 +32,12 @@
               "contracts/conditions",
               "contracts/examples"
             ]
+          },
+          {
+            "group": "Roadmap",
+            "pages": [
+              "roadmap"
+            ]
           }
         ]
       },
@@ -39,12 +45,12 @@
         "tab": "SDK",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Getting Started",
             "pages": [
               "sdk/overview",
               "sdk/installation",
               "sdk/concepts",
-              "sdk/limitations"
+              "sdk/deploy-operator"
             ]
           },
           {
@@ -63,7 +69,6 @@
               "sdk/merchant/quickstart",
               "sdk/merchant/payment-operations",
               "sdk/merchant/refund-handling",
-              "sdk/merchant/server-helpers",
               "sdk/merchant/subscriptions"
             ]
           },
@@ -72,9 +77,23 @@
             "pages": [
               "sdk/arbiter/quickstart",
               "sdk/arbiter/decision-submission",
+              "sdk/arbiter/registry",
               "sdk/arbiter/batch-operations",
               "sdk/arbiter/ai-integration",
               "sdk/arbiter/subscriptions"
+            ]
+          },
+          {
+            "group": "Helpers",
+            "pages": [
+              "sdk/helpers/refundable"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "sdk/limitations",
+              "sdk/examples"
             ]
           }
         ]

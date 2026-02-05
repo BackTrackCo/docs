@@ -1,0 +1,117 @@
+---
+title: "Roadmap"
+description: "Current progress and upcoming features for the x402r protocol and SDK"
+icon: "map"
+---
+
+## Protocol
+
+### V0 Demo (Completed)
+
+- Client SDK wrapper and MCP tool
+- NPM package published
+- Refund request encryption (Lit Protocol)
+- Basic refund flow (cancel, replace, approve/reject)
+
+### Protocol V2 (Completed)
+
+- Switched from proxy pattern to escrow scheme (commerce-payments)
+- PaymentOperator with pluggable conditions and recorders
+- Partial refund support (partial void)
+- EscrowPeriod and Freeze contracts
+- Factory pattern with CREATE2 deterministic deployment
+- ArbiterRegistry for on-chain arbiter discovery
+- Deployed on Base Sepolia and Base Mainnet
+
+### Developer Experience (In Progress)
+
+- Documentation restructure and accuracy fixes
+- LLM-friendly docs with MCP integration
+- Simple "API Down" arbiter template for first merchants
+- CI/CD pipeline for SDK and contracts
+
+### Protocol Extensions (Future)
+
+- Bond-based disputes
+- Multiple arbiter support per operator
+- Post-escrow arbitration handling
+- Reputation system for clients, merchants, and arbiters
+- Arbiter marketplace
+- Token wrapper for enforced refund protection
+
+---
+
+## SDK
+
+### Phase 0: Operator Deployment (Completed)
+
+- Fixed all SDK ABIs to match contracts
+- Factory deployment helpers (`deployMarketplaceOperator`)
+- Condition composition (AND/OR/NOT combinators)
+- Deterministic address computation (CREATE2)
+- Deployed all contracts on Base Sepolia and Base Mainnet
+
+### Phase 1: MVP Examples (Completed)
+
+- 7 working examples (deploy-operator, merchant-server, merchant-cli, client-cli, arbiter-cli, e2e-dispute, shared)
+- Full e2e dispute resolution flow
+
+### Phase 2: Core SDK (Completed)
+
+- `@x402r/client` — Refund requests, freeze, escrow period queries, subscriptions
+- `@x402r/merchant` — Release, charge, refundInEscrow, refundPostEscrow, refund handling
+- `@x402r/arbiter` — Decision submission, batch operations, registry, AI hooks
+- `@x402r/helpers` — `refundable()` helper for payment options
+- `@x402r/core` — Types, ABIs, config, deploy utilities
+- 316+ tests across all packages
+
+### Phase 3: Client UX (Upcoming)
+
+- Pre-payment info extraction (`getOperatorInfo` — discover arbiter, escrow period from operator address)
+- Combined freeze + refund (`freezeAndRequestRefund` — single call)
+- Condition awareness for clients
+
+### Phase 4: Subgraph Integration (Upcoming)
+
+- Deploy subgraph for payment event indexing
+- Implement 8 stubbed methods (`getPaymentState`, `getMyPayments`, etc.)
+- Historical payment listing for all roles
+
+### Future SDK Work
+
+- Evidence/metadata system with pluggable backends (IPFS, Arweave)
+- Encrypted communication channels (XMTP)
+- Session-based billing patterns
+- Multi-arbiter support
+- Dedicated Express/Hono middleware
+
+---
+
+## Contract Status
+
+| Contract | Base Sepolia | Base Mainnet |
+|----------|-------------|--------------|
+| AuthCaptureEscrow | Deployed | Deployed |
+| ERC3009PaymentCollector | Deployed | Deployed |
+| PaymentOperatorFactory | Deployed | Deployed |
+| EscrowPeriodFactory | Deployed | Deployed |
+| FreezeFactory | Deployed | Deployed |
+| RefundRequest | Deployed | Deployed |
+| ArbiterRegistry | Deployed | Deployed |
+| ProtocolFeeConfig | Deployed | Deployed |
+| Condition singletons | Deployed | Deployed |
+
+<Note>
+All contract addresses are available in `@x402r/core` via `getNetworkConfig()`. See the [Installation](/sdk/installation) page for details.
+</Note>
+
+## Get Involved
+
+<CardGroup cols={2}>
+  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo">
+    Follow development and contribute.
+  </Card>
+  <Card title="Support" icon="envelope" href="mailto:hi@x402r.org">
+    Get in touch with the team.
+  </Card>
+</CardGroup>

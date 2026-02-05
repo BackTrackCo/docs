@@ -8,7 +8,7 @@ icon: "download"
 
 <Note>
 Before installing the SDK, ensure you have:
-- Node.js 18 or later
+- Node.js 20 or later
 - A package manager (npm, yarn, or pnpm)
 - [viem](https://viem.sh) for blockchain interactions
 </Note>
@@ -25,7 +25,7 @@ Install only the packages you need for your use case:
   </Tab>
   <Tab title="Merchant">
     ```bash
-    npm install @x402r/merchant @x402r/core viem
+    npm install @x402r/merchant @x402r/helpers @x402r/core viem
     ```
   </Tab>
   <Tab title="Arbiter">
@@ -33,9 +33,14 @@ Install only the packages you need for your use case:
     npm install @x402r/arbiter @x402r/core viem
     ```
   </Tab>
+  <Tab title="Helpers Only">
+    ```bash
+    npm install @x402r/helpers @x402r/core viem
+    ```
+  </Tab>
   <Tab title="All Packages">
     ```bash
-    npm install @x402r/client @x402r/merchant @x402r/arbiter @x402r/core viem
+    npm install @x402r/client @x402r/merchant @x402r/arbiter @x402r/helpers @x402r/core viem
     ```
   </Tab>
 </Tabs>
@@ -56,7 +61,7 @@ const publicClient = createPublicClient({
 });
 
 // Wallet client for write operations (requires private key)
-const account = privateKeyToAccount('0x...');
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 const walletClient = createWalletClient({
   account,
   chain: baseSepolia,
@@ -73,12 +78,14 @@ import { getNetworkConfig } from '@x402r/core';
 
 const config = getNetworkConfig('eip155:84532'); // Base Sepolia
 
-console.log(config.refundRequest);  // RefundRequest contract
-console.log(config.usdc);           // USDC token address
+console.log(config.authCaptureEscrow); // Escrow contract
+console.log(config.refundRequest);     // RefundRequest contract
+console.log(config.arbiterRegistry);   // ArbiterRegistry contract
+console.log(config.usdc);             // USDC token address
 ```
 
 <Note>
-Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`.
+Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.
 </Note>
 
 <Warning>
@@ -87,20 +94,20 @@ Never commit private keys to version control. Use environment variables or a sec
 
 ## Quick Verification
 
-Verify your setup by querying a payment state:
+Verify your setup by querying refund status for a payment:
 
 ```typescript
 import { X402rClient } from '@x402r/client';
-import { PaymentState } from '@x402r/core';
 
 const client = new X402rClient({
   publicClient,
   operatorAddress: '0x...', // Your PaymentOperator address
+  refundRequestAddress: config.refundRequest,
 });
 
-// Check if the SDK is working
-const state = await client.getPaymentState(paymentInfo);
-console.log('Payment state:', PaymentState[state]);
+// Check if a refund request exists for a payment
+const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
+console.log('Has refund request:', hasRequest);
 ```
 
 ## Next Steps

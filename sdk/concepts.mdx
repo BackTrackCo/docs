@@ -42,34 +42,38 @@ interface PaymentInfo {
   token: `0x${string}`;             // Payment token (e.g., USDC)
   maxAmount: bigint;                // Maximum payment amount
   preApprovalExpiry: bigint;        // Pre-approval expiry timestamp (0n if not used)
-  authorizationExpiry: bigint;      // When authorization expires
+  authorizationExpiry: bigint;      // When payer can reclaim funds
   refundExpiry: bigint;             // Deadline for refund requests
   minFeeBps: number;                // Minimum fee in basis points
   maxFeeBps: number;                // Maximum fee in basis points
-  feeReceiver: `0x${string}`;       // Address that receives fees
+  feeReceiver: `0x${string}`;      // Address that receives fees
   salt: bigint;                     // Unique salt for this payment
 }
 ```
 
 <Tip>
-Use `computePaymentInfoHash()` from `@x402r/core` to compute the unique hash of a payment.
+Use `computePaymentInfoHash()` from `@x402r/core` to compute the unique hash of a payment. Use `parsePaymentInfo()` to deserialize a JSON PaymentInfo back into the typed struct.
 </Tip>
 
 ## Escrow Period
 
-Payments are held in escrow for a configurable period before they can be fully released. During this time:
+The **EscrowPeriod** contract tracks when a payment was authorized and enforces a configurable waiting period before funds can be released. During the escrow period:
 
-- **Payers** can request refunds
-- **Merchants** can release or refund payments
-- **Either party** can freeze the payment to pause the escrow timer
+- **Payers** can request refunds or freeze the payment
+- **Merchants** can refund but cannot release
+- **After the period** — merchants can release funds to themselves
 
 ```typescript
 import { X402rClient } from '@x402r/client';
 
-// Check escrow status
-const authTime = await client.getAuthorizationTime(paymentInfo, recorderAddress);
-const isPassed = await client.isEscrowPeriodPassed(paymentInfo, recorderAddress);
-const isFrozen = await client.isFrozen(paymentInfo, recorderAddress);
+// Check when payment was authorized
+const authTime = await client.getAuthorizationTime(paymentInfo, escrowPeriodAddress);
+
+// Check if still within escrow period
+const inEscrow = await client.isDuringEscrowPeriod(paymentInfo, escrowPeriodAddress);
+if (!inEscrow) {
+  console.log('Escrow period has passed - funds can be released');
+}
 ```
 
 ## Refund Requests
@@ -95,46 +99,58 @@ sequenceDiagram
     participant M as Merchant
     participant A as Arbiter
 
-    P->>R: requestRefund(paymentInfo)
+    P->>R: requestRefund(paymentInfo, amount, nonce)
     R-->>M: RefundRequested event
 
     alt Merchant approves
-        M->>R: updateStatus(Approved)
-        M->>R: refundInEscrow()
+        M->>R: approveRefundRequest(paymentInfo, nonce)
+        M->>R: refundInEscrow(paymentInfo, amount)
     else Merchant denies
-        M->>R: updateStatus(Denied)
+        M->>R: denyRefundRequest(paymentInfo, nonce)
     else Escalate to arbiter
-        A->>R: updateStatus(Approved/Denied)
-        A->>R: refundInEscrow() if approved
+        A->>R: approveRefundRequest(paymentInfo, nonce)
+        A->>R: executeRefundInEscrow(paymentInfo, amount)
     end
 ```
 
-## Freeze/Unfreeze
+### The Nonce Parameter
 
-Either party can freeze a payment to pause the escrow timer during a dispute:
+All refund methods require a `nonce` parameter. This is the record index from the PaymentIndexRecorder that identifies which charge the refund request applies to. For the first charge, use `0n`.
 
 ```typescript
-// Payer freezes payment
-await client.freezePayment(paymentInfo, recorderAddress);
+// Request refund for the first charge
+await client.requestRefund(paymentInfo, amount, 0n);
 
-// Merchant unfreezes payment
-await merchant.unfreezePayment(paymentInfo, recorderAddress);
+// Check status for the first charge
+const status = await client.getRefundStatus(paymentInfo, 0n);
+```
+
+## Freeze / Unfreeze
+
+The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing release until the freeze expires or is lifted:
+
+```typescript
+// Payer freezes payment (requires payer authorization)
+await client.freezePayment(paymentInfo, freezeAddress);
+
+// Merchant unfreezes payment (requires receiver authorization)
+await merchant.unfreezePayment(paymentInfo, freezeAddress);
 
 // Check frozen status
-const frozen = await client.isFrozen(paymentInfo, recorderAddress);
+const frozen = await client.isFrozen(paymentInfo, freezeAddress);
 ```
 
 <Warning>
-Freezing a payment does not automatically escalate to an arbiter. It simply pauses the escrow timer to allow time for dispute resolution.
+Freezing a payment does not automatically escalate to an arbiter. It pauses the release condition to allow time for dispute resolution.
 </Warning>
 
 ## Roles and Permissions
 
 | Role | Can Do |
 |------|--------|
-| **Payer** | Query payments, request refunds, freeze payments, cancel requests |
-| **Merchant** | Release payments, approve/deny refunds, unfreeze payments |
-| **Arbiter** | Approve/deny disputed refunds, execute refunds, batch operations |
+| **Payer** | Request refunds, freeze payments, cancel requests, query escrow state |
+| **Merchant** | Release payments, charge, approve/deny refunds, unfreeze payments |
+| **Arbiter** | Approve/deny disputed refunds, execute refunds, batch operations, registry |
 
 ## Contract Architecture
 
@@ -144,8 +160,9 @@ flowchart TB
         direction LR
         auth[authorize]
         rel[release]
+        chg[charge]
         ref[refundInEscrow]
-        set[settle]
+        refp[refundPostEscrow]
     end
 
     subgraph Components[Supporting Contracts]
@@ -154,28 +171,39 @@ flowchart TB
             rr1[Request/Cancel]
             rr2[Approve/Deny]
         end
-        subgraph EPR[EscrowPeriodRecorder]
-            epr1[Freeze/Unfreeze]
-            epr2[Track escrow time]
+        subgraph EP[EscrowPeriod]
+            ep1[Track auth time]
+            ep2[Check period]
+        end
+        subgraph FR[Freeze]
+            fr1[Freeze/Unfreeze]
+            fr2[Check frozen]
         end
         subgraph Cond[Conditions]
             c1[Access Control]
-            c2[Time-based rules]
+            c2[Combinators]
         end
     end
 
     PO --> RR
-    PO --> EPR
+    PO --> EP
+    PO --> FR
     PO --> Cond
 ```
 
 ## Next Steps
 
 <CardGroup cols={2}>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy your own PaymentOperator with all supporting contracts.
+  </Card>
   <Card title="Client SDK" icon="user" href="/sdk/client/quickstart">
     Build payer-side integrations.
   </Card>
   <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
     Add refund support to your server.
+  </Card>
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    Understand the underlying contract architecture.
   </Card>
 </CardGroup>

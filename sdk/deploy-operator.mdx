@@ -1,0 +1,159 @@
+---
+title: "Deploy an Operator"
+description: "Deploy a PaymentOperator with escrow, freeze, and dispute resolution in one call"
+icon: "rocket"
+---
+
+The `@x402r/core` package includes deployment utilities that handle the full lifecycle of deploying a PaymentOperator and all its supporting contracts.
+
+## Overview
+
+A complete marketplace operator deployment includes:
+
+1. **EscrowPeriod** — Records authorization time, enforces waiting period before release
+2. **Freeze** — Allows payer to freeze payment during escrow, receiver to unfreeze
+3. **StaticAddressCondition** — Restricts refund approval to the designated arbiter
+4. **OrCondition** — Allows either the receiver OR the arbiter to approve in-escrow refunds
+5. **StaticFeeCalculator** — Optional operator fee (basis points)
+6. **PaymentOperator** — The main contract tying everything together
+
+All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
+
+## Quick Deploy
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { deployMarketplaceOperator } from '@x402r/core/deploy';
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+
+const result = await deployMarketplaceOperator(
+  walletClient,
+  publicClient,
+  'eip155:84532', // Base Sepolia
+  {
+    feeRecipient: '0xYourAddress...',    // receives operator fees
+    arbiter: '0xArbiterAddress...',       // dispute resolver
+    escrowPeriodSeconds: 604800n,         // 7 days
+    operatorFeeBps: 100n,                 // 1% fee (optional)
+  }
+);
+
+console.log('Operator:', result.operatorAddress);
+console.log('EscrowPeriod:', result.escrowPeriodAddress);
+console.log('Freeze:', result.freezeAddress);
+console.log('New deployments:', result.summary.newDeployments);
+console.log('Existing (reused):', result.summary.existingContracts);
+```
+
+## Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `feeRecipient` | `Address` | Address that receives operator fees |
+| `arbiter` | `Address` | Arbiter address for dispute resolution |
+| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
+| `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
+| `operatorFeeBps` | `bigint` | Fee in basis points. Default: `0n` (no fee). `100n` = 1% |
+
+## Deployment Result
+
+The `deployMarketplaceOperator` function returns:
+
+```typescript
+interface MarketplaceOperatorDeployment {
+  operatorAddress: Address;           // The PaymentOperator
+  escrowPeriodAddress: Address;       // EscrowPeriod recorder/condition
+  freezeAddress: Address;             // Freeze condition
+  arbiterConditionAddress: Address;   // StaticAddressCondition for arbiter
+  refundInEscrowCondition: Address;   // OR(Receiver, Arbiter)
+  feeCalculatorAddress: Address | null; // null if no fee
+  txHashes: Hash[];                   // All deployment tx hashes
+  summary: {
+    newDeployments: number;           // Newly deployed contracts
+    existingContracts: number;        // Reused existing contracts
+  };
+}
+```
+
+<Tip>
+Because all contracts use CREATE2, redeploying with the same parameters is idempotent — it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+</Tip>
+
+## Preview Addresses (No Deploy)
+
+You can preview what addresses will be created without actually deploying:
+
+```typescript
+import { previewMarketplaceOperator } from '@x402r/core/deploy';
+
+const preview = await previewMarketplaceOperator(
+  publicClient,
+  'eip155:84532',
+  {
+    feeRecipient: '0xYourAddress...',
+    arbiter: '0xArbiterAddress...',
+    escrowPeriodSeconds: 604800n,
+  }
+);
+
+console.log('Operator will be at:', preview.operatorAddress);
+console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress);
+```
+
+## Operator Slot Configuration
+
+The deployed operator has the following slot configuration:
+
+| Slot | Contract | Purpose |
+|------|----------|---------|
+| `AUTHORIZE_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
+| `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
+| `CHARGE_CONDITION` | (none) | No restrictions on charge |
+| `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
+| `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+| `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
+| `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
+| `FEE_RECIPIENT` | Your address | Receives fees |
+
+## Network Support
+
+Deployment is supported on both networks:
+
+| Network | Chain ID | EIP-155 ID |
+|---------|----------|------------|
+| Base Sepolia | 84532 | `eip155:84532` |
+| Base Mainnet | 8453 | `eip155:8453` |
+
+<Warning>
+Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can get testnet ETH from the [Base Sepolia Faucet](https://www.base.org/faucet).
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Quickstart" icon="user" href="/sdk/client/quickstart">
+    Use the operator address with the Client SDK.
+  </Card>
+  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant/quickstart">
+    Release funds and handle refunds.
+  </Card>
+  <Card title="Helpers" icon="wrench" href="/sdk/helpers/refundable">
+    Mark payment options as refundable with your operator.
+  </Card>
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    Understand the underlying contract architecture.
+  </Card>
+</CardGroup>
