@@ -97,11 +97,11 @@ Pre-deployed singletons for role-based access control.
 
 Only the payment payer can call the action.
 
-**Address (Base Sepolia):** `0xDc0D800007ceACFf1299b926Ce22B4d4edCE6Ce7`
+**Address (Base Sepolia):** `0xBAF68176FF94CAdD403EF7FbB776bbca548AC09D`
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller)
     external pure returns (bool)
 {
     return caller == payment.payer;
@@ -117,11 +117,11 @@ function check(PaymentInfo calldata payment, address caller)
 
 Only the payment receiver can call the action.
 
-**Address (Base Sepolia):** `0x138Bf828643350AA3692aedDE8b2254eDF4D07EF`
+**Address (Base Sepolia):** `0x12EDefd4549c53497689067f165c0f101796Eb6D`
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller)
     external pure returns (bool)
 {
     return caller == payment.receiver;
@@ -148,7 +148,7 @@ contract StaticAddressCondition is ICondition {
         DESIGNATED_ADDRESS = _designatedAddress;
     }
 
-    function check(PaymentInfo calldata payment, address caller)
+    function check(PaymentInfo calldata payment, uint256, address caller)
         external view returns (bool)
     {
         return caller == DESIGNATED_ADDRESS;
@@ -179,11 +179,11 @@ const daoCondition = new StaticAddressCondition(daoMultisigAddress);
 
 Anyone can call the action (no restrictions).
 
-**Address (Base Sepolia):** `0xe2659dc0d716B1226DF6a09A5f47862cd1ff6733`
+**Address (Base Sepolia):** `0x785cC83DEa3d46D5509f3bf7496EAb26D42EE610`
 
 **Logic:**
 ```solidity
-function check(PaymentInfo calldata payment, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller)
     external pure returns (bool)
 {
     return true;
@@ -205,15 +205,14 @@ Compose multiple conditions with logical operators.
 All conditions must pass (`A && B && C`).
 
 **Usage:**
-```solidity
-// Deploy combinator
-AndCondition combo = new AndCondition([
-    RECEIVER_CONDITION,          // Must be receiver
-    ESCROW_PERIOD_CONDITION      // Must be after escrow
+```typescript
+// Deploy via factory
+const comboAddress = await andConditionFactory.write.deploy([
+  [RECEIVER_CONDITION, ESCROW_PERIOD_ADDRESS]  // Must be receiver AND after escrow
 ]);
 
 // Use in operator config
-config.releaseCondition = address(combo);
+config.releaseCondition = comboAddress;
 ```
 
 **Example:** Release requires receiver AND escrow passed
@@ -223,14 +222,13 @@ config.releaseCondition = address(combo);
 At least one condition must pass (`A || B`).
 
 **Usage:**
-```solidity
+```typescript
 // Receiver OR Arbiter can release
-OrCondition combo = new OrCondition([
-    RECEIVER_CONDITION,
-    ARBITER_CONDITION
+const comboAddress = await orConditionFactory.write.deploy([
+  [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-config.releaseCondition = address(combo);
+config.releaseCondition = comboAddress;
 ```
 
 **Example:** Either receiver or arbiter can release
@@ -240,11 +238,11 @@ config.releaseCondition = address(combo);
 Inverts a condition (`!A`).
 
 **Usage:**
-```solidity
+```typescript
 // Anyone EXCEPT payer can call
-NotCondition combo = new NotCondition(PAYER_CONDITION);
+const comboAddress = await notConditionFactory.write.deploy([PAYER_CONDITION]);
 
-config.releaseCondition = address(combo);
+config.releaseCondition = comboAddress;
 ```
 
 **Example:** Prevent payer from releasing their own payment
@@ -253,19 +251,17 @@ config.releaseCondition = address(combo);
 
 Combine combinators for complex logic:
 
-```solidity
+```typescript
 // (Receiver OR Arbiter) AND EscrowPassed
-OrCondition receiverOrArbiter = new OrCondition([
-    RECEIVER_CONDITION,
-    ARBITER_CONDITION
+const receiverOrArbiter = await orConditionFactory.write.deploy([
+  [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-AndCondition releaseCondition = new AndCondition([
-    address(receiverOrArbiter),
-    ESCROW_PERIOD_CONDITION
+const releaseCondition = await andConditionFactory.write.deploy([
+  [receiverOrArbiter, ESCROW_PERIOD_ADDRESS]
 ]);
 
-config.releaseCondition = address(releaseCondition);
+config.releaseCondition = releaseCondition;
 ```
 
 **Logic Tree:**
@@ -448,13 +444,12 @@ function getPaymentIndex(
 Combines multiple recorders into one, calling each in sequence.
 
 **Usage:**
-```solidity
-RecorderCombinator combo = new RecorderCombinator([
-    escrowPeriod,           // Records authorization time
-    paymentIndexRecorder    // Records payment index
+```typescript
+const comboAddress = await recorderCombinatorFactory.write.deploy([
+  [escrowPeriodAddress, paymentIndexRecorderAddress]  // Records auth time + payment index
 ]);
 
-config.authorizeRecorder = address(combo);
+config.authorizeRecorder = comboAddress;
 ```
 
 ### Custom Recorders
@@ -540,16 +535,24 @@ config = {
 
 ### Pattern 4: Multi-Party Release (2-of-3)
 
-```solidity
+```typescript
 // Requires any 2 of 3 parties to agree: Payer, Receiver, or Arbiter
 // This creates three OR branches, each requiring a different pair to call simultaneously
-const twoOfThree = new OrCondition([
-    new AndCondition([PAYER_CONDITION, RECEIVER_CONDITION]),      // Payer AND Receiver
-    new AndCondition([PAYER_CONDITION, ARBITER_CONDITION]),       // Payer AND Arbiter
-    new AndCondition([RECEIVER_CONDITION, ARBITER_CONDITION])     // Receiver AND Arbiter
+const payerAndReceiver = await andConditionFactory.write.deploy([
+  [PAYER_CONDITION, RECEIVER_CONDITION]
+]);
+const payerAndArbiter = await andConditionFactory.write.deploy([
+  [PAYER_CONDITION, ARBITER_CONDITION]
+]);
+const receiverAndArbiter = await andConditionFactory.write.deploy([
+  [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-config.releaseCondition = address(twoOfThree);
+const twoOfThree = await orConditionFactory.write.deploy([
+  [payerAndReceiver, payerAndArbiter, receiverAndArbiter]
+]);
+
+config.releaseCondition = twoOfThree;
 ```
 
 **Use case:** Multi-sig style releases requiring coordination
@@ -594,14 +597,14 @@ Prefer stateless conditions when possible:
 
 ```solidity
 // ✅ Stateless: No storage reads
-function check(PaymentInfo calldata payment, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller)
     external pure returns (bool)
 {
     return caller == payment.receiver;  // Pure computation
 }
 
 // ❌ Stateful: Storage reads
-function check(PaymentInfo calldata payment, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller)
     external view returns (bool)
 {
     return allowList[caller];  // SLOAD costs gas
@@ -642,6 +645,7 @@ contract TimeOfDayCondition is ICondition {
 
     function check(
         PaymentInfo calldata payment,
+        uint256,
         address caller
     ) external view returns (bool) {
         uint256 hour = (block.timestamp / 3600) % 24;

@@ -4,14 +4,63 @@ description: "System architecture, payment flows, and contract relationships"
 icon: "diagram-project"
 ---
 
-## System Diagrams
+## System Overview
 
-For detailed visual architecture diagrams, see the [x402r-contracts repository](https://github.com/BackTrackCo/x402r-contracts#architecture):
+```mermaid
+flowchart TB
+    subgraph Users
+        Payer
+        Receiver
+        DesAddr["Designated Address<br/>(Arbiter / Provider / DAO)"]
+    end
 
-- [System Overview](https://github.com/BackTrackCo/x402r-contracts#system-overview) - User interactions, operator slots, and escrow state machine
-- [Contract Relationships](https://github.com/BackTrackCo/x402r-contracts#contract-relationships) - How factories, operators, and conditions interact
-- [Condition Combinator Pattern](https://github.com/BackTrackCo/x402r-contracts#condition-combinator-pattern) - Composable authorization logic
-- [Escrow Period & Freeze Flow](https://github.com/BackTrackCo/x402r-contracts#escrow-period--freeze-flow) - Timeline of payment states
+    subgraph Factories
+        POF[PaymentOperatorFactory]
+        EPF[EscrowPeriodFactory]
+        FF[FreezeFactory]
+    end
+
+    subgraph Operator["PaymentOperator (per config)"]
+        Auth[authorize]
+        Charge[charge]
+        Release[release]
+        RefundIE[refundInEscrow]
+        RefundPE[refundPostEscrow]
+    end
+
+    subgraph Plugins["Conditions & Recorders"]
+        Cond["ICondition<br/>(check before action)"]
+        Rec["IRecorder<br/>(record after action)"]
+        EP[EscrowPeriod]
+        Freeze[Freeze]
+        And[AndCondition]
+        Or[OrCondition]
+    end
+
+    Escrow[AuthCaptureEscrow]
+    RR[RefundRequest]
+
+    Payer -->|authorize / freeze| Operator
+    Receiver -->|release / charge| Operator
+    DesAddr -->|refund / release| Operator
+    Payer -->|requestRefund| RR
+
+    POF -->|deploys| Operator
+    EPF -->|deploys| EP
+    FF -->|deploys| Freeze
+
+    Operator -->|checks| Cond
+    Operator -->|calls| Rec
+    Operator -->|locks/releases funds| Escrow
+
+    EP -.->|implements| Cond
+    EP -.->|implements| Rec
+    Freeze -.->|implements| Cond
+    And -.->|composes| Cond
+    Or -.->|composes| Cond
+```
+
+For additional visual diagrams, see the [x402r-contracts repository](https://github.com/BackTrackCo/x402r-contracts#architecture).
 
 ## Payment Flow Sequence
 
@@ -236,23 +285,20 @@ Ownership transfers use Solady's Ownable pattern:
 ### Core Events
 
 ```solidity
-// Payment lifecycle
-event PaymentAuthorized(bytes32 indexed paymentId, address indexed payer, uint256 amount);
-event PaymentReleased(bytes32 indexed paymentId, uint256 amount);
-event PaymentRefunded(bytes32 indexed paymentId, uint256 amount, bool inEscrow);
+// Payment lifecycle (PaymentOperator events)
+event AuthorizationCreated(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
+event ChargeExecuted(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
+event ReleaseExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, uint256 amount, uint256 timestamp);
+event RefundInEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
+event RefundPostEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
 
-// Refund requests
-event RefundRequested(bytes32 indexed paymentId, address indexed requester);
-event RefundApproved(bytes32 indexed paymentId, address indexed approver);
-event RefundDenied(bytes32 indexed paymentId, address indexed denier);
+// Fee distribution
+event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 arbiterAmount);
+event OperatorDeployed(address indexed operator, address indexed feeRecipient, address indexed releaseCondition);
 
-// Freeze state
-event PaymentFrozen(bytes32 indexed paymentId, uint40 frozenAt);
-event PaymentUnfrozen(bytes32 indexed paymentId);
-
-// Fee changes
-event FeeUpdateQueued(uint256 newMaxFee, uint256 newProtocolPct, uint256 effectiveTime);
-event FeeUpdateExecuted(uint256 maxFee, uint256 protocolPct);
+// Freeze state (Freeze contract events)
+event PaymentFrozen(bytes32 indexed paymentInfoHash, uint40 frozenAt);
+event PaymentUnfrozen(bytes32 indexed paymentInfoHash);
 ```
 
 These events enable off-chain monitoring and indexing.

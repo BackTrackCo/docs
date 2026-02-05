@@ -46,7 +46,9 @@ Deploys PaymentOperator instances with deterministic addresses.
 
 ### Contract Address
 
-**Base Sepolia:** TBD (deploy generic version)
+**Base Sepolia:** `0xe01CEd771A30A23a7A4C9c1db604C74D4Dc4ebe8`
+
+**Base Mainnet:** `0xA50F51254E8B08899EdB76Bd24b4DC6A61ba7dE7`
 
 ### Configuration Structure
 
@@ -119,7 +121,7 @@ assert(deployedAddress === predictedAddress);
 import { createWalletClient, http, getContract, zeroAddress } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { PaymentOperatorFactory, StaticAddressCondition } from "@x402r/contracts";
+import { PaymentOperatorABI } from '@x402r/core/abis';
 
 const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
 
@@ -132,28 +134,33 @@ const walletClient = createWalletClient({
 
 const factory = getContract({
   address: FACTORY_ADDRESS,
-  abi: PaymentOperatorFactory.abi,
+  abi: PaymentOperatorABI,
   client: walletClient
 });
 
-// Deploy condition for arbiter
-const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
+// Deploy condition for arbiter via factory
+const arbiterConditionHash = await staticAddressConditionFactory.write.deploy([arbiterAddress]);
+const arbiterConditionAddress = /* get from receipt */;
+
+// Deploy release condition: arbiter AND escrow period passed
+const releaseConditionHash = await andConditionFactory.write.deploy([
+  [arbiterConditionAddress, escrowPeriodAddress]
+]);
+const releaseConditionAddress = /* get from receipt */;
 
 // Define configuration
 const config = {
   feeRecipient: arbiterAddress,  // Arbiter earns fees
+  feeCalculator: feeCalculatorAddress,
   authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowRecorder,
+  authorizeRecorder: escrowPeriodAddress,
   chargeCondition: zeroAddress,  // Default allow
   chargeRecorder: zeroAddress,   // No recording
-  releaseCondition: new AndCondition([
-    arbiterCondition.address,
-    escrowPeriodCondition
-  ]),
-  releaseRecorder: escrowRecorder,
-  refundInEscrowCondition: arbiterCondition.address,
+  releaseCondition: releaseConditionAddress,
+  releaseRecorder: zeroAddress,
+  refundInEscrowCondition: arbiterConditionAddress,
   refundInEscrowRecorder: zeroAddress,
-  refundPostEscrowCondition: arbiterCondition.address,
+  refundPostEscrowCondition: arbiterConditionAddress,
   refundPostEscrowRecorder: zeroAddress
 };
 
@@ -201,7 +208,9 @@ Deploys `EscrowPeriod` contracts - combined recorder and condition for time-base
 
 ### Contract Address
 
-**Base Sepolia:** TBD
+**Base Sepolia:** `0x206D4DbB6E7b876e4B5EFAAD2a04e7d7813FB6ba`
+
+**Base Mainnet:** `0x2714EA3e839Ac50F52B2e2a5788F614cACeE5316`
 
 ### Deployment Method
 
@@ -346,11 +355,11 @@ const config = {
 
 Use these pre-deployed condition contracts:
 
-| Condition | Address (Base Sepolia) | Description |
-|-----------|------------------------|-------------|
-| PayerCondition | TBD | Only payer can call |
-| ReceiverCondition | TBD | Only receiver can call |
-| AlwaysTrueCondition | TBD | Anyone can call |
+| Condition | Address (Base Sepolia) | Address (Base Mainnet) | Description |
+|-----------|------------------------|------------------------|-------------|
+| PayerCondition | `0xBAF68176FF94CAdD403EF7FbB776bbca548AC09D` | `0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8` | Only payer can call |
+| ReceiverCondition | `0x12EDefd4549c53497689067f165c0f101796Eb6D` | `0xed02d3E5167BCc9582D851885A89b050AB816a56` | Only receiver can call |
+| AlwaysTrueCondition | `0x785cC83DEa3d46D5509f3bf7496EAb26D42EE610` | `0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178` | Anyone can call |
 
 ### Example Deployments
 
@@ -463,7 +472,7 @@ Approximate gas costs for factory deployments (Base Sepolia):
 
 | Operation | Gas Cost | USD (at 0.1 gwei, $3000 ETH) |
 |-----------|----------|------------------------------|
-| Deploy ArbitrationOperator | ~2.5M gas | ~$0.75 |
+| Deploy PaymentOperator | ~2.5M gas | ~$0.75 |
 | Deploy EscrowPeriod (condition + recorder) | ~1.8M gas | ~$0.54 |
 | Deploy Freeze | ~1.0M gas | ~$0.30 |
 | Predict address (view call) | 0 gas | $0.00 |
@@ -558,9 +567,10 @@ This enables:
 Always verify predicted address before deployment:
 
 ```typescript
-const predicted = await factory.predictOperatorAddress(arbiter, config, 5, 25);
-const deployed = await factory.deploy(arbiter, config, 5, 25);
-assert(predicted === deployed);
+const predicted = await factory.read.computeAddress([config]);
+const hash = await factory.write.deployOperator([config]);
+const receipt = await walletClient.waitForTransactionReceipt({ hash });
+// deployed address matches predicted
 ```
 
 ### 2. Reuse Condition Singletons
@@ -588,11 +598,11 @@ Deploy on testnet with same configuration before mainnet:
 
 ```typescript
 // Test on Base Sepolia first
-const testOperator = await testnetFactory.deploy(arbiter, config, 5, 25);
+const testHash = await testnetFactory.write.deployOperator([config]);
 // ... test thoroughly ...
 
 // Deploy on mainnet with identical config (same address!)
-const mainnetOperator = await mainnetFactory.deploy(arbiter, config, 5, 25);
+const mainnetHash = await mainnetFactory.write.deployOperator([config]);
 ```
 
 ### 4. Document Your Config
