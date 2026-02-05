@@ -4,9 +4,20 @@ description: "Working examples for deploying operators, building merchants, clie
 icon: "code"
 ---
 
-The SDK includes 7 working examples in the `x402r-sdk/examples/` directory. Each example is a standalone project that demonstrates a specific integration pattern.
+The SDK includes working examples and apps in the `x402r-sdk/` repository. Each is a standalone project that demonstrates a specific integration pattern.
 
-## Available Examples
+## Apps
+
+<CardGroup cols={2}>
+  <Card title="facilitator" icon="handshake">
+    HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
+
+    **Location:** `apps/facilitator/`
+    **Key concepts:** `/supported`, `/verify`, `/settle` endpoints, `createFacilitatorSigner()`
+  </Card>
+</CardGroup>
+
+## Examples
 
 <CardGroup cols={2}>
   <Card title="deploy-operator" icon="rocket">
@@ -15,9 +26,9 @@ The SDK includes 7 working examples in the `x402r-sdk/examples/` directory. Each
     **Key concepts:** `deployMarketplaceOperator()`, factory pattern, CREATE2
   </Card>
   <Card title="merchant-server" icon="server">
-    HTTP server that accepts escrow payments and handles refunds.
+    HTTP server that accepts escrow payments via x402's standard `paymentMiddleware`. Delegates verify/settle to the facilitator service.
 
-    **Key concepts:** `refundable()`, payment verification, release flow
+    **Key concepts:** `refundable()`, `paymentMiddlewareFromConfig()`, `HTTPFacilitatorClient`
   </Card>
   <Card title="merchant-cli" icon="terminal">
     CLI tool for merchants to release payments, approve/deny refunds, and query state.
@@ -46,25 +57,32 @@ The SDK includes 7 working examples in the `x402r-sdk/examples/` directory. Each
 
 ## Running Examples
 
-Each example is a standalone project. To run one:
-
-```bash
-cd x402r-sdk/examples/<example-name>
-
-# Install dependencies
-pnpm install
-
-# Set environment variables
-export PRIVATE_KEY=0x...
-export RPC_URL=https://sepolia.base.org
-
-# Run
-pnpm start
-```
-
 <Warning>
 All examples require a private key with Base Sepolia ETH and USDC. Get testnet USDC from the [Base Sepolia Faucet](https://www.base.org/faucet).
 </Warning>
+
+The full payment flow requires the facilitator to be running before the merchant server:
+
+```bash
+# 1. Start the facilitator service
+cd x402r-sdk/apps/facilitator
+cp .env.example .env  # Set PRIVATE_KEY + OPERATOR_ADDRESS
+pnpm dev
+
+# 2. Start the merchant server (new terminal)
+cd x402r-sdk/examples/merchant-server
+cp .env.example .env  # Set PRIVATE_KEY, OPERATOR_ADDRESS, FACILITATOR_URL
+pnpm dev
+
+# 3. Make a payment (new terminal)
+cd x402r-sdk/examples/client-cli
+cp .env.example .env  # Set PRIVATE_KEY
+pnpm start pay --url http://localhost:3000/weather
+```
+
+<Note>
+The facilitator must be running before the merchant server starts, as the merchant delegates payment verification and settlement to it.
+</Note>
 
 ## deploy-operator
 
@@ -103,12 +121,12 @@ This example uses `createFacilitatorSigner()` from `@x402r/evm` and `getPaymentI
 
 ## merchant-server
 
-Demonstrates a minimal HTTP server that:
+Demonstrates a minimal HTTP server that uses x402's standard middleware:
 
 1. Returns 402 with `refundable()` payment options
-2. Verifies incoming payments via the facilitator
-3. Watches for refund requests
-4. Auto-approves or requires manual review
+2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
+3. Delegates on-chain settlement to the facilitator after the handler runs
+4. Handles release/refund operations via `X402rMerchant` SDK
 
 ## Next Steps
 
