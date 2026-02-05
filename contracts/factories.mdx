@@ -284,13 +284,14 @@ const config = {
 
 ---
 
-## Freeze Policy Factory
+## Freeze Factory
 
-Deploys `FreezePolicy` instances that define who can freeze/unfreeze and for how long.
+Deploys `Freeze` condition contracts that block release when a payment is frozen.
 
 ### Contract Address
 
-**Base Sepolia:** TBD
+**Base Sepolia:** `0x199fed16577773Bb6b2D76CC3cD1c76c22D28835`
+**Base Mainnet:** `0xCAEd9474c06bf9139AC36C874dED838e1Bcb9310`
 
 ### Deployment Method
 
@@ -298,38 +299,15 @@ Deploys `FreezePolicy` instances that define who can freeze/unfreeze and for how
 function deploy(
     address freezeCondition,
     address unfreezeCondition,
-    uint256 freezeDuration
-) external returns (address policy)
-```
-
-**Parameters:**
-- `freezeCondition` - ICondition that authorizes freeze calls (e.g., PayerCondition)
-- `unfreezeCondition` - ICondition that authorizes unfreeze calls (e.g., ArbiterCondition)
-- `freezeDuration` - How long freeze lasts in seconds (`0` = permanent until unfrozen)
-
-**Returns:** Address of deployed FreezePolicy
-
----
-
-## Freeze Factory
-
-Deploys `Freeze` condition contracts that block release when a payment is frozen.
-
-### Contract Address
-
-**Base Sepolia:** TBD
-
-### Deployment Method
-
-```solidity
-function deploy(
-    address freezePolicy,
+    uint256 freezeDuration,
     address escrowPeriodContract
 ) external returns (address freezeAddr)
 ```
 
 **Parameters:**
-- `freezePolicy` - Address of the FreezePolicy contract (required)
+- `freezeCondition` - ICondition that authorizes freeze calls (e.g., PayerCondition)
+- `unfreezeCondition` - ICondition that authorizes unfreeze calls (e.g., PayerCondition, ArbiterCondition)
+- `freezeDuration` - How long freeze lasts in seconds (`0` = permanent until unfrozen)
 - `escrowPeriodContract` - Address of EscrowPeriod contract (`address(0)` = freeze unconstrained by time)
 
 **Returns:** Address of deployed Freeze condition
@@ -337,22 +315,23 @@ function deploy(
 ### Full Freeze Deployment Example
 
 ```typescript
-// Step 1: Deploy FreezePolicy
-const freezePolicy = await freezePolicyFactory.write.deploy([
-  PAYER_CONDITION,      // Only payer can freeze
-  ARBITER_CONDITION,    // Only arbiter can unfreeze
-  3 * 24 * 60 * 60      // 3 days (auto-expires)
+// Step 1: Deploy EscrowPeriod (7 days, operator-only recording)
+const escrowPeriod = await escrowPeriodFactory.write.deploy([
+  7 * 24 * 60 * 60,    // 7 days
+  zeroHash             // bytes32(0) = operator-only
 ]);
 
-// Step 2: Deploy Freeze condition (linked to EscrowPeriod)
+// Step 2: Deploy Freeze condition (payer freeze/unfreeze, 3-day duration, linked to EscrowPeriod)
 const freeze = await freezeFactory.write.deploy([
-  freezePolicy,         // Use the policy we just deployed
-  escrowPeriodAddress   // Link to EscrowPeriod (or zeroAddress for unconstrained)
+  PAYER_CONDITION,      // Only payer can freeze
+  PAYER_CONDITION,      // Only payer can unfreeze (or use ARBITER_CONDITION)
+  3 * 24 * 60 * 60,     // 3 days (auto-expires)
+  escrowPeriod          // Link to EscrowPeriod (or zeroAddress for unconstrained)
 ]);
 
 // Step 3: Compose with EscrowPeriod for release condition
 const releaseCondition = await andConditionFactory.write.deploy([
-  [escrowPeriodAddress, freeze]
+  [escrowPeriod, freeze]
 ]);
 
 // Use in operator config
@@ -380,10 +359,11 @@ Use these pre-deployed condition contracts:
     Payer can freeze, arbiter can unfreeze (or auto-expires after 3 days):
 
     ```typescript
-    const freezePolicy = await freezePolicyFactory.deploy(
+    const freeze = await freezeFactory.deploy(
       PAYER_CONDITION,      // Only payer can freeze
       ARBITER_CONDITION,    // Only arbiter can unfreeze
-      3 * 24 * 60 * 60      // 3 days (auto-expires)
+      3 * 24 * 60 * 60,     // 3 days (auto-expires)
+      escrowPeriodAddress   // Link to EscrowPeriod
     );
     ```
   </Tab>
@@ -392,10 +372,11 @@ Use these pre-deployed condition contracts:
     Receiver can freeze, arbiter can unfreeze (or auto-expires after 5 days):
 
     ```typescript
-    const freezePolicy = await freezePolicyFactory.deploy(
+    const freeze = await freezeFactory.deploy(
       RECEIVER_CONDITION,   // Only receiver can freeze
       ARBITER_CONDITION,    // Only arbiter can unfreeze
-      5 * 24 * 60 * 60      // 5 days (auto-expires)
+      5 * 24 * 60 * 60,     // 5 days (auto-expires)
+      escrowPeriodAddress   // Link to EscrowPeriod
     );
     ```
   </Tab>
@@ -410,10 +391,11 @@ Use these pre-deployed condition contracts:
       RECEIVER_CONDITION
     ]);
 
-    const freezePolicy = await freezePolicyFactory.deploy(
-      orCondition.address,  // Payer OR Receiver
-      orCondition.address,  // Payer OR Receiver
-      3 * 24 * 60 * 60      // 3 days
+    const freeze = await freezeFactory.deploy(
+      orCondition.address,  // Payer OR Receiver can freeze
+      orCondition.address,  // Payer OR Receiver can unfreeze
+      3 * 24 * 60 * 60,     // 3 days
+      escrowPeriodAddress   // Link to EscrowPeriod
     );
     ```
   </Tab>
@@ -422,10 +404,11 @@ Use these pre-deployed condition contracts:
     Only arbiter can freeze/unfreeze:
 
     ```typescript
-    const freezePolicy = await freezePolicyFactory.deploy(
+    const freeze = await freezeFactory.deploy(
       ARBITER_CONDITION,    // Only arbiter can freeze
       ARBITER_CONDITION,    // Only arbiter can unfreeze
-      7 * 24 * 60 * 60      // 7 days
+      7 * 24 * 60 * 60,     // 7 days
+      escrowPeriodAddress   // Link to EscrowPeriod
     );
     ```
   </Tab>
@@ -482,7 +465,7 @@ Approximate gas costs for factory deployments (Base Sepolia):
 |-----------|----------|------------------------------|
 | Deploy ArbitrationOperator | ~2.5M gas | ~$0.75 |
 | Deploy EscrowPeriod (condition + recorder) | ~1.8M gas | ~$0.54 |
-| Deploy FreezePolicy | ~800K gas | ~$0.24 |
+| Deploy Freeze | ~1.0M gas | ~$0.30 |
 | Predict address (view call) | 0 gas | $0.00 |
 
 <Tip>
@@ -521,15 +504,9 @@ bytes32 key = keccak256(abi.encodePacked(escrowPeriod, authorizedCodehash));
 bytes32 salt = keccak256(abi.encodePacked("escrowPeriod", key));
 ```
 
-**FreezePolicyFactory:**
-```solidity
-bytes32 key = keccak256(abi.encodePacked(freezeCondition, unfreezeCondition, freezeDuration));
-bytes32 salt = keccak256(abi.encodePacked("freezePolicy", key));
-```
-
 **FreezeFactory:**
 ```solidity
-bytes32 key = keccak256(abi.encodePacked(freezePolicy, escrowPeriodContract));
+bytes32 key = keccak256(abi.encodePacked(freezeCondition, unfreezeCondition, freezeDuration, escrowPeriodContract));
 bytes32 salt = keccak256(abi.encodePacked("freeze", key));
 ```
 

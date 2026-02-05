@@ -97,9 +97,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 **EscrowPeriod** - Combined recorder and condition that tracks authorization time and enforces escrow period
 
-**Freeze** - Standalone condition that blocks release when payment is frozen
-
-**FreezePolicy** - Defines who can freeze/unfreeze and for how long
+**Freeze** - Standalone condition that blocks release when payment is frozen (with configurable freeze/unfreeze authorization)
 
 **Key features:**
 - Configurable escrow periods (e.g., 7 days, 14 days)
@@ -113,8 +111,6 @@ x402r extends commerce-payments with flexible payment capabilities:
 **PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
 
 **EscrowPeriodFactory** - Deploys EscrowPeriod contracts
-
-**FreezePolicyFactory** - Deploys freeze policy instances
 
 **FreezeFactory** - Deploys Freeze condition contracts
 
@@ -158,7 +154,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 Most contracts are immutable to prevent rug pulls and ensure trustlessness:
 - **PaymentOperator** - Cannot pause or upgrade
 - **EscrowPeriodCondition** - Cannot modify escrow period
-- **FreezePolicy** - Cannot change freeze rules
+- **Freeze** - Cannot change freeze rules after deployment
 
 Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelock). Operator fees are immutable.
 </Accordion>

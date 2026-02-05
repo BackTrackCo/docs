@@ -333,13 +333,13 @@ For freeze functionality, deploy a separate `Freeze` condition and compose both 
 
 ### Freeze
 
-Standalone condition that blocks release when a payment is frozen. Manages freeze/unfreeze state with optional escrow period time constraint.
+Standalone condition that blocks release when a payment is frozen. Manages freeze/unfreeze state with configurable authorization and optional escrow period time constraint.
 
 **Deployment:** Via FreezeFactory
 
 **Architecture:**
 - Implements `ICondition`
-- Uses a `FreezePolicy` to determine who can freeze/unfreeze
+- Freeze/unfreeze authorization via `ICondition` contracts (passed directly to constructor)
 - Optionally linked to `EscrowPeriod` to restrict freezing to during the escrow period
 
 **Logic:**
@@ -361,37 +361,13 @@ function check(
 // Both:                releaseCondition = AndCondition([escrowPeriod, freeze])
 ```
 
-### FreezePolicy
-
-Determines who can freeze/unfreeze payments. Delegates authorization to `ICondition` contracts.
-
-**Deployment:** Via FreezePolicyFactory
-
-**Methods:**
-```solidity
-function canFreeze(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    address caller
-) external view returns (bool allowed, uint256 duration);
-
-function canUnfreeze(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    address caller
-) external view returns (bool);
-```
-
 **Example Configuration:**
 ```typescript
-// Payer can freeze, arbiter can unfreeze, 3-day freeze duration
-const freezePolicy = await freezePolicyFactory.deploy(
+// Deploy Freeze with payer freeze, arbiter unfreeze, 3-day duration
+const freeze = await freezeFactory.deploy(
   PAYER_CONDITION,      // freeze condition (payer protection)
   ARBITER_CONDITION,    // unfreeze condition (dispute resolution)
-  3 * 24 * 60 * 60      // 3 days (auto-expires, 0 = permanent)
-);
-
-// Then deploy Freeze condition using this policy
-const freeze = await freezeFactory.deploy(
-  freezePolicy,         // freeze policy address
+  3 * 24 * 60 * 60,     // 3 days (auto-expires, 0 = permanent)
   escrowPeriod          // optional: link to EscrowPeriod (address(0) = unconstrained)
 );
 ```

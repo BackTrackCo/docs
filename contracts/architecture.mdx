@@ -53,10 +53,10 @@ Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-
 
 **Timeline:**
 - **Day 0:** Payment authorized, escrow period begins
-- **Day 0-7:** Payer can freeze if suspicious (per FreezePolicy)
-- **Day 3:** Payer freezes payment (freeze lasts 3 days per policy)
+- **Day 0-7:** Payer can freeze if suspicious (per Freeze contract configuration)
+- **Day 3:** Payer freezes payment (freeze lasts 3 days per configuration)
 - **Day 3-6:** Payment frozen, release blocked
-- **Day 6:** Freeze expires automatically (or designated address unfreezes early per FreezePolicy)
+- **Day 6:** Freeze expires automatically (or authorized address unfreezes early)
 - **Day 7:** Escrow period ends
 - **Day 7+:** Authorized address(es) can release (if not frozen)
 
