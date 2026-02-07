@@ -4,22 +4,17 @@ description: "Working examples for deploying operators, building merchants, clie
 icon: "code"
 ---
 
-The SDK includes working examples and apps in the `x402r-sdk/` repository. Each is a standalone project that demonstrates a specific integration pattern.
+The SDK includes working examples in the `x402r-sdk/` repository. Each is a standalone project that demonstrates a specific integration pattern.
 
-## Apps
+## Examples
 
 <CardGroup cols={2}>
   <Card title="facilitator" icon="handshake">
     HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
 
-    **Location:** `apps/facilitator/`
-    **Key concepts:** `/supported`, `/verify`, `/settle` endpoints, `createFacilitatorSigner()`
+    **Location:** `examples/facilitator/`
+    **Key concepts:** `/supported`, `/verify`, `/settle` endpoints, `EscrowFacilitatorScheme`
   </Card>
-</CardGroup>
-
-## Examples
-
-<CardGroup cols={2}>
   <Card title="deploy-operator" icon="rocket">
     Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
 
@@ -40,15 +35,10 @@ The SDK includes working examples and apps in the `x402r-sdk/` repository. Each 
 
     **Key concepts:** `X402rClient`, `requestRefund()`, `freezePayment()`
   </Card>
-  <Card title="arbiter-cli" icon="gavel">
-    CLI tool for arbiters to review cases, make decisions, and manage registry.
+  <Card title="arbiter-cli (in progress)" icon="gavel">
+    CLI tool for arbiters to review cases, make decisions, and manage registry. This example is under active development.
 
     **Key concepts:** `X402rArbiter`, `approveRefundRequest()`, `registerArbiter()`
-  </Card>
-  <Card title="e2e-dispute" icon="shield-check">
-    End-to-end dispute resolution flow: deploy operator, create payment, freeze, request refund, arbiter resolves.
-
-    **Key concepts:** Full lifecycle, `createFacilitatorSigner()`, `getPaymentInfoFromEvents()`
   </Card>
   <Card title="shared" icon="share-nodes">
     Shared utilities used by the CLI examples (display helpers, PaymentInfo formatting).
@@ -65,7 +55,7 @@ The full payment flow requires the facilitator to be running before the merchant
 
 ```bash
 # 1. Start the facilitator service
-cd x402r-sdk/apps/facilitator
+cd x402r-sdk/examples/facilitator
 cp .env.example .env  # Set PRIVATE_KEY + OPERATOR_ADDRESS
 pnpm dev
 
@@ -106,19 +96,6 @@ const result = await deployMarketplaceOperator(
 
 See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
 
-## e2e-dispute
-
-The most comprehensive example — runs through the entire dispute lifecycle:
-
-1. Deploys a fresh operator
-2. Creates a payment with ERC-3009 authorization
-3. Payer freezes the payment
-4. Payer requests a refund
-5. Arbiter reviews and approves
-6. Arbiter executes the refund
-
-This example uses `createFacilitatorSigner()` from `@x402r/evm` and `getPaymentInfoFromEvents()` from `@x402r/arbiter` to reconstruct PaymentInfo from on-chain events.
-
 ## merchant-server
 
 Demonstrates a minimal HTTP server that uses x402's standard middleware:
@@ -126,7 +103,7 @@ Demonstrates a minimal HTTP server that uses x402's standard middleware:
 1. Returns 402 with `refundable()` payment options
 2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
 3. Delegates on-chain settlement to the facilitator after the handler runs
-4. Handles release/refund operations via `X402rMerchant` SDK
+4. Returns weather data after successful payment
 
 ## Next Steps
 
