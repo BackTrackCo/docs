@@ -263,67 +263,6 @@ async function handleRefundWorkflow(
 }
 ```
 
-## Automated Refund Processing
-
-This example shows a policy-based system that automatically processes refund requests based on configurable rules.
-
-```typescript
-import { X402rMerchant } from '@x402r/merchant';
-import { RequestStatus } from '@x402r/core';
-
-interface RefundPolicy {
-  /** Auto-approve refunds under this amount (in token units) */
-  autoApproveUnder: bigint;
-  /** Maximum number of requests to process per batch */
-  batchSize: bigint;
-}
-
-async function processRefundBatch(
-  merchant: X402rMerchant,
-  policy: RefundPolicy
-) {
-  // Get total pending count
-  const totalCount = await merchant.getRefundRequestCount();
-  console.log(`Total refund requests: ${totalCount}`);
-
-  if (totalCount === 0n) {
-    console.log('No refund requests to process');
-    return;
-  }
-
-  // Fetch a batch of request keys
-  const { keys, total } = await merchant.getPendingRefundRequests(0n, policy.batchSize);
-  console.log(`Processing ${keys.length} of ${total} requests`);
-
-  for (const key of keys) {
-    const request = await merchant.getRefundRequestByKey(key);
-
-    // Skip non-pending requests
-    if (request.status !== RequestStatus.Pending) {
-      continue;
-    }
-
-    if (request.amount < policy.autoApproveUnder) {
-      // Auto-approve small refunds
-      // Note: approveRefundRequest and refundInEscrow need
-      // the original paymentInfo, which you would retrieve
-      // from your payment database using request.paymentInfoHash
-      console.log(`Auto-approve candidate: key=${key}, amount=${request.amount}`);
-    } else {
-      console.log(`Manual review required: key=${key}, amount=${request.amount}`);
-    }
-  }
-}
-
-// Usage
-const policy: RefundPolicy = {
-  autoApproveUnder: BigInt('5000000'), // Auto-approve under 5 USDC
-  batchSize: 20n,
-};
-
-await processRefundBatch(merchant, policy);
-```
-
 ## Refund Request Lifecycle
 
 ```mermaid

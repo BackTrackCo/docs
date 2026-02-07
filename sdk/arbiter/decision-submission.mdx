@@ -236,43 +236,6 @@ flowchart TD
     H --> K[Merchant Keeps Funds]
 ```
 
-## Error Handling
-
-```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { RequestStatus } from '@x402r/core';
-import type { PaymentInfo } from '@x402r/core';
-
-async function safeProcessCase(
-  arbiter: X402rArbiter,
-  paymentInfo: PaymentInfo,
-  nonce: bigint
-) {
-  try {
-    // Check that a refund request exists
-    const hasRequest = await arbiter.hasRefundRequest(paymentInfo, nonce);
-    if (!hasRequest) {
-      return { error: 'No refund request found' };
-    }
-
-    // Check that it is still pending
-    const status = await arbiter.getRefundStatus(paymentInfo, nonce);
-    if (status !== RequestStatus.Pending) {
-      return { error: `Request already ${RequestStatus[status]}` };
-    }
-
-    // Approve and execute
-    const { txHash: approveTx } = await arbiter.approveRefundRequest(paymentInfo, nonce);
-    const { txHash: executeTx } = await arbiter.executeRefundInEscrow(paymentInfo);
-
-    return { success: true, approveTx, executeTx };
-  } catch (error) {
-    console.error('Failed to process case:', error);
-    return { error: (error as Error).message };
-  }
-}
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>

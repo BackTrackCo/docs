@@ -53,49 +53,6 @@ The SDK is organized into five packages, each designed for a specific role in th
   </Accordion>
 </AccordionGroup>
 
-## Architecture
-
-```mermaid
-flowchart BT
-    subgraph core[@x402r/core]
-        direction LR
-        types[Types]
-        abis[ABIs]
-        config[Network Config]
-        deploy[Deploy]
-    end
-
-    subgraph helpers[@x402r/helpers]
-        ref[refundable]
-    end
-
-    subgraph client[@x402r/client]
-        direction LR
-        rr[Refund Request]
-        eo[Escrow/Freeze]
-        cs[Subscriptions]
-    end
-
-    subgraph merchant[@x402r/merchant]
-        direction LR
-        rf[Release/Charge]
-        rh[Refund Handling]
-        ms[Subscriptions]
-    end
-
-    subgraph arbiter[@x402r/arbiter]
-        direction LR
-        ad[Approve/Deny]
-        reg[Registry]
-        bo[Batch Ops]
-    end
-
-    client --> core
-    merchant --> core
-    arbiter --> core
-    helpers --> core
-```
-
 ## Network Support
 
 | Network | Chain ID | Status |

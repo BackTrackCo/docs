@@ -9,38 +9,25 @@ The SDK includes working examples in the `x402r-sdk/` repository. Each is a stan
 ## Examples
 
 <CardGroup cols={2}>
-  <Card title="facilitator" icon="handshake">
+  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator">
     HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
-
-    **Location:** `examples/facilitator/`
-    **Key concepts:** `/supported`, `/verify`, `/settle` endpoints, `EscrowFacilitatorScheme`
   </Card>
-  <Card title="deploy-operator" icon="rocket">
+  <Card title="deploy-operator" icon="rocket" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
     Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
-
-    **Key concepts:** `deployMarketplaceOperator()`, factory pattern, CREATE2
   </Card>
-  <Card title="merchant-server" icon="server">
+  <Card title="merchant-server" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-server">
     HTTP server that accepts escrow payments via x402's standard `paymentMiddleware`. Delegates verify/settle to the facilitator service.
-
-    **Key concepts:** `refundable()`, `paymentMiddlewareFromConfig()`, `HTTPFacilitatorClient`
   </Card>
-  <Card title="merchant-cli" icon="terminal">
+  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-cli">
     CLI tool for merchants to release payments, approve/deny refunds, and query state.
-
-    **Key concepts:** `X402rMerchant`, `release()`, `approveRefundRequest()`
   </Card>
-  <Card title="client-cli" icon="user">
+  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/client-cli">
     CLI tool for payers to request refunds, freeze payments, and check status.
-
-    **Key concepts:** `X402rClient`, `requestRefund()`, `freezePayment()`
   </Card>
-  <Card title="arbiter-cli (in progress)" icon="gavel">
+  <Card title="arbiter-cli (in progress)" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter-cli">
     CLI tool for arbiters to review cases, make decisions, and manage registry. This example is under active development.
-
-    **Key concepts:** `X402rArbiter`, `approveRefundRequest()`, `registerArbiter()`
   </Card>
-  <Card title="shared" icon="share-nodes">
+  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
     Shared utilities used by the CLI examples (display helpers, PaymentInfo formatting).
   </Card>
 </CardGroup>
@@ -48,7 +35,7 @@ The SDK includes working examples in the `x402r-sdk/` repository. Each is a stan
 ## Running Examples
 
 <Warning>
-All examples require a private key with Base Sepolia ETH and USDC. Get testnet USDC from the [Base Sepolia Faucet](https://www.base.org/faucet).
+All examples require a private key with Base Sepolia ETH and USDC. See [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets) for testnet tokens.
 </Warning>
 
 The full payment flow requires the facilitator to be running before the merchant server:

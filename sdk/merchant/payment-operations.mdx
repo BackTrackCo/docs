@@ -240,61 +240,6 @@ flowchart TD
     J --> H
 ```
 
-## Complete Example
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rMerchant } from '@x402r/merchant';
-import { getNetworkConfig } from '@x402r/core';
-
-async function main() {
-  const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const account = privateKeyToAccount(process.env.MERCHANT_KEY as `0x${string}`);
-  const walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const config = getNetworkConfig('eip155:84532')!;
-
-  const merchant = new X402rMerchant({
-    publicClient,
-    walletClient,
-    operatorAddress: '0xYourOperator...',
-    escrowAddress: config.authCaptureEscrow,
-    refundRequestAddress: config.refundRequest,
-  });
-
-  // 1. Query available amounts
-  const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
-  console.log(`Capturable: ${capturableAmount}, Refundable: ${refundableAmount}`);
-
-  // 2. Release if funds are available
-  if (capturableAmount > 0n) {
-    const { txHash } = await merchant.release(paymentInfo, capturableAmount);
-    console.log('Released:', txHash);
-  }
-
-  // 3. Inspect operator configuration
-  const operatorConfig = await merchant.getOperatorConfig();
-  console.log('Escrow contract:', operatorConfig.escrow);
-  console.log('Release condition:', operatorConfig.releaseCondition);
-
-  // 4. Check fee structure
-  const fees = await merchant.getFeeStructure();
-  console.log('Fee calculator:', fees.feeCalculator);
-}
-
-main().catch(console.error);
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>

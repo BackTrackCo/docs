@@ -146,46 +146,6 @@ The method name is `isDuringEscrowPeriod`, **not** `isEscrowPeriodPassed`. It re
 The escrow period length is configured at the contract level when the `EscrowPeriod` condition is deployed. Common values are 7 days, 14 days, or 30 days. You can calculate the remaining time from `getAuthorizationTime` and the configured period.
 </Tip>
 
-## Example: Escrow Status Dashboard
-
-```typescript
-import { X402rClient } from '@x402r/client';
-import type { PaymentInfo } from '@x402r/core';
-
-async function showEscrowStatus(
-  client: X402rClient,
-  paymentInfo: PaymentInfo,
-  freezeAddress: `0x${string}`,
-  escrowPeriodAddress: `0x${string}`
-) {
-  // Query all escrow-related state
-  const frozen = await client.isFrozen(paymentInfo, freezeAddress);
-  const duringEscrow = await client.isDuringEscrowPeriod(
-    paymentInfo,
-    escrowPeriodAddress
-  );
-  const authTime = await client.getAuthorizationTime(
-    paymentInfo,
-    escrowPeriodAddress
-  );
-
-  const authDate = new Date(Number(authTime) * 1000);
-
-  console.log('Escrow Status:');
-  console.log(`  Authorized: ${authDate.toISOString()}`);
-  console.log(`  Frozen: ${frozen ? 'Yes' : 'No'}`);
-  console.log(`  During Escrow Period: ${duringEscrow ? 'Yes' : 'No'}`);
-
-  if (frozen) {
-    console.log('  Action: Timer paused due to freeze. Awaiting dispute resolution.');
-  } else if (duringEscrow) {
-    console.log('  Action: Escrow period active. Refund can still be requested.');
-  } else {
-    console.log('  Action: Escrow period passed. Merchant can fully release funds.');
-  }
-}
-```
-
 ## Example: Freeze and Request Refund
 
 A common pattern is to freeze a payment before submitting a refund request, ensuring the merchant cannot release funds while the request is pending.
