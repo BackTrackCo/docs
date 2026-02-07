@@ -105,7 +105,7 @@ Server sends this to request payment:
   "accepts": [{
     "scheme": "escrow",
     "network": "eip155:8453",
-    "maxAmountRequired": "10000000",
+    "amount": "10000000",
     "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     "payTo": "0xReceiver...",
     "extra": {
@@ -314,6 +314,18 @@ sequenceDiagram
         Note over Escrow: Payer reclaims without operator
     end
 ```
+
+## Self-Hosted Facilitator
+
+x402r ships a self-hosted facilitator service at `x402r-sdk/examples/facilitator/` that implements x402's facilitator protocol for escrow payments. This service:
+
+1. Exposes a `/supported` endpoint with escrow scheme configuration (operator, escrow, and token collector addresses)
+2. Verifies payment signatures via `/verify`
+3. Settles payments on-chain via `/settle` by calling `authorize()` on the PaymentOperator
+
+Merchant servers use x402's standard `paymentMiddleware` with an `HTTPFacilitatorClient` pointing to this service, so they don't need to handle blockchain interactions directly.
+
+See [Examples](/sdk/examples) for the complete setup guide.
 
 ## vs Exact Scheme
 

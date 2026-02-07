@@ -6,15 +6,6 @@ icon: "rocket"
 
 The `@x402r/arbiter` package provides everything arbiters need to resolve disputes: reviewing cases, making decisions, executing refunds, and integrating AI for automated resolution.
 
-## Prerequisites
-
-<Note>
-Before starting, ensure you have:
-- Node.js 20+
-- A funded wallet on Base Sepolia designated as an arbiter
-- Understanding of the X402r refund lifecycle
-</Note>
-
 ## Installation
 
 ```bash
@@ -23,26 +14,11 @@ npm install @x402r/arbiter @x402r/core viem
 
 ## Setup
 
-Create the X402rArbiter instance:
+Create viem clients as described in [Installation](/sdk/installation), then:
 
 ```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
 import { X402rArbiter } from '@x402r/arbiter';
 import { getNetworkConfig } from '@x402r/core';
-
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-});
-
-const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`);
-const walletClient = createWalletClient({
-  account,
-  chain: baseSepolia,
-  transport: http(),
-});
 
 const config = getNetworkConfig('eip155:84532')!;
 
@@ -153,56 +129,6 @@ const { unsubscribe } = arbiter.watchNewCases((event) => {
 const { unsubscribe: unsubDecisions } = arbiter.watchDecisions((event) => {
   console.log('Decision made:', event);
 });
-```
-
-## Complete Example
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig, RequestStatus } from '@x402r/core';
-
-async function main() {
-  const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const account = privateKeyToAccount(process.env.ARBITER_KEY as `0x${string}`);
-  const walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const config = getNetworkConfig('eip155:84532')!;
-
-  const arbiter = new X402rArbiter({
-    publicClient,
-    walletClient,
-    operatorAddress: '0x...',
-    refundRequestAddress: config.refundRequest,
-    arbiterRegistryAddress: config.arbiterRegistry,
-  });
-
-  // Register as an arbiter
-  await arbiter.registerArbiter('https://arbiter.example.com/api');
-
-  // Get pending cases
-  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 10n, '0xReceiver...');
-  console.log(`${total} pending cases`);
-
-  // Watch for new cases
-  arbiter.watchNewCases(async (event) => {
-    console.log('New case to review:', event);
-  });
-
-  console.log('Arbiter is watching for new cases...');
-}
-
-main().catch(console.error);
 ```
 
 ## Next Steps

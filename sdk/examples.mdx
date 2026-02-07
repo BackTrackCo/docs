@@ -4,67 +4,62 @@ description: "Working examples for deploying operators, building merchants, clie
 icon: "code"
 ---
 
-The SDK includes 7 working examples in the `x402r-sdk/examples/` directory. Each example is a standalone project that demonstrates a specific integration pattern.
+The SDK includes working examples in the `x402r-sdk/` repository. Each is a standalone project that demonstrates a specific integration pattern.
 
-## Available Examples
+## Examples
 
 <CardGroup cols={2}>
-  <Card title="deploy-operator" icon="rocket">
+  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator">
+    HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
+  </Card>
+  <Card title="deploy-operator" icon="rocket" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
     Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
-
-    **Key concepts:** `deployMarketplaceOperator()`, factory pattern, CREATE2
   </Card>
-  <Card title="merchant-server" icon="server">
-    HTTP server that accepts escrow payments and handles refunds.
-
-    **Key concepts:** `refundable()`, payment verification, release flow
+  <Card title="merchant-server" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-server">
+    HTTP server that accepts escrow payments via x402's standard `paymentMiddleware`. Delegates verify/settle to the facilitator service.
   </Card>
-  <Card title="merchant-cli" icon="terminal">
+  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-cli">
     CLI tool for merchants to release payments, approve/deny refunds, and query state.
-
-    **Key concepts:** `X402rMerchant`, `release()`, `approveRefundRequest()`
   </Card>
-  <Card title="client-cli" icon="user">
+  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/client-cli">
     CLI tool for payers to request refunds, freeze payments, and check status.
-
-    **Key concepts:** `X402rClient`, `requestRefund()`, `freezePayment()`
   </Card>
-  <Card title="arbiter-cli" icon="gavel">
-    CLI tool for arbiters to review cases, make decisions, and manage registry.
-
-    **Key concepts:** `X402rArbiter`, `approveRefundRequest()`, `registerArbiter()`
+  <Card title="arbiter-cli (in progress)" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter-cli">
+    CLI tool for arbiters to review cases, make decisions, and manage registry. This example is under active development.
   </Card>
-  <Card title="e2e-dispute" icon="shield-check">
-    End-to-end dispute resolution flow: deploy operator, create payment, freeze, request refund, arbiter resolves.
-
-    **Key concepts:** Full lifecycle, `createFacilitatorSigner()`, `getPaymentInfoFromEvents()`
-  </Card>
-  <Card title="shared" icon="share-nodes">
+  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
     Shared utilities used by the CLI examples (display helpers, PaymentInfo formatting).
   </Card>
 </CardGroup>
 
 ## Running Examples
 
-Each example is a standalone project. To run one:
+<Warning>
+All examples require a private key with Base Sepolia ETH and USDC. See [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets) for testnet tokens.
+</Warning>
+
+The full payment flow requires the facilitator to be running before the merchant server:
 
 ```bash
-cd x402r-sdk/examples/<example-name>
+# 1. Start the facilitator service
+cd x402r-sdk/examples/facilitator
+cp .env.example .env  # Set PRIVATE_KEY + OPERATOR_ADDRESS
+pnpm dev
 
-# Install dependencies
-pnpm install
+# 2. Start the merchant server (new terminal)
+cd x402r-sdk/examples/merchant-server
+cp .env.example .env  # Set PRIVATE_KEY, OPERATOR_ADDRESS, FACILITATOR_URL
+pnpm dev
 
-# Set environment variables
-export PRIVATE_KEY=0x...
-export RPC_URL=https://sepolia.base.org
-
-# Run
-pnpm start
+# 3. Make a payment (new terminal)
+cd x402r-sdk/examples/client-cli
+cp .env.example .env  # Set PRIVATE_KEY
+pnpm start pay --url http://localhost:3000/weather
 ```
 
-<Warning>
-All examples require a private key with Base Sepolia ETH and USDC. Get testnet USDC from the [Base Sepolia Faucet](https://www.base.org/faucet).
-</Warning>
+<Note>
+The facilitator must be running before the merchant server starts, as the merchant delegates payment verification and settlement to it.
+</Note>
 
 ## deploy-operator
 
@@ -88,27 +83,14 @@ const result = await deployMarketplaceOperator(
 
 See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
 
-## e2e-dispute
-
-The most comprehensive example — runs through the entire dispute lifecycle:
-
-1. Deploys a fresh operator
-2. Creates a payment with ERC-3009 authorization
-3. Payer freezes the payment
-4. Payer requests a refund
-5. Arbiter reviews and approves
-6. Arbiter executes the refund
-
-This example uses `createFacilitatorSigner()` from `@x402r/evm` and `getPaymentInfoFromEvents()` from `@x402r/arbiter` to reconstruct PaymentInfo from on-chain events.
-
 ## merchant-server
 
-Demonstrates a minimal HTTP server that:
+Demonstrates a minimal HTTP server that uses x402's standard middleware:
 
 1. Returns 402 with `refundable()` payment options
-2. Verifies incoming payments via the facilitator
-3. Watches for refund requests
-4. Auto-approves or requires manual review
+2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
+3. Delegates on-chain settlement to the facilitator after the handler runs
+4. Returns weather data after successful payment
 
 ## Next Steps
 

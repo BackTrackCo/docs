@@ -6,14 +6,9 @@ icon: "rocket"
 
 The `@x402r/merchant` package provides everything merchants need to handle X402r payments: releasing funds, charging, processing refunds, and managing escrow.
 
-## Prerequisites
-
-<Note>
-Before starting, ensure you have:
-- Node.js 20+
-- A funded wallet on Base Sepolia
-- A deployed PaymentOperator (see [Deploy Operator](/sdk/deploy-operator))
-</Note>
+<Info>
+**Most merchants start here:** The [merchant-server example](/sdk/examples#merchant-server) shows how to accept escrow payments via HTTP middleware. This SDK (`@x402r/merchant`) is for post-payment lifecycle -- releasing funds, handling refund requests, and managing escrow.
+</Info>
 
 ## Installation
 
@@ -23,26 +18,11 @@ npm install @x402r/merchant @x402r/helpers @x402r/core viem
 
 ## Setup
 
-Create the X402rMerchant instance:
+Create viem clients as described in [Installation](/sdk/installation), then:
 
 ```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
 import { X402rMerchant } from '@x402r/merchant';
 import { getNetworkConfig } from '@x402r/core';
-
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-});
-
-const account = privateKeyToAccount(process.env.MERCHANT_PRIVATE_KEY as `0x${string}`);
-const walletClient = createWalletClient({
-  account,
-  chain: baseSepolia,
-  transport: http(),
-});
 
 const config = getNetworkConfig('eip155:84532')!;
 
@@ -157,57 +137,6 @@ const { unsubscribe } = merchant.watchRefundRequests((event) => {
 const { unsubscribe: unsubReleases } = merchant.watchReleases((event) => {
   console.log('Release executed:', event);
 });
-```
-
-## Complete Example
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rMerchant } from '@x402r/merchant';
-import { getNetworkConfig, RequestStatus } from '@x402r/core';
-
-async function main() {
-  const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const account = privateKeyToAccount(process.env.MERCHANT_KEY as `0x${string}`);
-  const walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const config = getNetworkConfig('eip155:84532')!;
-
-  const merchant = new X402rMerchant({
-    publicClient,
-    walletClient,
-    operatorAddress: '0x...',
-    escrowAddress: config.authCaptureEscrow,
-    refundRequestAddress: config.refundRequest,
-  });
-
-  // Check payment amounts
-  const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
-  console.log(`Capturable: ${capturableAmount}, Refundable: ${refundableAmount}`);
-
-  // Release if escrow period has passed
-  if (capturableAmount > 0n) {
-    const { txHash } = await merchant.release(paymentInfo, capturableAmount);
-    console.log('Released:', txHash);
-  }
-
-  // Watch for new refund requests
-  merchant.watchRefundRequests(async (event) => {
-    console.log('New refund request:', event);
-  });
-}
-
-main().catch(console.error);
 ```
 
 ## Next Steps

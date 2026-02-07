@@ -220,77 +220,6 @@ getRefundRequestByKey(
 ): Promise<RefundRequestData>
 ```
 
-## Complete Example: Refund Request Flow
-
-This example shows the full lifecycle: check if a request exists, submit a refund, then poll for status updates.
-
-```typescript
-import { X402rClient } from '@x402r/client';
-import { RequestStatus } from '@x402r/core';
-import type { PaymentInfo } from '@x402r/core';
-
-async function requestRefundWithTracking(
-  client: X402rClient,
-  paymentInfo: PaymentInfo,
-  refundAmount: bigint
-) {
-  const nonce = 0n; // First charge
-
-  // Step 1: Check if a refund request already exists
-  const hasRequest = await client.hasRefundRequest(paymentInfo, nonce);
-
-  if (hasRequest) {
-    const existingStatus = await client.getRefundStatus(paymentInfo, nonce);
-    console.log(`Refund request already exists with status: ${existingStatus}`);
-
-    if (existingStatus === RequestStatus.Pending) {
-      console.log('Request is still pending - waiting for decision');
-      return;
-    }
-
-    if (existingStatus === RequestStatus.Denied) {
-      console.log('Previous request was denied');
-      return;
-    }
-  }
-
-  // Step 2: Submit the refund request
-  const { txHash } = await client.requestRefund(
-    paymentInfo,
-    refundAmount,
-    nonce
-  );
-  console.log(`Refund requested: ${txHash}`);
-
-  // Step 3: Watch for status updates
-  const { unsubscribe } = client.watchRefundRequests((event) => {
-    console.log(`Refund event: ${event.eventName}`);
-
-    if (event.eventName === 'RefundRequestStatusUpdated') {
-      const newStatus = event.args.status;
-      if (newStatus === RequestStatus.Approved) {
-        console.log('Refund approved - funds will be returned');
-        unsubscribe();
-      } else if (newStatus === RequestStatus.Denied) {
-        console.log('Refund denied by merchant or arbiter');
-        unsubscribe();
-      }
-    }
-  });
-
-  // Step 4: Alternatively, poll for status
-  const pollInterval = setInterval(async () => {
-    const status = await client.getRefundStatus(paymentInfo, nonce);
-
-    if (status !== RequestStatus.Pending) {
-      console.log(`Refund resolved with status: ${status}`);
-      clearInterval(pollInterval);
-      unsubscribe();
-    }
-  }, 10_000); // Poll every 10 seconds
-}
-```
-
 ## Refund Request Lifecycle
 
 ```mermaid
@@ -302,34 +231,6 @@ stateDiagram-v2
     Approved --> [*]: Funds returned
     Denied --> [*]
     Cancelled --> [*]
-```
-
-## Listing All Refund Requests
-
-```typescript
-async function listAllRefundRequests(client: X402rClient) {
-  const total = await client.getMyRefundRequestCount();
-  console.log(`Total refund requests: ${total}`);
-
-  // Fetch in pages of 10
-  const pageSize = 10n;
-  let offset = 0n;
-
-  while (offset < total) {
-    const { keys } = await client.getMyRefundRequests(offset, pageSize);
-
-    for (const key of keys) {
-      const request = await client.getRefundRequestByKey(key);
-      console.log(
-        `  Hash: ${request.paymentInfoHash}, ` +
-        `Amount: ${request.amount}, ` +
-        `Status: ${request.status}`
-      );
-    }
-
-    offset += pageSize;
-  }
-}
 ```
 
 ## Next Steps

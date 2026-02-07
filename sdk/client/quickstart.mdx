@@ -6,15 +6,6 @@ icon: "rocket"
 
 The `@x402r/client` package provides everything payers need to interact with X402r payments: requesting refunds, freezing payments, and managing escrow.
 
-## Prerequisites
-
-<Note>
-Before starting, ensure you have:
-- Node.js 20+
-- A funded wallet on Base Sepolia
-- Basic understanding of [viem](https://viem.sh)
-</Note>
-
 ## Installation
 
 ```bash
@@ -23,26 +14,11 @@ npm install @x402r/client @x402r/core viem
 
 ## Setup
 
-Create the X402rClient instance:
+Create viem clients as described in [Installation](/sdk/installation), then:
 
 ```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
 import { X402rClient } from '@x402r/client';
 import { getNetworkConfig } from '@x402r/core';
-
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-});
-
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-const walletClient = createWalletClient({
-  account,
-  chain: baseSepolia,
-  transport: http(),
-});
 
 const networkConfig = getNetworkConfig('eip155:84532')!;
 
@@ -131,69 +107,6 @@ const { unsubscribe: unsubRefunds } = client.watchRefundRequests((event) => {
 // Later: stop watching
 unsubscribe();
 unsubRefunds();
-```
-
-## Complete Example
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rClient } from '@x402r/client';
-import { getNetworkConfig, RequestStatus } from '@x402r/core';
-
-async function main() {
-  const publicClient = createPublicClient({
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-  const walletClient = createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(),
-  });
-
-  const config = getNetworkConfig('eip155:84532')!;
-
-  const client = new X402rClient({
-    publicClient,
-    walletClient,
-    operatorAddress: '0x...',
-    refundRequestAddress: config.refundRequest,
-  });
-
-  // Check if a refund request already exists
-  const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
-
-  if (!hasRequest) {
-    // Request a refund
-    const { txHash } = await client.requestRefund(
-      paymentInfo,
-      paymentInfo.maxAmount, // full refund
-      0n
-    );
-    console.log(`Refund requested: ${txHash}`);
-  }
-
-  // Check status
-  const status = await client.getRefundStatus(paymentInfo, 0n);
-  if (status === RequestStatus.Approved) {
-    console.log('Refund was approved!');
-  }
-
-  // List my refund requests (paginated)
-  const { keys, total } = await client.getMyRefundRequests(0n, 10n);
-  console.log(`${total} total refund requests`);
-
-  for (const key of keys) {
-    const request = await client.getRefundRequestByKey(key);
-    console.log(`Amount: ${request.amount}, Status: ${request.status}`);
-  }
-}
-
-main().catch(console.error);
 ```
 
 ## Next Steps

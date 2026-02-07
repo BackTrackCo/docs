@@ -1,8 +1,12 @@
 ---
 title: "SDK Overview"
-description: "Production-ready TypeScript SDK for the X402r refundable payments protocol"
+description: "TypeScript SDK for the X402r refundable payments protocol (experimental)"
 icon: "cube"
 ---
+
+<Warning>
+The X402r SDK is in active development (v0.1.0). APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
+</Warning>
 
 The X402r SDK provides a complete TypeScript implementation for integrating with the X402r refundable payments protocol. It enables clients, merchants, and arbiters to interact with smart contracts for payment authorization, escrow management, and dispute resolution.
 
@@ -48,49 +52,6 @@ The SDK is organized into five packages, each designed for a specific role in th
     On-chain registry for arbiters to register, update metadata, and be discovered by merchants and clients.
   </Accordion>
 </AccordionGroup>
-
-## Architecture
-
-```mermaid
-flowchart BT
-    subgraph core[@x402r/core]
-        direction LR
-        types[Types]
-        abis[ABIs]
-        config[Network Config]
-        deploy[Deploy]
-    end
-
-    subgraph helpers[@x402r/helpers]
-        ref[refundable]
-    end
-
-    subgraph client[@x402r/client]
-        direction LR
-        rr[Refund Request]
-        eo[Escrow/Freeze]
-        cs[Subscriptions]
-    end
-
-    subgraph merchant[@x402r/merchant]
-        direction LR
-        rf[Release/Charge]
-        rh[Refund Handling]
-        ms[Subscriptions]
-    end
-
-    subgraph arbiter[@x402r/arbiter]
-        direction LR
-        ad[Approve/Deny]
-        reg[Registry]
-        bo[Batch Ops]
-    end
-
-    client --> core
-    merchant --> core
-    arbiter --> core
-    helpers --> core
-```
 
 ## Network Support
 
