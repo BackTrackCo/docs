@@ -93,6 +93,7 @@
           {
             "group": "Reference",
             "pages": [
+              "sdk/supported-networks",
               "sdk/limitations"
             ]
           }
