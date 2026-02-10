@@ -6,6 +6,10 @@ icon: "rocket"
 
 The `@x402r/core` package includes deployment utilities that handle the full lifecycle of deploying a PaymentOperator and all its supporting contracts.
 
+<Card title="Run the example on GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator" horizontal>
+  Clone the deploy-operator example and deploy your own operator in minutes.
+</Card>
+
 ## Overview
 
 A complete marketplace operator deployment includes:
@@ -19,7 +23,32 @@ A complete marketplace operator deployment includes:
 
 All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
 
-## Quick Deploy
+## Run the Example
+
+The fastest way to deploy an operator is to run the [example script](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator) directly.
+
+**Prerequisites:**
+- Node.js 20+
+- A private key with Base Sepolia ETH ([get testnet ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
+
+```bash
+git clone https://github.com/BackTrackCo/x402r-sdk.git
+cd x402r-sdk
+pnpm install && pnpm build
+PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/index.ts
+```
+
+This deploys a complete operator with 7-day escrow, 3-day freeze, and 1% operator fee. For quick E2E testing, use the short-escrow variant:
+
+```bash
+PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/deploy-short-escrow.ts
+```
+
+The script outputs all deployed contract addresses and BaseScan links for each transaction.
+
+## Using the SDK Directly
+
+If you want to integrate deployment into your own code:
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -44,10 +73,11 @@ const result = await deployMarketplaceOperator(
   publicClient,
   'eip155:84532', // Base Sepolia
   {
-    feeRecipient: '0xYourAddress...',    // receives operator fees
-    arbiter: '0xArbiterAddress...',       // dispute resolver
-    escrowPeriodSeconds: 604800n,         // 7 days
-    operatorFeeBps: 100n,                 // 1% fee (optional)
+    feeRecipient: account.address,        // receives operator fees
+    arbiter: '0xArbiterAddress...',        // dispute resolver
+    escrowPeriodSeconds: 604800n,          // 7 days
+    freezeDurationSeconds: 259200n,        // 3 days max freeze
+    operatorFeeBps: 100n,                  // 1% fee (optional)
   }
 );
 
@@ -144,6 +174,9 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 ## Next Steps
 
 <CardGroup cols={2}>
+  <Card title="Example on GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
+    Clone and run the deploy-operator example.
+  </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">
     See working merchant and client examples.
   </Card>
