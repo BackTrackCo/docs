@@ -9,26 +9,29 @@ The SDK includes working examples in the `x402r-sdk/` repository. Each is a stan
 ## Examples
 
 <CardGroup cols={2}>
-  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator">
-    HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
+  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator/basic">
+    Operator-agnostic HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
   </Card>
   <Card title="deploy-operator" icon="rocket" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
     Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
   </Card>
-  <Card title="merchant-server" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-server">
-    HTTP server that accepts escrow payments via x402's standard `paymentMiddleware`. Delegates verify/settle to the facilitator service.
+  <Card title="server-express" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express">
+    Express merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
   </Card>
-  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant-cli">
-    CLI tool for merchants to release payments, approve/deny refunds, and query state.
+  <Card title="server-hono" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/hono">
+    Hono merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
   </Card>
-  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/client-cli">
-    CLI tool for payers to request refunds, freeze payments, and check status.
+  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/merchant-cli">
+    CLI tool for merchants to release payments, approve/deny refunds, and query escrow state.
   </Card>
-  <Card title="arbiter-cli (in progress)" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter-cli">
-    CLI tool for arbiters to review cases, make decisions, and manage registry. This example is under active development.
+  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/client-cli">
+    CLI tool for payers to `pay`, `preview-fee`, request refunds, freeze payments, and check status.
   </Card>
-  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
-    Shared utilities used by the CLI examples (display helpers, PaymentInfo formatting).
+  <Card title="arbiter-cli" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/arbiter-cli">
+    CLI tool for arbiters to review cases, make decisions, and manage registry.
+  </Card>
+  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/shared">
+    Shared utilities used by the CLI examples: `parsePaymentInfo`, `shortAddress`, `formatUSDC`.
   </Card>
 </CardGroup>
 
@@ -41,24 +44,28 @@ All examples require a private key with Base Sepolia ETH and USDC. See [Base net
 The full payment flow requires the facilitator to be running before the merchant server:
 
 ```bash
-# 1. Start the facilitator service
-cd x402r-sdk/examples/facilitator
-cp .env.example .env  # Set PRIVATE_KEY + OPERATOR_ADDRESS
-pnpm dev
+# All commands run from the x402r-sdk/ root directory
 
-# 2. Start the merchant server (new terminal)
-cd x402r-sdk/examples/merchant-server
-cp .env.example .env  # Set PRIVATE_KEY, OPERATOR_ADDRESS, FACILITATOR_URL
-pnpm dev
+# 1. Set up environment files
+cp examples/facilitator/basic/.env-local examples/facilitator/basic/.env
+# Edit .env — set PRIVATE_KEY
 
-# 3. Make a payment (new terminal)
-cd x402r-sdk/examples/client-cli
-cp .env.example .env  # Set PRIVATE_KEY
-pnpm start pay --url http://localhost:3000/weather
+cp examples/servers/express/.env-local examples/servers/express/.env
+# Edit .env — set ADDRESS, OPERATOR_ADDRESS, FACILITATOR_URL
+
+# 2. Start the facilitator (port 4022)
+pnpm example:facilitator
+
+# 3. Start the merchant server (new terminal, port 4021)
+pnpm example:server:express
+# Or: pnpm example:server:hono
+
+# 4. Make a payment (new terminal)
+pnpm example:client-cli pay --url http://localhost:4021/weather
 ```
 
 <Note>
-The facilitator must be running before the merchant server starts, as the merchant delegates payment verification and settlement to it.
+The facilitator must be running before the merchant server (Express or Hono) starts, as the merchant delegates payment verification and settlement to it.
 </Note>
 
 ## deploy-operator
@@ -83,9 +90,9 @@ const result = await deployMarketplaceOperator(
 
 See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
 
-## merchant-server
+## Server Examples
 
-Demonstrates a minimal HTTP server that uses x402's standard middleware:
+Demonstrates minimal merchant servers (Express and Hono variants) that use `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` via x402's standard middleware:
 
 1. Returns 402 with `refundable()` payment options
 2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
