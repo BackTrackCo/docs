@@ -1,20 +1,20 @@
 ---
-title: "Client Quickstart"
-description: "Get started with the X402r Client SDK for payer integrations"
+title: "Client SDK"
+description: "Payer-side SDK for refunds, freezes, and escrow management (experimental)"
 icon: "rocket"
 ---
 
-The `@x402r/client` package provides everything payers need to interact with X402r payments: requesting refunds, freezing payments, and managing escrow.
+<Warning>
+The Client SDK is experimental. APIs will change as the refund and dispute system design evolves.
+</Warning>
 
-## Installation
+<Note>
+The `@x402r/client` package is not yet published on npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk).
+</Note>
 
-```bash
-npm install @x402r/client @x402r/core viem
-```
+The `@x402r/client` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
 
 ## Setup
-
-Create viem clients as described in [Installation](/sdk/installation), then:
 
 ```typescript
 import { X402rClient } from '@x402r/client';
@@ -31,97 +31,32 @@ const client = new X402rClient({
 });
 ```
 
-## Request a Refund
+## Available Methods
 
-Submit a refund request for a payment that is in escrow:
+The Client SDK currently supports:
 
-```typescript
-// Request refund for the first charge (nonce = 0n)
-const { txHash } = await client.requestRefund(
-  paymentInfo,
-  BigInt('1000000'), // amount to refund (e.g., 1 USDC)
-  0n                 // nonce: identifies which charge
-);
-console.log(`Refund requested: ${txHash}`);
+- **`requestRefund()`** — Submit a refund request for a payment in escrow
+- **`getRefundStatus()`** — Check the status of a refund request
+- **`freezePayment()`** — Freeze a payment to prevent release during a dispute
+- **`isFrozen()`** — Check if a payment is frozen
+- **`isDuringEscrowPeriod()`** — Check if a payment is still in its escrow window
+- **`getAuthorizationTime()`** — Get when a payment was authorized
 
-// Check refund status
-const status = await client.getRefundStatus(paymentInfo, 0n);
-console.log(`Refund status: ${status}`);
-// 0 = Pending, 1 = Approved, 2 = Denied, 3 = Cancelled
-```
+## Try It Now
 
-## Check Escrow Period
+The easiest way to try client features is with the **client-cli** example, which provides a command-line interface for all client operations:
 
-Query whether the payment is still within its escrow period:
-
-```typescript
-const escrowPeriodAddress = '0x...'; // EscrowPeriod contract address
-
-// Check if still within escrow period
-const inEscrow = await client.isDuringEscrowPeriod(paymentInfo, escrowPeriodAddress);
-if (inEscrow) {
-  console.log('Still in escrow period - can request refund');
-} else {
-  console.log('Escrow period passed - funds can be released');
-}
-
-// Get when the payment was authorized
-const authTime = await client.getAuthorizationTime(paymentInfo, escrowPeriodAddress);
-console.log(`Authorized at: ${new Date(Number(authTime) * 1000)}`);
-```
-
-## Freeze a Payment
-
-Freeze a payment to prevent release while a dispute is resolved:
-
-```typescript
-const freezeAddress = '0x...'; // Freeze contract address
-
-// Freeze the payment (only payer can do this)
-const { txHash } = await client.freezePayment(paymentInfo, freezeAddress);
-console.log(`Payment frozen: ${txHash}`);
-
-// Check if payment is frozen
-const frozen = await client.isFrozen(paymentInfo, freezeAddress);
-console.log(`Frozen: ${frozen}`);
-```
-
-## Watch for Updates
-
-Subscribe to real-time events:
-
-```typescript
-// Watch payment state changes (releases, refunds)
-const { unsubscribe } = client.watchPaymentState(
-  paymentInfoHash,
-  (event) => {
-    console.log('Payment event:', event.eventName);
-  }
-);
-
-// Watch for refund request updates
-const { unsubscribe: unsubRefunds } = client.watchRefundRequests((event) => {
-  console.log('Refund event:', event.eventName);
-});
-
-// Later: stop watching
-unsubscribe();
-unsubRefunds();
-```
+<Card title="client-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/client-cli">
+  CLI tool for payers to `pay`, `preview-fee`, request refunds, freeze payments, and check status.
+</Card>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Payment Queries" icon="magnifying-glass" href="/sdk/client/payment-queries">
-    Learn about payment query methods (including stubbed methods pending subgraph).
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    See all working examples including the full payment flow.
   </Card>
-  <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">
-    Deep dive into refund workflows.
-  </Card>
-  <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
-    Manage freeze and escrow timing.
-  </Card>
-  <Card title="Event Subscriptions" icon="bell" href="/sdk/client/subscriptions">
-    Real-time event watching.
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy a PaymentOperator to test client operations against.
   </Card>
 </CardGroup>

@@ -1,0 +1,171 @@
+---
+title: "Merchant Server Quickstart"
+description: "Accept escrow-backed refundable payments on your Express server in 5 minutes"
+icon: "store"
+---
+
+<Warning>
+The X402r SDK packages are not yet published on npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk). See [Installation](/sdk/installation) for details.
+</Warning>
+
+This guide walks you through setting up an Express server that accepts x402r escrow-backed payments. By the end, you'll have a paid API endpoint protected by the x402 payment middleware with refundable escrow support.
+
+<Tip>
+The full source code for this example is available on [GitHub](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express).
+</Tip>
+
+## Prerequisites
+
+- Node.js 20+
+- A deployed PaymentOperator contract ([Deploy Operator](/sdk/deploy-operator))
+- A running facilitator service ([Facilitator Quickstart](/sdk/facilitator/getting-started))
+- Base Sepolia ETH for testing
+
+## Setup
+
+<Steps>
+  <Step title="Create project and install dependencies">
+    ```bash
+    mkdir merchant-server && cd merchant-server
+    npm init -y
+    npm install express @x402/core @x402/express @x402r/evm @x402r/helpers dotenv
+    ```
+  </Step>
+
+  <Step title="Configure environment variables">
+    Create a `.env` file in the project root:
+
+    ```bash
+    ADDRESS=0xYourMerchantAddress
+    OPERATOR_ADDRESS=0xYourPaymentOperatorAddress
+    FACILITATOR_URL=http://localhost:4022
+    ```
+  </Step>
+
+  <Step title="Create the server">
+    Create `index.ts`:
+
+    ```typescript
+    import "dotenv/config";
+    import express from "express";
+    import { paymentMiddleware, x402ResourceServer } from "@x402/express";
+    import { EscrowServerScheme } from "@x402r/evm/escrow/server";
+    import { refundable } from "@x402r/helpers";
+    import { HTTPFacilitatorClient } from "@x402/core/server";
+
+    const address = process.env.ADDRESS as `0x${string}`;
+    const operatorAddress = process.env.OPERATOR_ADDRESS as `0x${string}`;
+    if (!address || !operatorAddress) {
+      console.error("Missing required environment variables: ADDRESS, OPERATOR_ADDRESS");
+      process.exit(1);
+    }
+
+    const facilitatorUrl = process.env.FACILITATOR_URL;
+    if (!facilitatorUrl) {
+      console.error("FACILITATOR_URL environment variable is required");
+      process.exit(1);
+    }
+    const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
+
+    const app = express();
+
+    app.use(
+      paymentMiddleware(
+        {
+          "GET /weather": {
+            accepts: [
+              refundable(
+                {
+                  scheme: "escrow",
+                  price: "$0.01",
+                  network: "eip155:84532",
+                  payTo: address,
+                },
+                operatorAddress,
+              ),
+            ],
+            description: "Weather data",
+            mimeType: "application/json",
+          },
+        },
+        new x402ResourceServer(facilitatorClient).register(
+          "eip155:84532",
+          new EscrowServerScheme() as never,
+        ),
+      ),
+    );
+
+    app.get("/weather", (req, res) => {
+      res.send({
+        report: { weather: "sunny", temperature: 70 },
+      });
+    });
+
+    app.listen(4021, () => {
+      console.log("Server listening at http://localhost:4021");
+    });
+    ```
+  </Step>
+
+  <Step title="Start the server">
+    ```bash
+    npx tsx index.ts
+    ```
+
+    You should see:
+    ```
+    Server listening at http://localhost:4021
+    ```
+  </Step>
+
+  <Step title="Test the endpoint">
+    ```bash
+    curl http://localhost:4021/weather
+    ```
+
+    Without a valid payment header, the server responds with HTTP 402 and the escrow payment requirements:
+
+    ```json
+    {
+      "x402Version": 2,
+      "accepts": [{
+        "scheme": "escrow",
+        "price": "$0.01",
+        "network": "eip155:84532",
+        "payTo": "0x...",
+        "extra": {
+          "escrowAddress": "0x...",
+          "operatorAddress": "0x...",
+          "tokenCollector": "0x...",
+          "minFeeBps": 0,
+          "maxFeeBps": 1000
+        }
+      }]
+    }
+    ```
+  </Step>
+</Steps>
+
+## How it works
+
+- **`refundable()`** wraps a standard x402 payment option with escrow configuration (contract addresses, fee bounds) from the network config.
+- **`EscrowServerScheme`** registers the escrow payment scheme with the x402 resource server so it can validate escrow-backed payments.
+- **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 if no payment is provided.
+- **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
+    Configure escrow options and fee bounds.
+  </Card>
+  <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
+    Release payments, handle refunds, and manage escrow.
+  </Card>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy your own PaymentOperator contract.
+  </Card>
+  <Card title="Facilitator Quickstart" icon="server" href="/sdk/facilitator/getting-started">
+    Run your own facilitator service.
+  </Card>
+</CardGroup>
