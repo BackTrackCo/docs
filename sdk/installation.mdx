@@ -4,6 +4,10 @@ description: "Install and configure the X402r SDK packages"
 icon: "download"
 ---
 
+<Warning>
+The X402r SDK packages are not yet published on npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk) using your package manager's Git URL support, or clone the repo and link locally.
+</Warning>
+
 ## Install Packages
 
 Install only the packages you need for your use case:
@@ -19,19 +23,9 @@ Install only the packages you need for your use case:
     npm install @x402r/merchant @x402r/helpers @x402r/core viem
     ```
   </Tab>
-  <Tab title="Arbiter">
-    ```bash
-    npm install @x402r/arbiter @x402r/core viem
-    ```
-  </Tab>
   <Tab title="Helpers Only">
     ```bash
     npm install @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="All Packages">
-    ```bash
-    npm install @x402r/client @x402r/merchant @x402r/arbiter @x402r/helpers @x402r/core viem
     ```
   </Tab>
 </Tabs>
@@ -63,37 +57,13 @@ Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) fo
 Never commit private keys to version control. Use environment variables or a secrets manager.
 </Warning>
 
-## Quick Verification
-
-Verify your setup by querying refund status for a payment:
-
-```typescript
-import { X402rClient } from '@x402r/client';
-
-const client = new X402rClient({
-  publicClient,
-  operatorAddress: '0x...', // Your PaymentOperator address
-  refundRequestAddress: config.refundRequest,
-});
-
-// Check if a refund request exists for a payment
-const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
-console.log('Has refund request:', hasRequest);
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
     Learn about payment states, escrow, and the refund lifecycle.
   </Card>
-  <Card title="Client Quickstart" icon="user" href="/sdk/client/quickstart">
-    Start building as a payer/client.
-  </Card>
-  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant/quickstart">
-    Integrate refunds into your server.
-  </Card>
-  <Card title="Arbiter Quickstart" icon="scale-balanced" href="/sdk/arbiter/quickstart">
-    Build a dispute resolution system.
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Working examples for merchants, clients, and arbiters.
   </Card>
 </CardGroup>

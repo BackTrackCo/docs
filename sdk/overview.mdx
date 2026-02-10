@@ -5,6 +5,10 @@ icon: "cube"
 ---
 
 <Warning>
+The X402r SDK packages are not yet published on npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk). See [Installation](/sdk/installation) for details.
+</Warning>
+
+<Warning>
 The X402r SDK is in active development (v0.1.0). APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
 </Warning>
 
@@ -12,9 +16,9 @@ The X402r SDK provides a complete TypeScript implementation for integrating with
 
 ## Packages
 
-The SDK is organized into five packages, each designed for a specific role in the payment ecosystem:
+The SDK is organized into packages designed for specific roles in the payment ecosystem:
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="@x402r/core" icon="box" href="/sdk/concepts">
     Shared types, ABIs, network config, deploy utilities, and condition builders.
   </Card>
@@ -24,34 +28,13 @@ The SDK is organized into five packages, each designed for a specific role in th
   <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
     SDK for merchants to release payments, charge, and handle refunds.
   </Card>
-  <Card title="@x402r/arbiter" icon="scale-balanced" href="/sdk/arbiter/quickstart">
-    SDK for arbiters to resolve disputes, manage registry, and automate decisions with AI.
+  <Card title="@x402r/arbiter" icon="gavel" href="/sdk/arbiter/quickstart">
+    SDK for arbiters to resolve disputes and manage refund decisions.
+  </Card>
+  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
+    Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
   </Card>
 </CardGroup>
-
-<Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
-  Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
-</Card>
-
-## Key Features
-
-<AccordionGroup>
-  <Accordion title="Type-safe contract interactions" icon="shield-check">
-    Built on [viem](https://viem.sh) for fully typed interactions with X402r smart contracts. All ABIs are exported with complete TypeScript types.
-  </Accordion>
-  <Accordion title="Event subscriptions" icon="bell">
-    Real-time event watching for payment state changes, refund requests, and freeze events across all packages.
-  </Accordion>
-  <Accordion title="AI-ready arbiter SDK" icon="robot">
-    Built-in hooks for integrating AI models into dispute resolution workflows with structured evaluation contexts.
-  </Accordion>
-  <Accordion title="One-command deployment" icon="rocket">
-    `deployMarketplaceOperator()` deploys all necessary contracts (operator, escrow period, freeze, conditions) in a single call.
-  </Accordion>
-  <Accordion title="Arbiter registry" icon="clipboard-list">
-    On-chain registry for arbiters to register, update metadata, and be discovered by merchants and clients.
-  </Accordion>
-</AccordionGroup>
 
 ## Network Support
 
@@ -72,7 +55,7 @@ The SDK is organized into five packages, each designed for a specific role in th
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator with one function call.
   </Card>
-  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk">
-    Source code and examples.
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Working examples for merchants, clients, and arbiters.
   </Card>
 </CardGroup>

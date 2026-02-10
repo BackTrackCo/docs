@@ -4,6 +4,10 @@ description: "Configure HTTP 402 responses with escrow-backed refundable payment
 icon: "wrench"
 ---
 
+<Warning>
+The X402r SDK packages are not yet published on npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk). See [Installation](/sdk/installation) for details.
+</Warning>
+
 The `@x402r/helpers` package provides the `refundable()` function — a framework-agnostic helper that adds escrow configuration to x402 payment options.
 
 <Note>
@@ -161,13 +165,10 @@ app.get('/api/resource', (req, res) => {
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator to use with refundable().
   </Card>
-  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant/quickstart">
-    Full merchant integration guide.
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    See merchant server examples using refundable().
   </Card>
   <Card title="Protocol Overview" icon="diagram-project" href="/x402-integration/overview">
     Understand the escrow scheme.
-  </Card>
-  <Card title="Limitations" icon="circle-info" href="/sdk/limitations">
-    Current SDK constraints.
   </Card>
 </CardGroup>
