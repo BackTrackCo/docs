@@ -23,28 +23,64 @@ A complete marketplace operator deployment includes:
 
 All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
 
-## Run the Example
-
-The fastest way to deploy an operator is to run the [example script](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator) directly.
+## Deploy Your Operator
 
 **Prerequisites:**
-- Node.js 20+
+- Node.js 20+, pnpm 9.15+
 - A private key with Base Sepolia ETH ([get testnet ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
 
-```bash
-git clone https://github.com/BackTrackCo/x402r-sdk.git
-cd x402r-sdk
-pnpm install && pnpm build
-PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/index.ts
-```
+<Steps>
+  <Step title="Clone and build the SDK">
+    ```bash
+    git clone https://github.com/BackTrackCo/x402r-sdk.git
+    cd x402r-sdk
+    pnpm install && pnpm build
+    ```
+  </Step>
+  <Step title="Configure your deployment">
+    Copy the example env file and set your private key:
+    ```bash
+    cd examples/deploy-operator
+    cp .env.example .env
+    ```
 
-This deploys a complete operator with 7-day escrow, 3-day freeze, and 1% operator fee. For quick E2E testing, use the short-escrow variant:
+    Edit `.env` with your values. Only `PRIVATE_KEY` is required — everything else has sensible defaults:
 
+    | Variable | Default | Description |
+    |----------|---------|-------------|
+    | `PRIVATE_KEY` | — | Deployer wallet (required) |
+    | `ARBITER` | deployer address | Dispute resolver |
+    | `FEE_RECIPIENT` | deployer address | Receives operator fees |
+    | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
+    | `FREEZE_DURATION` | `259200` (3 days) | Freeze duration in seconds |
+    | `FEE_BPS` | `100` (1%) | Operator fee in basis points |
+    | `NETWORK_ID` | `eip155:84532` | Chain identifier |
+    | `RPC_URL` | `https://sepolia.base.org` | RPC endpoint |
+  </Step>
+  <Step title="Run the deployment">
+    ```bash
+    pnpm start
+    ```
+
+    Or pass env vars inline from the SDK root:
+    ```bash
+    PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/index.ts
+    ```
+  </Step>
+  <Step title="Use your operator address">
+    The script outputs all deployed contract addresses and BaseScan links. Use the `PaymentOperator` address in your payment payloads:
+    ```typescript
+    operator: "0xYourOperatorAddress..."
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+For quick E2E testing with short timers (5-minute escrow, 3-minute freeze), use the short-escrow variant instead:
 ```bash
 PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/deploy-short-escrow.ts
 ```
-
-The script outputs all deployed contract addresses and BaseScan links for each transaction.
+</Tip>
 
 ## Using the SDK Directly
 
