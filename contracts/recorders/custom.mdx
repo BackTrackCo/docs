@@ -78,7 +78,7 @@ contract ReleaseCountRecorderTest is Test {
     ReleaseCountRecorder recorder;
 
     function setUp() public {
-        recorder = new ReleaseCountRecorder();
+        recorder = new ReleaseCountRecorder(address(escrow));
     }
 
     function test_incrementsOnRecord() public {
