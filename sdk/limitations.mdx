@@ -1,45 +1,14 @@
 ---
 title: "Current Limitations"
-description: "Known limitations in the current SDK and what's coming next"
+description: "Known limitations and constraints in the current SDK"
 icon: "circle-info"
 ---
 
-The SDK provides full coverage of core payment flows including authorization, release, charge, refund, and dispute resolution. This page documents the known limitations and planned improvements.
+The SDK provides full coverage of core payment flows including authorization, release, charge, refund, dispute resolution, and evidence submission. This page documents the known limitations.
 
-## Stubbed Methods (Pending Subgraph)
+## Distribution
 
-Several payment query methods exist in the SDK but throw `NotImplementedError` because they require a subgraph/indexer for efficient querying. The on-chain contracts don't store payment listings — state is derived from events.
-
-<Warning>
-The following methods are defined but will throw `NotImplementedError` when called. They are planned for implementation once a subgraph is deployed.
-</Warning>
-
-### Client SDK (5 stubbed)
-
-| Method | Description | Workaround |
-|--------|-------------|------------|
-| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
-| `paymentExists(paymentInfoHash)` | Check if payment exists | Use `getPaymentAmounts()` on merchant SDK |
-| `isInEscrow(paymentInfoHash)` | Check if in escrow | Use `getPaymentAmounts()` on merchant SDK |
-| `getPaymentDetails(paymentInfoHash)` | Get stored PaymentInfo | Reconstruct from `AuthorizationCreated` events |
-| `getMyPayments()` | List payer's payments | Watch `AuthorizationCreated` events via subscriptions |
-
-### Merchant SDK (2 stubbed)
-
-| Method | Description | Workaround |
-|--------|-------------|------------|
-| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
-| `getReceiverPayments()` | List receiver's payments | Watch `AuthorizationCreated` events via subscriptions |
-
-### Arbiter SDK (1 stubbed)
-
-| Method | Description | Workaround |
-|--------|-------------|------------|
-| `getPaymentState(paymentInfo)` | Get payment state enum | Query escrow contract events directly |
-
-<Tip>
-All working refund, release, charge, freeze, and subscription methods function correctly. Only the payment **listing and state query** methods are stubbed.
-</Tip>
+Packages are not yet published to npm. Install directly from the [GitHub repository](https://github.com/BackTrackCo/x402r-sdk). See [Installation](/sdk/installation) for details.
 
 ## API Constraints
 
@@ -63,28 +32,27 @@ All SDK methods require a complete `PaymentInfo` object. You cannot query by has
 // Works - full PaymentInfo
 const status = await client.getRefundStatus(paymentInfo, 0n);
 
-// Not supported - hash-only queries require subgraph
+// Not supported - hash-only queries require the full struct
 // const state = await client.getPaymentStateByHash(hash);
 ```
 
-### No Evidence/Metadata System
+### Event Log Scanning Limits
 
-The SDK doesn't provide built-in support for attaching evidence to refund requests or disputes. Use external storage (IPFS, database) and reference it off-chain.
+`getPayerPayments()`, `getReceiverPayments()`, and `getPaymentDetails()` scan `AuthorizationCreated` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Pass a `fromBlock` parameter for large ranges:
+
+```typescript
+// Scan only recent blocks to avoid RPC limits
+const payments = await client.getPayerPayments(recentBlockNumber);
+const details = await client.getPaymentDetails(hash, recentBlockNumber);
+```
 
 ### No Express/Hono Middleware
 
 The `refundable()` helper in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware — use `refundable()` directly when constructing payment options.
 
-## Roadmap
-
-See the [Roadmap](/roadmap) page for planned features and timeline.
-
 ## Getting Updates
 
 <CardGroup cols={2}>
-  <Card title="Roadmap" icon="map" href="/roadmap">
-    See what's planned next for the SDK and protocol.
-  </Card>
   <Card title="SDK Overview" icon="cube" href="/sdk/overview">
     Return to SDK documentation.
   </Card>

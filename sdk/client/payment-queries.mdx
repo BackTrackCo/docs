@@ -1,25 +1,18 @@
 ---
 title: "Payment Queries"
-description: "Query payment states and details with the Client SDK - status of stubbed methods and workarounds"
+description: "Query payment states and details with the Client SDK"
 icon: "magnifying-glass"
 ---
 
-<Warning>
-**All five payment query methods are currently stubbed.** They throw a `NotImplementedError` when called.
-
-The `PaymentOperator` contract does not store payment state on-chain in a queryable mapping. Payment state is derived from the escrow contract and event logs. A **subgraph or indexer** is required to make these methods functional. Until then, use the workarounds described below for each method.
-</Warning>
-
-The Client SDK defines five payment query methods on `X402rClient`. These represent the planned API for querying payment information once a subgraph is deployed. This page documents each method's intended behavior and provides working alternatives you can use today.
+The Client SDK provides five methods for querying payment state and history. These read directly from the escrow contract and on-chain event logs.
 
 ## getPaymentState
 
-Query the current lifecycle state of a payment.
+Derive the lifecycle state of a payment from the escrow contract (amounts and expiry).
 
 ```typescript
 import { PaymentState } from '@x402r/core';
 
-// Planned API (currently throws NotImplementedError)
 const state = await client.getPaymentState(paymentInfo);
 
 // PaymentState enum:
@@ -30,203 +23,98 @@ const state = await client.getPaymentState(paymentInfo);
 // 4 = Expired      - Authorization expired, payer can reclaim
 ```
 
-### Signature
-
 ```typescript
 getPaymentState(paymentInfo: PaymentInfo): Promise<PaymentState>
 ```
 
-<Info>
-**Workaround:** Use `merchant.getPaymentAmounts(paymentInfo)` from the Merchant SDK. If `capturable > 0`, the payment is effectively in escrow. If both `capturable` and `refundable` are `0`, the payment is settled.
-
-```typescript
-const amounts = await merchant.getPaymentAmounts(paymentInfo);
-
-if (amounts.capturable > 0n) {
-  console.log('Payment is in escrow');
-} else if (amounts.refundable > 0n) {
-  console.log('Payment released but still refundable');
-} else {
-  console.log('Payment is settled');
-}
-```
-</Info>
-
 ## paymentExists
 
-Check whether a payment has been authorized through the operator.
+Check whether a payment has been collected by reading the escrow's `hasCollectedPayment` flag.
 
 ```typescript
-// Planned API (currently throws NotImplementedError)
 const exists = await client.paymentExists(paymentInfoHash);
 if (exists) {
   console.log('Payment found');
 }
 ```
 
-### Signature
-
 ```typescript
 paymentExists(paymentInfoHash: `0x${string}`): Promise<boolean>
 ```
 
-<Info>
-**Workaround:** Watch for `AuthorizationCreated` events on the `PaymentOperator` contract. You can query past logs using viem's `getContractEvents`:
-
-```typescript
-import { PaymentOperatorABI } from '@x402r/core';
-
-const events = await publicClient.getContractEvents({
-  address: operatorAddress,
-  abi: PaymentOperatorABI,
-  eventName: 'AuthorizationCreated',
-  fromBlock: 'earliest',
-});
-
-const exists = events.some(
-  (e) => e.args.paymentInfoHash === paymentInfoHash
-);
-```
-</Info>
-
 ## isInEscrow
 
-Check if a payment is currently held in escrow with capturable funds.
+Check if a payment currently has capturable funds in escrow.
 
 ```typescript
-// Planned API (currently throws NotImplementedError)
 const inEscrow = await client.isInEscrow(paymentInfoHash);
 if (inEscrow) {
-  console.log('Payment can be refunded');
+  console.log('Payment has funds in escrow');
 }
 ```
-
-### Signature
 
 ```typescript
 isInEscrow(paymentInfoHash: `0x${string}`): Promise<boolean>
 ```
 
-<Info>
-**Workaround:** Use the working escrow period methods instead. If `isDuringEscrowPeriod` returns `true`, the payment is still in its escrow window:
-
-```typescript
-const escrowPeriodAddress = '0x...'; // EscrowPeriod contract address
-
-const duringEscrow = await client.isDuringEscrowPeriod(
-  paymentInfo,
-  escrowPeriodAddress
-);
-
-if (duringEscrow) {
-  console.log('Still in escrow period - refund possible');
-}
-```
-</Info>
-
 ## getPaymentDetails
 
-Retrieve the full `PaymentInfo` struct from a payment hash.
+Retrieve the full `PaymentInfo` struct by scanning `AuthorizationCreated` events for the given hash.
 
 ```typescript
-// Planned API (currently throws NotImplementedError)
 const details = await client.getPaymentDetails(paymentInfoHash);
 
 console.log('Payer:', details.payer);
 console.log('Receiver:', details.receiver);
 console.log('Amount:', details.maxAmount);
-console.log('Token:', details.token);
 ```
 
-### Signature
-
 ```typescript
-getPaymentDetails(paymentInfoHash: `0x${string}`): Promise<PaymentInfo>
+getPaymentDetails(
+  paymentInfoHash: `0x${string}`,
+  fromBlock?: bigint
+): Promise<PaymentInfo>
 ```
 
-<Info>
-**Workaround:** Store the `PaymentInfo` struct locally when you first create the payment. The hash is deterministic (it is the keccak256 of the struct), so you can maintain your own mapping of hash to `PaymentInfo` in a local database or cache.
+<Note>
+This method scans event logs. Pass `fromBlock` to limit the scan range if your RPC limits `eth_getLogs` responses (Base Sepolia typically caps at 10,000 blocks).
+</Note>
+
+## getPayerPayments
+
+List all payments where the connected wallet is the payer, by scanning `AuthorizationCreated` events.
 
 ```typescript
-// When payment is created, store the PaymentInfo
-const paymentInfoMap = new Map<string, PaymentInfo>();
-paymentInfoMap.set(paymentInfoHash, paymentInfo);
+const payments = await client.getPayerPayments();
 
-// Later, retrieve it
-const details = paymentInfoMap.get(paymentInfoHash);
-```
-</Info>
-
-## getMyPayments
-
-List all payment hashes where the connected wallet is the payer.
-
-```typescript
-// Planned API (currently throws NotImplementedError)
-const { hashes } = await client.getMyPayments();
-
-console.log(`You have ${hashes.length} payments`);
-
-for (const hash of hashes) {
-  console.log(`Payment: ${hash}`);
+for (const { hash, paymentInfo } of payments) {
+  console.log(`Payment ${hash}: ${paymentInfo.maxAmount}`);
 }
 ```
 
-### Signature
-
 ```typescript
-getMyPayments(): Promise<{ hashes: readonly `0x${string}`[] }>
+getPayerPayments(
+  fromBlock?: bigint
+): Promise<Array<{ hash: `0x${string}`; paymentInfo: PaymentInfo }>>
 ```
 
-<Info>
-**Workaround:** Use `watchMyPayments` to track payments in real-time and accumulate them, or query `AuthorizationCreated` logs filtered by the payer address:
-
-```typescript
-import { PaymentOperatorABI } from '@x402r/core';
-
-const events = await publicClient.getContractEvents({
-  address: operatorAddress,
-  abi: PaymentOperatorABI,
-  eventName: 'AuthorizationCreated',
-  args: {
-    payer: walletClient.account.address,
-  },
-  fromBlock: 'earliest',
-});
-
-const hashes = events.map((e) => e.args.paymentInfoHash!);
-console.log(`Found ${hashes.length} payments`);
-```
-</Info>
-
-## Why a Subgraph Is Needed
-
-The `PaymentOperator` contract is designed for gas efficiency. It does not maintain queryable mappings of all payments. Payment lifecycle data is emitted as events (`AuthorizationCreated`, `ReleaseExecuted`, `RefundInEscrowExecuted`, etc.) but not stored in contract storage.
-
-To provide these query methods, the SDK needs a **subgraph** (e.g., The Graph) or an **indexer** that:
-
-1. Indexes all `PaymentOperator` events
-2. Maintains a derived state machine for each payment
-3. Tracks payer-to-payment relationships
-4. Exposes a GraphQL API for efficient querying
-
-<Tip>
-Once the subgraph is deployed, these methods will work without any code changes on your side. The API signatures will remain the same.
-</Tip>
+<Note>
+Like `getPaymentDetails`, this scans event logs. Pass `fromBlock` to limit the range for large histories.
+</Note>
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">
-    Working methods for requesting and managing refunds.
+    Request and manage refunds.
   </Card>
   <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
-    Working methods for freeze and escrow period queries.
-  </Card>
-  <Card title="Event Subscriptions" icon="bell" href="/sdk/client/subscriptions">
-    Real-time event watching as a workaround for query methods.
+    Freeze payments and query escrow periods.
   </Card>
   <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
     Full setup guide for the Client SDK.
+  </Card>
+  <Card title="Limitations" icon="circle-info" href="/sdk/limitations">
+    Known constraints including event log scanning limits.
   </Card>
 </CardGroup>

@@ -125,15 +125,12 @@ const option = refundable({
 
 ## Supported Networks
 
-The function automatically resolves addresses from the network config. Unsupported networks throw an error:
+The function resolves addresses from the network config for all supported networks. See `getNetworkConfig()` for the full list (Base Sepolia, Base, Ethereum, Ethereum Sepolia, Polygon, Arbitrum, Optimism, Avalanche, Celo, Monad).
 
 ```typescript
-// Works
 refundable({ network: 'eip155:84532', ... }, '0x...');  // Base Sepolia
 refundable({ network: 'eip155:8453', ... }, '0x...');   // Base Mainnet
-
-// Throws: "Unsupported network: eip155:1"
-refundable({ network: 'eip155:1', ... }, '0x...');
+refundable({ network: 'eip155:1', ... }, '0x...');      // Ethereum
 ```
 
 ## Integration with x402

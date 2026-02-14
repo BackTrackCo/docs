@@ -1,5 +1,5 @@
 ---
-title: "Event Subscriptions"
+title: "Merchant Events"
 description: "Subscribe to real-time refund, release, and freeze events with the Merchant SDK"
 icon: "bell"
 ---
@@ -181,18 +181,14 @@ The `freezeAddress` parameter is the address of the Freeze condition contract, n
 | `watchFreezeEvents` | `PaymentFrozen` / `PaymentUnfrozen` | `FreezeEventLog` | Monitor dispute-related freezes |
 
 <Tip>
-All three watchers use viem's `watchContractEvent` under the hood, which maintains a WebSocket connection to the RPC provider. Make sure your provider supports WebSocket subscriptions for real-time event delivery.
-</Tip>
-
-<Tip>
 All subscription methods use viem's `watchContractEvent` under the hood. For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
 </Tip>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Merchant Quickstart" icon="rocket" href="/sdk/merchant/quickstart">
-    Review the complete merchant setup and initialization.
+  <Card title="Merchant SDK" icon="rocket" href="/sdk/merchant/quickstart">
+    Release funds, charge, and query escrow state.
   </Card>
   <Card title="Arbiter SDK" icon="scale-balanced" href="/sdk/arbiter/quickstart">
     Learn about dispute resolution from the arbiter perspective.

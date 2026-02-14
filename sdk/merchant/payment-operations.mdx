@@ -98,7 +98,7 @@ Post-escrow refunds require the merchant to have sufficient token balance. The t
 
 ### Get Payment Amounts
 
-Use `getPaymentAmounts()` to query the current capturable and refundable amounts for a payment. This method reads directly from the escrow contract and is fully functional (not stubbed).
+Use `getPaymentAmounts()` to query the current capturable and refundable amounts for a payment. This method reads directly from the escrow contract.
 
 ```typescript
 const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
@@ -180,48 +180,58 @@ if (releaseCondition === ZERO_ADDRESS) {
 }
 ```
 
-## Stubbed Methods
+### Get Payment State
 
-The following methods are defined but not yet implemented. They throw a `NotImplementedError` when called and will be available once subgraph/indexer integration is complete.
-
-<Warning>
-These methods throw `NotImplementedError` at runtime. Do not call them in production code until they are implemented.
-</Warning>
-
-### getPaymentState
-
-Returns the lifecycle state of a payment (NonExistent, InEscrow, Released, Settled, Expired). Requires subgraph integration.
+Use `getPaymentState()` to derive the lifecycle state of a payment from the escrow contract.
 
 ```typescript
-import { PaymentState, NotImplementedError } from '@x402r/core';
+import { PaymentState } from '@x402r/core';
 
-try {
-  const state = await merchant.getPaymentState(paymentInfo);
-} catch (error) {
-  if (error instanceof NotImplementedError) {
-    console.log('getPaymentState requires subgraph integration');
-    // Use getPaymentAmounts() as an alternative to infer state
-    const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
-    if (capturableAmount > 0n) {
-      console.log('Payment has funds in escrow');
-    }
-  }
+const state = await merchant.getPaymentState(paymentInfo);
+// PaymentState: NonExistent, InEscrow, Released, Settled, or Expired
+```
+
+```typescript
+getPaymentState(paymentInfo: PaymentInfo): Promise<PaymentState>
+```
+
+### Get Receiver Payments
+
+Use `getReceiverPayments()` to list all payments where the connected wallet is the receiver, by scanning `AuthorizationCreated` events.
+
+```typescript
+const payments = await merchant.getReceiverPayments();
+
+for (const { hash, paymentInfo } of payments) {
+  console.log(`Payment ${hash}: ${paymentInfo.maxAmount}`);
 }
 ```
 
-### getReceiverPayments
+```typescript
+getReceiverPayments(
+  fromBlock?: bigint
+): Promise<Array<{ hash: `0x${string}`; paymentInfo: PaymentInfo }>>
+```
 
-Returns all payment hashes where the current wallet is the receiver. Requires subgraph integration.
+<Note>
+This method scans event logs. Pass `fromBlock` to limit the scan range if your RPC limits `eth_getLogs` responses (Base Sepolia typically caps at 10,000 blocks).
+</Note>
+
+### Get Payment Details
+
+Use `getPaymentDetails()` to retrieve the full `PaymentInfo` struct by scanning `AuthorizationCreated` events for a given hash.
 
 ```typescript
-try {
-  const { hashes } = await merchant.getReceiverPayments();
-} catch (error) {
-  if (error instanceof NotImplementedError) {
-    console.log('getReceiverPayments requires subgraph integration');
-    // Use event subscriptions as an alternative to track payments
-  }
-}
+const details = await merchant.getPaymentDetails(paymentInfoHash);
+console.log('Payer:', details.payer);
+console.log('Amount:', details.maxAmount);
+```
+
+```typescript
+getPaymentDetails(
+  paymentInfoHash: `0x${string}`,
+  fromBlock?: bigint
+): Promise<PaymentInfo>
 ```
 
 ## Release vs Refund Decision Flow

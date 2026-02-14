@@ -4,7 +4,7 @@ description: "Request and manage refunds with the Client SDK - submit, cancel, a
 icon: "rotate-left"
 ---
 
-The Client SDK provides complete refund management capabilities for payers. All refund methods documented on this page are **fully functional** and interact directly with the `RefundRequest` contract on-chain.
+The Client SDK provides complete refund management capabilities for payers. All refund methods interact directly with the `RefundRequest` contract on-chain.
 
 <Note>
 **About the `nonce` parameter:** Every refund method requires a `nonce: bigint` parameter. This is the record index from the `PaymentIndexRecorder` and identifies which charge within a payment you are requesting a refund for. For the first (and most common) charge, use `0n`.
@@ -24,24 +24,6 @@ const { txHash } = await client.requestRefund(
 console.log(`Refund requested: ${txHash}`);
 ```
 
-### Signature
-
-```typescript
-requestRefund(
-  paymentInfo: PaymentInfo,
-  amount: bigint,
-  nonce: bigint
-): Promise<{ txHash: `0x${string}` }>
-```
-
-<Warning>
-You can only request a refund if:
-- The payment is in escrow (has capturable funds)
-- No existing refund request exists for this payment and nonce combination
-- You are the payer for this payment
-- A `walletClient` and `refundRequestAddress` are configured on the client
-</Warning>
-
 ## cancelRefundRequest
 
 Cancel a pending refund request that you submitted. Only the original requester (payer) can cancel, and only while the request status is `Pending`.
@@ -51,173 +33,45 @@ const { txHash } = await client.cancelRefundRequest(paymentInfo, 0n);
 console.log(`Refund request cancelled: ${txHash}`);
 ```
 
-### Signature
+## Query Refund State
+
+These methods read on-chain state for refund requests. None require a wallet client.
+
+### Check existence and status
 
 ```typescript
-cancelRefundRequest(
-  paymentInfo: PaymentInfo,
-  nonce: bigint
-): Promise<{ txHash: `0x${string}` }>
-```
-
-<Note>
-You can only cancel a refund request if:
-- You are the original requester (payer)
-- The request status is still `Pending`
-</Note>
-
-## hasRefundRequest
-
-Check whether a refund request exists for a given payment and nonce.
-
-```typescript
+// Check if a refund request exists
 const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
 
-if (hasRequest) {
-  console.log('Refund request already exists');
-} else {
-  console.log('No refund request yet - can submit one');
-}
-```
-
-### Signature
-
-```typescript
-hasRefundRequest(
-  paymentInfo: PaymentInfo,
-  nonce: bigint
-): Promise<boolean>
-```
-
-## getRefundStatus
-
-Get the current status of a refund request. Returns a `RequestStatus` enum value.
-
-```typescript
-import { RequestStatus } from '@x402r/core';
-
+// Get just the status
 const status = await client.getRefundStatus(paymentInfo, 0n);
-
-switch (status) {
-  case RequestStatus.Pending:   // 0
-    console.log('Waiting for merchant/arbiter decision');
-    break;
-  case RequestStatus.Approved:  // 1
-    console.log('Refund approved');
-    break;
-  case RequestStatus.Denied:    // 2
-    console.log('Refund denied');
-    break;
-  case RequestStatus.Cancelled: // 3
-    console.log('Refund was cancelled by payer');
-    break;
-}
+// Returns: RequestStatus.Pending | Approved | Denied | Cancelled
 ```
 
-### Signature
+### Get full refund request data
 
 ```typescript
-getRefundStatus(
-  paymentInfo: PaymentInfo,
-  nonce: bigint
-): Promise<RequestStatus>
-```
-
-## getRefundRequest
-
-Get the full refund request data including amount, status, payment hash, and nonce.
-
-```typescript
+// By paymentInfo + nonce
 const request = await client.getRefundRequest(paymentInfo, 0n);
+console.log(request.amount, request.status);
 
-console.log('Payment hash:', request.paymentInfoHash);
-console.log('Nonce:', request.nonce);
-console.log('Amount:', request.amount);
-console.log('Status:', request.status);
+// By composite key (from getMyRefundRequests)
+const request2 = await client.getRefundRequestByKey(compositeKey);
 ```
 
-### Signature
+### List your refund requests
 
 ```typescript
-getRefundRequest(
-  paymentInfo: PaymentInfo,
-  nonce: bigint
-): Promise<RefundRequestData>
-```
+// Get total count
+const count = await client.getMyRefundRequestCount();
 
-The `RefundRequestData` type contains:
-
-```typescript
-interface RefundRequestData {
-  paymentInfoHash: `0x${string}`;
-  nonce: bigint;
-  amount: bigint;
-  status: RequestStatus;
-}
-```
-
-## getMyRefundRequests
-
-Get a paginated list of composite keys for all refund requests submitted by the connected wallet. Use these keys with `getRefundRequestByKey` to fetch full details.
-
-```typescript
+// Get paginated keys, then fetch details
 const { keys, total } = await client.getMyRefundRequests(0n, 10n);
-
-console.log(`Showing ${keys.length} of ${total} total refund requests`);
 
 for (const key of keys) {
   const request = await client.getRefundRequestByKey(key);
   console.log(`Amount: ${request.amount}, Status: ${request.status}`);
 }
-```
-
-### Signature
-
-```typescript
-getMyRefundRequests(
-  offset: bigint,
-  count: bigint
-): Promise<{ keys: readonly `0x${string}`[]; total: bigint }>
-```
-
-<Tip>
-Use `offset` and `count` for pagination. For example, to fetch page 2 with 10 items per page, use `getMyRefundRequests(10n, 10n)`.
-</Tip>
-
-## getMyRefundRequestCount
-
-Get the total number of refund requests submitted by the connected wallet.
-
-```typescript
-const count = await client.getMyRefundRequestCount();
-console.log(`Total refund requests: ${count}`);
-```
-
-### Signature
-
-```typescript
-getMyRefundRequestCount(): Promise<bigint>
-```
-
-## getRefundRequestByKey
-
-Look up a refund request by its composite key. The composite key is `keccak256(paymentInfoHash, nonce)` and is returned by `getMyRefundRequests`.
-
-```typescript
-const request = await client.getRefundRequestByKey(compositeKey);
-
-console.log('Payment hash:', request.paymentInfoHash);
-console.log('Nonce:', request.nonce);
-console.log('Amount:', request.amount);
-console.log('Status:', request.status);
-```
-
-### Signature
-
-```typescript
-getRefundRequestByKey(
-  compositeKey: `0x${string}`
-): Promise<RefundRequestData>
 ```
 
 ## Refund Request Lifecycle
@@ -233,6 +87,19 @@ stateDiagram-v2
     Cancelled --> [*]
 ```
 
+## Method Reference
+
+| Method | Parameters | Returns |
+|--------|-----------|---------|
+| `requestRefund` | `paymentInfo, amount, nonce` | `{ txHash }` |
+| `cancelRefundRequest` | `paymentInfo, nonce` | `{ txHash }` |
+| `hasRefundRequest` | `paymentInfo, nonce` | `boolean` |
+| `getRefundStatus` | `paymentInfo, nonce` | `RequestStatus` |
+| `getRefundRequest` | `paymentInfo, nonce` | `RefundRequestData` |
+| `getRefundRequestByKey` | `compositeKey` | `RefundRequestData` |
+| `getMyRefundRequests` | `offset, count` | `{ keys, total }` |
+| `getMyRefundRequestCount` | none | `bigint` |
+
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -243,7 +110,7 @@ stateDiagram-v2
     Watch for refund status updates in real-time.
   </Card>
   <Card title="Payment Queries" icon="magnifying-glass" href="/sdk/client/payment-queries">
-    Planned query methods and current workarounds.
+    Query payment state and details.
   </Card>
   <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
     Full setup guide for the Client SDK.
