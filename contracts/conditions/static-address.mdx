@@ -40,15 +40,17 @@ contract StaticAddressCondition is ICondition {
 
 ## Example
 
+Deploy via [StaticAddressConditionFactory](/contracts/factories):
+
 ```typescript
 // For marketplace arbiter
-const arbiterCondition = new StaticAddressCondition(arbiterAddress);
+const arbiterCondition = await staticAddressConditionFactory.write.deploy([arbiterAddress]);
 
 // For subscription service provider
-const providerCondition = new StaticAddressCondition(serviceProviderAddress);
+const providerCondition = await staticAddressConditionFactory.write.deploy([serviceProviderAddress]);
 
-// For DAO governance
-const daoCondition = new StaticAddressCondition(daoMultisigAddress);
+// For DAO governance — same address = same deterministic address (idempotent)
+const daoCondition = await staticAddressConditionFactory.write.deploy([daoMultisigAddress]);
 ```
 
 ## Gas

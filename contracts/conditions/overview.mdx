@@ -103,16 +103,12 @@ For complete configuration examples, see the [Examples](/contracts/examples) pag
 
 ### Singleton Reuse
 
-Deploy conditions once, reuse everywhere:
+Singleton conditions are deployed once and reused by all operators. Reference the existing addresses — don't deploy new instances:
 
 ```typescript
-// Good: Reuse singleton
+// Good: Reference the singleton address
 const config1 = { authorizeCondition: PAYER_CONDITION };
-const config2 = { authorizeCondition: PAYER_CONDITION }; // Same instance
-
-// Bad: Deploy multiple instances of a singleton
-const payer1 = await deployContract("PayerCondition");
-const payer2 = await deployContract("PayerCondition"); // Wasteful
+const config2 = { authorizeCondition: PAYER_CONDITION }; // Same address
 ```
 
 ### Stateless Conditions

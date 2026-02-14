@@ -44,14 +44,14 @@ contract TimeOfDayCondition is ICondition {
 }
 ```
 
-Usage — only allow releases during business hours:
+Usage — deploy via a factory and use in operator config:
 
 ```typescript
-// Deploy the condition
-const businessHours = await deployContract("TimeOfDayCondition", [9, 17]);
+// Deploy via your custom factory
+const businessHours = await timeOfDayConditionFactory.write.deploy([9, 17]);
 
 // Use in operator config
-config.releaseCondition = businessHours.address;
+config.releaseCondition = businessHours;
 ```
 
 ## Security Checklist
