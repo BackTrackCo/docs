@@ -139,12 +139,7 @@
       "vscode"
     ]
   },
-  "redirects": [
-    {
-      "source": "/contracts/conditions",
-      "destination": "/contracts/conditions/overview"
-    }
-  ],
+  "redirects": [],
   "footer": {
     "socials": {
       "x": "https://x.com/x402rorg",
