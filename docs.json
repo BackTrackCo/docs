@@ -61,7 +61,6 @@
               "sdk/merchant/getting-started",
               "sdk/helpers/refundable",
               "sdk/merchant/quickstart",
-              "sdk/merchant/payment-operations",
               "sdk/merchant/refund-handling"
             ]
           },
