@@ -42,9 +42,15 @@ contract TimeOfDayCondition is ICondition {
         return hour >= startHour && hour < endHour;
     }
 }
+```
 
-// Usage: Only allow releases during business hours
-const businessHours = await new TimeOfDayCondition(9, 17);
+Usage — only allow releases during business hours:
+
+```typescript
+// Deploy the condition
+const businessHours = await deployContract("TimeOfDayCondition", [9, 17]);
+
+// Use in operator config
 config.releaseCondition = businessHours.address;
 ```
 

@@ -110,9 +110,9 @@ Deploy conditions once, reuse everywhere:
 const config1 = { authorizeCondition: PAYER_CONDITION };
 const config2 = { authorizeCondition: PAYER_CONDITION }; // Same instance
 
-// Bad: Deploy multiple times
-const payer1 = await new PayerCondition();
-const payer2 = await new PayerCondition(); // Wasteful
+// Bad: Deploy multiple instances of a singleton
+const payer1 = await deployContract("PayerCondition");
+const payer2 = await deployContract("PayerCondition"); // Wasteful
 ```
 
 ### Stateless Conditions

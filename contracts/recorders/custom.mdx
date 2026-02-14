@@ -43,25 +43,28 @@ contract MyRecorder is BaseRecorder {
 Tracks the number and total amount of releases per payment:
 
 ```solidity
-contract ReleaseCountRecorder is IRecorder {
+contract ReleaseCountRecorder is BaseRecorder {
     mapping(bytes32 => uint256) public releaseCount;
     mapping(bytes32 => uint256) public totalReleased;
+
+    constructor(address _escrow) BaseRecorder(_escrow) {}
 
     function record(
         PaymentInfo calldata payment,
         uint256 amount,
         address caller
-    ) external {
-        releaseCount[payment.paymentId]++;
-        totalReleased[payment.paymentId] += amount;
+    ) external onlyAuthorizedOperator {
+        bytes32 hash = escrow.getHash(payment);
+        releaseCount[hash]++;
+        totalReleased[hash] += amount;
     }
 
     // Enable tracking partial releases
-    function getStats(bytes32 paymentId)
+    function getStats(bytes32 paymentHash)
         external view
         returns (uint256 count, uint256 total)
     {
-        return (releaseCount[paymentId], totalReleased[paymentId]);
+        return (releaseCount[paymentHash], totalReleased[paymentHash]);
     }
 }
 ```
@@ -80,7 +83,8 @@ contract ReleaseCountRecorderTest is Test {
 
     function test_incrementsOnRecord() public {
         recorder.record(paymentInfo, 100e6, caller);
-        (uint256 count, uint256 total) = recorder.getStats(paymentInfo.paymentId);
+        bytes32 hash = escrow.getHash(paymentInfo);
+        (uint256 count, uint256 total) = recorder.getStats(hash);
         assertEq(count, 1);
         assertEq(total, 100e6);
     }
@@ -88,7 +92,8 @@ contract ReleaseCountRecorderTest is Test {
     function test_tracksMultipleReleases() public {
         recorder.record(paymentInfo, 50e6, caller);
         recorder.record(paymentInfo, 30e6, caller);
-        (uint256 count, uint256 total) = recorder.getStats(paymentInfo.paymentId);
+        bytes32 hash = escrow.getHash(paymentInfo);
+        (uint256 count, uint256 total) = recorder.getStats(hash);
         assertEq(count, 2);
         assertEq(total, 80e6);
     }
