@@ -123,22 +123,6 @@ const option = refundable(
 );
 ```
 
-## Watch for Events
-
-Subscribe to incoming refund requests and releases:
-
-```typescript
-// Watch for refund requests
-const { unsubscribe } = merchant.watchRefundRequests((event) => {
-  console.log('New refund request:', event);
-});
-
-// Watch for releases
-const { unsubscribe: unsubReleases } = merchant.watchReleases((event) => {
-  console.log('Release executed:', event);
-});
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -150,8 +134,5 @@ const { unsubscribe: unsubReleases } = merchant.watchReleases((event) => {
   </Card>
   <Card title="Helpers" icon="wrench" href="/sdk/helpers/refundable">
     Use the refundable() helper for payment options.
-  </Card>
-  <Card title="Event Subscriptions" icon="bell" href="/sdk/merchant/subscriptions">
-    Real-time event watching.
   </Card>
 </CardGroup>

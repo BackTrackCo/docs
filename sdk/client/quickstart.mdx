@@ -41,6 +41,14 @@ The Client SDK currently supports:
 - **`isFrozen()`** — Check if a payment is frozen
 - **`isDuringEscrowPeriod()`** — Check if a payment is still in its escrow window
 - **`getAuthorizationTime()`** — Get when a payment was authorized
+- **`getPaymentState()`** — Derive the lifecycle state of a payment
+- **`paymentExists()`** — Check if a payment has been authorized
+- **`isInEscrow()`** — Check if a payment has capturable funds
+- **`getPaymentDetails()`** — Retrieve full PaymentInfo from event logs
+- **`getPayerPayments()`** — List all payments for the connected wallet
+- **`submitEvidence()`** — Attach evidence (IPFS CID) to a refund request
+- **`getEvidence()`** — Retrieve a single evidence entry by index
+- **`getAllEvidence()`** — Retrieve all evidence for a refund request
 
 ## Try It Now
 

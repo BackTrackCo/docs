@@ -44,7 +44,7 @@ Never commit private keys to source control. Use environment variables or a secr
   </Step>
 
   <Step title="Create the facilitator server">
-    Create `index.ts`:
+    Create `index.ts`. This is identical to a standard x402 facilitator, with two additions: the `@x402r/evm` import and the `registerEscrowScheme()` call.
 
     ```typescript
     import "dotenv/config";
@@ -63,14 +63,9 @@ Never commit private keys to source control. Use environment variables or a secr
     }
 
     const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-    console.info(`Facilitator account: ${account.address}`);
-
     const viemClient = createWalletClient({
-      account,
-      chain: baseSepolia,
-      transport: http(),
+      account, chain: baseSepolia, transport: http(),
     }).extend(publicActions);
-
     const evmSigner = toFacilitatorEvmSigner({
       address: account.address,
       getCode: (args) => viemClient.getCode(args),
@@ -81,8 +76,10 @@ Never commit private keys to source control. Use environment variables or a secr
       waitForTransactionReceipt: (args) => viemClient.waitForTransactionReceipt(args),
     });
 
+    // Standard x402 facilitator setup
     const facilitator = new x402Facilitator();
 
+    // x402r: Register the escrow scheme to handle refundable payments
     registerEscrowScheme(facilitator, {
       signer: evmSigner,
       networks: "eip155:84532",
@@ -96,22 +93,19 @@ Never commit private keys to source control. Use environment variables or a secr
         paymentPayload: PaymentPayload;
         paymentRequirements: PaymentRequirements;
       };
-      const response = await facilitator.verify(paymentPayload, paymentRequirements);
-      res.json(response);
+      res.json(await facilitator.verify(paymentPayload, paymentRequirements));
     });
 
     app.post("/settle", async (req, res) => {
       const { paymentPayload, paymentRequirements } = req.body;
-      const response = await facilitator.settle(
+      res.json(await facilitator.settle(
         paymentPayload as PaymentPayload,
         paymentRequirements as PaymentRequirements,
-      );
-      res.json(response);
+      ));
     });
 
-    app.get("/supported", async (req, res) => {
-      const response = facilitator.getSupported();
-      res.json(response);
+    app.get("/supported", async (_req, res) => {
+      res.json(facilitator.getSupported());
     });
 
     const PORT = process.env.PORT || "4022";
@@ -130,24 +124,6 @@ Never commit private keys to source control. Use environment variables or a secr
     ```
     Facilitator account: 0x...
     Facilitator listening on http://localhost:4022
-    ```
-  </Step>
-
-  <Step title="Verify the service">
-    ```bash
-    curl http://localhost:4022/supported
-    ```
-
-    The response lists supported payment schemes and networks:
-
-    ```json
-    {
-      "supportedSchemes": {
-        "escrow": {
-          "networks": ["eip155:84532"]
-        }
-      }
-    }
     ```
   </Step>
 </Steps>

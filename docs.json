@@ -51,14 +51,35 @@
               "sdk/installation",
               "sdk/concepts",
               "sdk/deploy-operator",
-              "sdk/examples"
+              "sdk/examples",
+              "sdk/limitations"
             ]
           },
           {
             "group": "Merchant",
             "pages": [
               "sdk/merchant/getting-started",
-              "sdk/helpers/refundable"
+              "sdk/helpers/refundable",
+              "sdk/merchant/quickstart",
+              "sdk/merchant/payment-operations",
+              "sdk/merchant/refund-handling"
+            ]
+          },
+          {
+            "group": "Client",
+            "pages": [
+              "sdk/client/quickstart",
+              "sdk/client/payment-queries",
+              "sdk/client/escrow-management",
+              "sdk/client/refund-operations"
+            ]
+          },
+          {
+            "group": "Arbiter",
+            "pages": [
+              "sdk/arbiter/quickstart",
+              "sdk/arbiter/decision-submission",
+              "sdk/arbiter/registry"
             ]
           },
           {
@@ -68,11 +89,13 @@
             ]
           },
           {
-            "group": "Coming Soon",
+            "group": "Experimental",
             "pages": [
-              "sdk/merchant/quickstart",
-              "sdk/client/quickstart",
-              "sdk/arbiter/quickstart"
+              "sdk/client/subscriptions",
+              "sdk/merchant/subscriptions",
+              "sdk/arbiter/subscriptions",
+              "sdk/arbiter/batch-operations",
+              "sdk/arbiter/ai-integration"
             ]
           }
         ]
