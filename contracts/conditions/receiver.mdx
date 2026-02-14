@@ -1,0 +1,54 @@
+---
+title: "ReceiverCondition"
+description: "Restrict actions to the payment receiver only"
+icon: "store"
+---
+
+## Overview
+
+ReceiverCondition is a singleton condition that restricts an action to the payment's receiver address.
+
+**Type:** Singleton (deployed once, reused by all operators)
+
+**Address (Base Sepolia):** `0x12EDefd4549c53497689067f165c0f101796Eb6D`
+
+**Address (Base Mainnet):** `0xed02d3E5167BCc9582D851885A89b050AB816a56`
+
+## Logic
+
+```solidity
+function check(PaymentInfo calldata payment, uint256, address caller)
+    external pure returns (bool)
+{
+    return caller == payment.receiver;
+}
+```
+
+The condition compares `caller` against `payment.receiver` — pure computation with no storage reads.
+
+## When to Use
+
+| Slot | Use Case |
+|------|----------|
+| `RELEASE_CONDITION` | Let receiver release funds after escrow |
+| `CHARGE_CONDITION` | Let receiver charge partial amounts |
+| `REFUND_IN_ESCROW_CONDITION` | Let receiver voluntarily refund |
+
+<Note>
+For release, ReceiverCondition is often composed with [EscrowPeriod](/contracts/conditions/escrow-period) via [AndCondition](/contracts/conditions/combinators) to ensure the escrow window has passed before the receiver can release.
+</Note>
+
+## Gas
+
+**Cost:** Minimal — `pure` function with no storage reads.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="PayerCondition" icon="user" href="/contracts/conditions/payer">
+    Restrict actions to the payment payer.
+  </Card>
+  <Card title="EscrowPeriod" icon="clock" href="/contracts/conditions/escrow-period">
+    Add time-based release restrictions.
+  </Card>
+</CardGroup>

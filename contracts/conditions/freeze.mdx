@@ -1,0 +1,94 @@
+---
+title: "Freeze"
+description: "Block payment release when frozen, with configurable freeze/unfreeze authorization"
+icon: "snowflake"
+---
+
+## Overview
+
+Freeze is a standalone condition that blocks release when a payment is frozen. It manages freeze/unfreeze state with configurable authorization and optional duration-based auto-expiry.
+
+**Type:** Per-deployment via [FreezeFactory](/contracts/factories)
+
+## Architecture
+
+- Implements `ICondition`
+- Freeze/unfreeze authorization via `ICondition` contracts (passed to constructor)
+- Optionally linked to [EscrowPeriod](/contracts/conditions/escrow-period) to restrict freezing to during the escrow window
+
+## Logic
+
+```solidity
+// ICondition — returns false when frozen (blocks release)
+function check(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256,
+    address
+) external view returns (bool allowed) {
+    return !isFrozen(paymentInfo);
+}
+```
+
+## Deployment
+
+Deploy via [FreezeFactory](/contracts/factories):
+
+```typescript
+// Deploy Freeze with payer freeze, arbiter unfreeze, 3-day duration
+const freeze = await freezeFactory.deploy(
+  PAYER_CONDITION,      // freeze condition (payer protection)
+  ARBITER_CONDITION,    // unfreeze condition (dispute resolution)
+  3 * 24 * 60 * 60,     // 3 days (auto-expires, 0 = permanent)
+  escrowPeriod          // optional: link to EscrowPeriod (address(0) = unconstrained)
+);
+```
+
+## Composition Patterns
+
+```solidity
+// Escrow period only:  releaseCondition = escrowPeriod
+// Freeze only:         releaseCondition = freeze
+// Both:                releaseCondition = AndCondition([escrowPeriod, freeze])
+```
+
+Use [AndCondition](/contracts/conditions/combinators) to require both escrow period elapsed **and** not frozen before release.
+
+## Freeze Duration
+
+- Payment frozen at time `T`
+- Freeze expires at `T + freezeDuration`
+- After expiry, payment is automatically unfrozen
+- Can be manually unfrozen earlier by the authorized party
+- Duration of `0` means permanent freeze (until manually unfrozen)
+
+| Duration | Use Case |
+|----------|----------|
+| 1 day | Quick investigation period |
+| 3 days | Standard fraud check window |
+| 5-7 days | Extended investigation |
+| 14+ days | Complex dispute resolution |
+
+<Warning>
+Freeze duration should balance payer protection with receiver UX. Too long and receivers may avoid the platform. Too short and payers can't adequately investigate.
+</Warning>
+
+## Use Cases
+
+- **Buyer protection** — Payer freezes suspicious payments during escrow
+- **Dispute holds** — Arbiter freezes payments pending investigation
+- **Compliance** — Compliance officer freezes flagged transactions
+
+## Gas
+
+**Cost:** ~20k gas per freeze/unfreeze (one `SSTORE`). The `check()` call is a `view` with one `SLOAD`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="EscrowPeriod" icon="clock" href="/contracts/conditions/escrow-period">
+    Add time-based release restrictions.
+  </Card>
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Deploy Freeze via FreezeFactory.
+  </Card>
+</CardGroup>

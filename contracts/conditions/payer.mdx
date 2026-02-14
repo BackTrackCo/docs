@@ -1,0 +1,54 @@
+---
+title: "PayerCondition"
+description: "Restrict actions to the payment payer only"
+icon: "user"
+---
+
+## Overview
+
+PayerCondition is a singleton condition that restricts an action to the payment's payer address.
+
+**Type:** Singleton (deployed once, reused by all operators)
+
+**Address (Base Sepolia):** `0xBAF68176FF94CAdD403EF7FbB776bbca548AC09D`
+
+**Address (Base Mainnet):** `0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8`
+
+## Logic
+
+```solidity
+function check(PaymentInfo calldata payment, uint256, address caller)
+    external pure returns (bool)
+{
+    return caller == payment.payer;
+}
+```
+
+The condition compares `caller` against `payment.payer` — pure computation with no storage reads.
+
+## When to Use
+
+| Slot | Use Case |
+|------|----------|
+| `AUTHORIZE_CONDITION` | Let payer create payments (subscriptions, invoices) |
+| `REFUND_IN_ESCROW_CONDITION` | Let payer request refunds during escrow |
+| `REFUND_POST_ESCROW_CONDITION` | Let payer cancel streams |
+
+<Note>
+Typically paired with [ReceiverCondition](/contracts/conditions/receiver) for release, since payers shouldn't release their own funds in most configurations.
+</Note>
+
+## Gas
+
+**Cost:** Minimal — `pure` function with no storage reads.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="ReceiverCondition" icon="store" href="/contracts/conditions/receiver">
+    Restrict actions to the payment receiver.
+  </Card>
+  <Card title="Combinators" icon="puzzle-piece" href="/contracts/conditions/combinators">
+    Combine PayerCondition with other conditions.
+  </Card>
+</CardGroup>

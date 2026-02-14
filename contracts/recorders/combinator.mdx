@@ -1,0 +1,50 @@
+---
+title: "RecorderCombinator"
+description: "Chain multiple recorders into a single slot"
+icon: "layer-group"
+---
+
+## Overview
+
+RecorderCombinator chains multiple recorders into one, calling each in sequence. Since each operator slot accepts only one recorder address, use RecorderCombinator when you need multiple recorders for the same action.
+
+## Deployment
+
+Deploy via RecorderCombinatorFactory:
+
+```typescript
+const comboAddress = await recorderCombinatorFactory.write.deploy([
+  [escrowPeriodAddress, paymentIndexRecorderAddress]  // Records auth time + payment index
+]);
+
+config.authorizeRecorder = comboAddress;
+```
+
+## Behavior
+
+- Recorders are called in the order provided
+- **If any recorder reverts, all revert** — the entire recording is atomic
+- Each recorder receives the same `paymentInfo`, `amount`, and `caller` parameters
+
+## Limits
+
+<Warning>
+**Max 10 recorders per combinator.** Each additional recorder adds ~1k gas overhead for the delegation call.
+</Warning>
+
+## Gas
+
+**Cost:** Sum of all individual recorder costs + ~1k gas overhead per recorder for delegation.
+
+Example: EscrowPeriod (~20k) + PaymentIndexRecorder (~20k) + ~2k overhead = ~42k gas total.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AuthorizationTimeRecorder" icon="clock" href="/contracts/recorders/authorization-time">
+    Record authorization timestamps.
+  </Card>
+  <Card title="PaymentIndexRecorder" icon="list-ol" href="/contracts/recorders/payment-index">
+    Index payments for on-chain queries.
+  </Card>
+</CardGroup>

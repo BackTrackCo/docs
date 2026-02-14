@@ -1,0 +1,71 @@
+---
+title: "Audits"
+description: "Audit status, trust assumptions, and security roadmap for x402r contracts"
+icon: "shield-halved"
+---
+
+## Audit Status
+
+x402r is built on top of a **fork** of Base's [commerce-payments](https://github.com/base/commerce-payments) protocol. The original commerce-payments contracts have been professionally audited. Our fork adds `partialVoid()` to the escrow contract (for partial refunds during escrow), and all x402r-specific contracts built on top of the fork are **not yet audited**.
+
+### What's Audited (Upstream)
+
+The original commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration) were audited by:
+
+- **Spearbit** (2 audits)
+- **Coinbase Protocol Security** (3 audits)
+
+These audits cover the core escrow lifecycle: authorize, capture, void, reclaim, and refund. Audit reports are available in the [commerce-payments repository](https://github.com/base/commerce-payments).
+
+### What's Not Audited
+
+| Component | Status | Risk |
+|-----------|--------|------|
+| `partialVoid()` on AuthCaptureEscrow | **Unaudited** (fork addition) | Follows same patterns as audited `void()`, but adds partial amount logic |
+| PaymentOperator | **Unaudited** | Core operator with condition/recorder dispatch and fee system |
+| PaymentOperatorFactory | **Unaudited** | CREATE2 deterministic deployment |
+| ProtocolFeeConfig | **Unaudited** | Timelocked fee governance |
+| StaticFeeCalculator | **Unaudited** | Simple immutable fee calculator |
+| Condition plugins | **Unaudited** | PayerCondition, ReceiverCondition, StaticAddressCondition, AlwaysTrueCondition |
+| Combinator plugins | **Unaudited** | AndCondition, OrCondition, NotCondition |
+| EscrowPeriod | **Unaudited** | Combined recorder + time-lock condition |
+| Freeze | **Unaudited** | Freeze/unfreeze state management |
+| Recorder plugins | **Unaudited** | AuthorizationTimeRecorder, PaymentIndexRecorder, RecorderCombinator |
+| RefundRequest | **Unaudited** | Refund request lifecycle management |
+
+### What This Means
+
+- The audited escrow layer provides a strong foundation — fund custody, token transfers, and payment state transitions have been professionally reviewed
+- `partialVoid()` is a minimal addition (~20 lines) that mirrors the audited `void()` function with an additional amount parameter and balance check
+- The condition/recorder plugin system is stateless or minimal-state by design, reducing attack surface
+
+<Warning>
+Use x402r contracts on mainnet at your own risk. While we've built with security best practices (CEI pattern, reentrancy guards, immutable configuration, timelocked governance), the x402r-specific code has not undergone a formal audit.
+</Warning>
+
+## Security Practices
+
+Even without a formal audit, the x402r contracts follow established security patterns:
+
+- **CEI (Checks-Effects-Interactions)** ordering in all state-changing functions
+- **ReentrancyGuardTransient** (EIP-1153) on all external entry points
+- **Immutable configuration** — operator conditions and fee calculators cannot be changed after deployment
+- **7-day timelock** on protocol fee changes via ProtocolFeeConfig
+- **2-step ownership transfers** via Solady's Ownable
+- **Comprehensive Forge test suite** covering core flows and edge cases
+
+## Audit Roadmap
+
+We plan to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
+
+1. **`partialVoid()`** — our only change to the audited commerce-payments escrow, and the foundation everything else depends on
+2. **PaymentOperator** — condition dispatch, fee calculation, fee locking, distribution
+3. **Plugin system** — conditions, recorders, combinators, and their factories
+4. **EscrowPeriod + Freeze** — time-lock enforcement and freeze state management
+5. **RefundRequest** — request lifecycle and access control
+
+We'll publish audit reports publicly once completed.
+
+<Note>
+If you're interested in integrating x402r and want to discuss the security posture in more detail, or if you've found a vulnerability, reach out at [security@x402r.org](mailto:security@x402r.org).
+</Note>

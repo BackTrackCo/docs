@@ -1,0 +1,67 @@
+---
+title: "StaticAddressCondition"
+description: "Restrict actions to a specific designated address"
+icon: "bullseye"
+---
+
+## Overview
+
+StaticAddressCondition restricts an action to a single designated address. Unlike PayerCondition and ReceiverCondition (which read from payment data), this condition checks against an immutable address set at deployment.
+
+**Type:** Per-deployment (deploy one per designated address via [factory](/contracts/factories))
+
+## Logic
+
+```solidity
+contract StaticAddressCondition is ICondition {
+    address public immutable DESIGNATED_ADDRESS;
+
+    constructor(address _designatedAddress) {
+        DESIGNATED_ADDRESS = _designatedAddress;
+    }
+
+    function check(PaymentInfo calldata payment, uint256, address caller)
+        external view returns (bool)
+    {
+        return caller == DESIGNATED_ADDRESS;
+    }
+}
+```
+
+## When to Use
+
+| Role | Description |
+|------|-------------|
+| **Arbiter** | Deploy with arbiter address for dispute resolution |
+| **Service Provider** | Deploy with provider address for subscriptions |
+| **DAO Treasury** | Deploy with multisig address for governance |
+| **Compliance Officer** | Deploy with compliance address for approvals |
+| **Platform** | Deploy with platform address for controlled releases |
+
+## Example
+
+```typescript
+// For marketplace arbiter
+const arbiterCondition = new StaticAddressCondition(arbiterAddress);
+
+// For subscription service provider
+const providerCondition = new StaticAddressCondition(serviceProviderAddress);
+
+// For DAO governance
+const daoCondition = new StaticAddressCondition(daoMultisigAddress);
+```
+
+## Gas
+
+**Cost:** Minimal — `view` function with a single `immutable` read (compiled as a constant in bytecode, not a storage read).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Deploy StaticAddressCondition via factory.
+  </Card>
+  <Card title="Combinators" icon="puzzle-piece" href="/contracts/conditions/combinators">
+    Compose with other conditions using And/Or/Not.
+  </Card>
+</CardGroup>
