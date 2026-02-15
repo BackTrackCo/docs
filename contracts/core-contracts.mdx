@@ -1,6 +1,6 @@
 ---
 title: "Core Contracts"
-description: "Detailed explanation of PaymentOperator, RefundRequest, and AuthCaptureEscrow"
+description: "PaymentOperator, RefundRequest, and the Base Commerce Payments contracts they build on"
 icon: "file-contract"
 ---
 
@@ -89,7 +89,7 @@ function authorize(
 **Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
 
 <Tip>
-**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
+For details on `authorizationExpiry`, `refundExpiry`, and other `PaymentInfo` time fields, see [Payment Fields](/x402-integration/payment-fields).
 </Tip>
 
 #### charge()
@@ -458,158 +458,49 @@ RefundRequest is **advisory only**. Approval does not automatically execute refu
 
 ---
 
-## AuthCaptureEscrow
+## AuthCaptureEscrow <span style={{opacity: 0.6, fontSize: '0.8em'}}>(Base Commerce Payments)</span>
 
-Base escrow contract from commerce-payments library.
+<Info>
+The contracts in this section are part of [Base Commerce Payments](https://github.com/base/commerce-payments), not x402r. x402r's PaymentOperator wraps these contracts and adds conditions, recorders, and fees on top. See the [commerce-payments documentation](https://github.com/base/commerce-payments) for the full reference.
+</Info>
 
-### Overview
+Core escrow contract for holding ERC-20 tokens during payments.
 
 - **Type:** Singleton (one per network)
-- **Source:** [commerce-payments](https://github.com/BackTrackCo/commerce-payments) (x402r fork)
+- **Source:** [commerce-payments](https://github.com/base/commerce-payments) ([x402r fork](https://github.com/BackTrackCo/commerce-payments) adds partial void)
 - **Purpose:** Hold ERC-20 tokens during payment lifecycle
 - **Access:** Operator-based (only registered operators can manage payments)
 
-<Note>
-x402r uses a forked version of commerce-payments with added **partial void** support for handling partially completed orders.
-</Note>
+### Payment Lifecycle
 
-### Payment State Machine
+![Payment Lifecycle Diagram](https://raw.githubusercontent.com/base/commerce-payments/main/docs/diagrams/PaymentLifecycleDiagram.png)
 
-```mermaid
-stateDiagram-v2
-    [*] --> NonExistent
-    NonExistent --> InEscrow: authorize()
-    InEscrow --> Released: release()
-    InEscrow --> Settled: void() / refundInEscrow()
-    Released --> Settled: reclaim() / refundPostEscrow()
-    Settled --> [*]
+Six core operations:
 
-    note right of InEscrow
-        Funds locked in escrow
-        Payer can reclaim after expiry
-    end note
+| Operation | What it does | State transition |
+|-----------|-------------|------------------|
+| **Authorize** | Lock payer funds in escrow | `NonExistent` → `InEscrow` |
+| **Capture** | Transfer escrowed funds to receiver | `InEscrow` → `Released` |
+| **Charge** | Combined authorize + capture (instant) | `NonExistent` → `Released` |
+| **Void** | Cancel authorization, return funds to payer | `InEscrow` → `Settled` |
+| **Reclaim** | Payer recovers funds after `authorizationExpiry` | `InEscrow` → `Settled` |
+| **Refund** | Return captured funds from receiver to payer | `Released` → `Settled` |
 
-    note right of Released
-        Funds transferred to receiver
-        Can still refund post-escrow
-    end note
+### Contracts Architecture
 
-    note right of Settled
-        Terminal state
-        No further actions possible
-    end note
-```
+![Contracts Architecture Diagram](https://raw.githubusercontent.com/base/commerce-payments/main/docs/diagrams/ContractsArchitecture.png)
 
-### Key Methods
+Three components:
 
-#### authorize()
+- **AuthCaptureEscrow** — Core contract managing fund movement and payment lifecycle
+- **Token Collectors** — Pluggable modules for pulling tokens (ERC-3009, Permit2, pre-approval, spend permissions)
+- **Token Stores** — Per-operator vaults using CREATE2 deterministic deployment
 
-Locks tokens in escrow. Called by operator.
-
-```solidity
-function authorize(
-    bytes32 paymentId,
-    address payer,
-    address receiver,
-    uint256 amount,
-    address token,
-    address operator
-) external onlyOperator
-```
-
-**Requires:** Payer has approved escrow contract for `amount` of `token`
+### What x402r Changes
 
 <Note>
-The base escrow contract uses individual parameters (paymentId, payer, receiver, etc.) while the PaymentOperator wraps them in a `PaymentInfo` struct. The operator translates between the two formats internally.
+x402r uses a [fork of commerce-payments](https://github.com/BackTrackCo/commerce-payments) that adds **partial void** support (`partialVoid()`), enabling partial refunds during escrow. This is what powers `PaymentOperator.refundInEscrow()` with specific amounts rather than full-void only.
 </Note>
-
-#### release()
-
-Releases tokens to receiver. Called by operator.
-
-```solidity
-function release(
-    bytes32 paymentId
-) external onlyOperator returns (uint256 amount)
-```
-
-**State change:** `InEscrow` → `Released`
-
-#### void()
-
-Returns tokens to payer (full refund). Called by operator.
-
-```solidity
-function void(
-    bytes32 paymentId
-) external onlyOperator
-```
-
-**State change:** `InEscrow` → `Settled`
-
-**Use case:** Refund during escrow period
-
-#### reclaim()
-
-Takes tokens back from receiver to give to payer. Called by operator.
-
-```solidity
-function reclaim(
-    bytes32 paymentId,
-    address from,
-    uint256 amount
-) external onlyOperator
-```
-
-**State change:** `Released` → `Settled`
-
-**Use case:** Refund after release
-
-**Requires:** Receiver has approved escrow for `amount`
-
-#### partialVoid()
-
-Returns partial amount to payer.
-
-```solidity
-function partialVoid(
-    bytes32 paymentId,
-    uint256 amount
-) external onlyOperator
-```
-
-**Use case:** Partial refunds for partially fulfilled orders
-
-### Security Features
-
-- **Operator whitelist** - Only registered operators can manage payments
-- **Reentrancy protection** - All state changes protected
-- **Event logging** - Complete audit trail
-
----
-
-## Supporting Contracts
-
-### ERC3009PaymentCollector
-
-Payment collection with gasless meta-transactions.
-
-**Features:**
-- ERC-3009 `transferWithAuthorization()` support
-- Nonce-based replay protection
-- Deadline-based expiry
-- Multicall3 integration
-
-**Use case:** Allow payers to authorize payments via signed messages instead of direct transactions (gasless UX).
-
-### TokenStore
-
-Safe token transfer utilities from commerce-payments.
-
-**Features:**
-- Reentrancy-safe transfers
-- SafeERC20 integration
-- Balance tracking
 
 ---
 

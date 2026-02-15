@@ -12,52 +12,25 @@ x402r is a smart contract extension for HTTP-native refundable payments. It buil
 
 See the [system architecture diagrams](https://github.com/BackTrackCo/x402r-contracts#architecture) in the x402r-contracts repository.
 
-## Commerce Payments (Base Layer)
+## Commerce Payments <span style={{opacity: 0.6, fontSize: '0.8em'}}>(Base Layer)</span>
 
-[Commerce Payments](https://github.com/BackTrackCo/commerce-payments) provides the foundational payment infrastructure.
+<Info>
+The contracts in this section are part of [Base Commerce Payments](https://github.com/base/commerce-payments) (MIT licensed), not x402r. They provide the foundational escrow infrastructure that x402r extends.
+</Info>
+
+[Commerce Payments](https://github.com/base/commerce-payments) provides three core contracts:
+
+**AuthCaptureEscrow** — Core escrow contract for holding ERC-20 tokens during payments. Manages the payment state machine (`NonExistent` → `InEscrow` → `Released` → `Settled`) with authorize, capture, void, and reclaim operations.
+
+**ERC3009PaymentCollector** — Gasless payment collection via ERC-3009 `transferWithAuthorization`. Supports nonce-based replay protection, deadline-based expiry, and Multicall3 batching.
+
+**TokenStore** — Safe token storage and transfer utilities with reentrancy protection and OpenZeppelin SafeERC20 integration.
+
+See [Core Contracts](/contracts/core-contracts#authcaptureescrow) for architecture diagrams and details.
 
 <Note>
 x402r uses a [fork of commerce-payments](https://github.com/BackTrackCo/commerce-payments) that adds **partial void** support for handling partially completed orders and partial refunds.
 </Note>
-
-### AuthCaptureEscrow
-
-Core escrow contract for holding ERC-20 tokens during payments.
-
-**Features:**
-- Authorization-based deposits (no direct transfers)
-- Payment state machine: `NonExistent` → `InEscrow` → `Released` → `Settled`
-- Void/reclaim for failed authorizations
-- **Partial void support** (x402r addition) - Refund partial amounts during escrow
-- Operator-based access control
-
-**Key Methods:**
-```solidity
-authorize(paymentId, payer, receiver, amount, token, operator)
-charge(paymentId, amount)
-release(paymentId)
-void(paymentId)
-reclaim(paymentId, receiver, amount)
-```
-
-### ERC3009PaymentCollector
-
-Payment collection with ERC-3009 transferWithAuthorization support.
-
-**Features:**
-- Gasless payments via meta-transactions
-- Nonce-based replay protection
-- Deadline-based expiry
-- Integration with Multicall3 for batching
-
-### TokenStore
-
-Safe token storage and transfer utilities.
-
-**Features:**
-- Reentrancy-safe transfers
-- Balance tracking
-- Integration with OpenZeppelin SafeERC20
 
 ## What x402r Adds
 

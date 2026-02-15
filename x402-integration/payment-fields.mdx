@@ -1,0 +1,212 @@
+---
+title: "Payment Fields"
+description: "Reference for PaymentInfo fields, escrow scheme extra fields, and time field configuration"
+icon: "rectangle-list"
+---
+
+## Overview
+
+When a server returns a `402 PaymentRequired` response, it includes **extra fields** that tell the client how to construct the payment. The client uses these to build a `PaymentInfo` struct that gets committed on-chain.
+
+This page covers both the `PaymentInfo` struct (from [Base Commerce Payments](https://github.com/base/commerce-payments)) and the x402r extra fields, with a focus on how the time fields interact with x402r's [operator system](/contracts/core-contracts#paymentoperator).
+
+## PaymentInfo <span style={{opacity: 0.6, fontSize: '0.8em'}}>(Base Commerce Payments)</span>
+
+<Info>
+`PaymentInfo` is defined by [Base Commerce Payments](https://github.com/base/commerce-payments). These fields are committed on-chain and form a unique, hashable identity for each payment.
+</Info>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `operator` | address | Operator contract address. Only this contract can call capture/void/refund on the escrow for this payment |
+| `payer` | address | Address of the payer who signed the ERC-3009 authorization |
+| `receiver` | address | Address of the merchant/receiver who will receive funds on capture |
+| `token` | address | ERC-20 token address (e.g., USDC) |
+| `maxAmount` | uint120 | Maximum amount the operator can capture. Partial captures are allowed up to this total |
+| `preApprovalExpiry` | uint48 | See [Pre-Approval Expiry](#pre-approval-expiry) |
+| `authorizationExpiry` | uint48 | See [Authorization Expiry](#authorization-expiry) |
+| `refundExpiry` | uint48 | See [Refund Expiry](#refund-expiry) |
+| `minFeeBps` | uint16 | Minimum fee in basis points. Operator's calculated fee must be ≥ this value or `authorize()` reverts |
+| `maxFeeBps` | uint16 | Maximum fee in basis points. Operator's calculated fee must be ≤ this value or `authorize()` reverts |
+| `feeReceiver` | address | Must equal the operator contract address. The operator accumulates protocol fees internally and distributes them separately |
+| `salt` | uint256 | Random value ensuring each PaymentInfo hash is unique, even for identical payment parameters |
+
+## Extra Fields <span style={{opacity: 0.6, fontSize: '0.8em'}}>(x402r)</span>
+
+These fields appear in the `extra` object of a `PaymentRequired` response. They configure how the payment maps to a [PaymentOperator](/contracts/core-contracts#paymentoperator) and its conditions.
+
+### Required
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `escrowAddress` | address | AuthCaptureEscrow contract address on the specified network |
+| `operatorAddress` | address | PaymentOperator contract that controls capture/void/refund (stored as `PaymentInfo.operator`) |
+| `tokenCollector` | address | ERC-3009 token collector contract — receives the `transferWithAuthorization` call to pull tokens into escrow |
+
+### Optional
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `authorizeAddress` | address | `operatorAddress` | Where the facilitator calls `authorize()`. Usually the operator contract, but can differ if the operator delegates authorization |
+| `minDeposit` | uint256 | No minimum | Minimum accepted deposit amount (in token base units). Clients depositing less will be rejected |
+| `maxDeposit` | uint256 | No maximum | Maximum accepted deposit amount (in token base units). Prevents excessively large authorizations |
+| `authorizationExpirySeconds` | uint32 | `type(uint32).max` | Duration until the payer can reclaim funds. Converted to absolute timestamp in PaymentInfo. See [Authorization Expiry](#authorization-expiry) |
+| `refundExpirySeconds` | uint48 | `type(uint48).max` | Duration until post-capture refunds expire. Converted to absolute timestamp in PaymentInfo. See [Refund Expiry](#refund-expiry) |
+| `preApprovalExpirySeconds` | number | Facilitator-set | Duration for ERC-3009 signature validity. See [Pre-Approval Expiry](#pre-approval-expiry) |
+| `minFeeBps` | uint16 | `0` | Minimum fee the payer will accept, in basis points (100 bps = 1%). See [Fee Fields](#fee-fields) |
+| `maxFeeBps` | uint16 | `0` | Maximum fee the payer will accept, in basis points. See [Fee Fields](#fee-fields) |
+| `feeReceiver` | address | `operatorAddress` | Address that receives fees. Must match the operator contract address (enforced by `validFees` modifier) |
+| `name` | string | — | Token name for ERC-3009 domain separator (e.g., `"USDC"`) |
+| `version` | string | — | Token version for ERC-3009 domain separator (e.g., `"2"`) |
+
+## Time Fields
+
+The escrow scheme has three independent time fields. Each protects a different party and operates at a different layer.
+
+<Warning>
+These are **not** the same as the operator's [escrow period](/contracts/conditions/escrow-period). The escrow period is configured at the operator contract level and controls when the merchant can release funds. The time fields below are per-payment values set in the PaymentInfo struct. See [Authorization Expiry vs Escrow Period](#authorization-expiry-vs-escrow-period) for how they interact.
+</Warning>
+
+### Pre-Approval Expiry
+
+**What it controls:** How long the ERC-3009 signature remains valid.
+
+**Who it protects:** The payer — prevents stale signatures from being used long after they were signed.
+
+**How it works:** This field doubles as the `validBefore` parameter in the ERC-3009 `transferWithAuthorization` call. If the facilitator tries to settle after this timestamp, the token contract rejects the transfer.
+
+<Note>
+Setting `preApprovalExpiry` to `0n` causes **immediate** signature expiry — the authorization can never be settled. Always set this to a future timestamp.
+</Note>
+
+```typescript
+// Typical usage: signature valid for 5 minutes
+const preApprovalExpiry = BigInt(Math.floor(Date.now() / 1000)) + 300n;
+```
+
+### Authorization Expiry
+
+**What it controls:** When the payer can reclaim escrowed funds without operator cooperation.
+
+**Who it protects:** The payer — a safety valve if the operator disappears or becomes unresponsive.
+
+**How it works:** After this timestamp passes, the payment transitions to `Expired` state and the payer can call `reclaim()` directly on the escrow contract to recover their funds. The operator can no longer capture.
+
+| Scenario | Typical Value | Why |
+|----------|---------------|-----|
+| Marketplace / one-time payment | `type(uint48).max` (never) | Payer relies on escrow period + refund/freeze for protection |
+| Subscription / pre-authorization | `now + subscription duration` | Payer pre-loads funds and needs a guaranteed exit after the term |
+
+```typescript
+// Marketplace: disable payer reclaim (rely on escrow period instead)
+authorizationExpiry: MAX_UINT48
+
+// Subscription: payer can reclaim unused funds after 1 year
+authorizationExpiry: BigInt(Math.floor(Date.now() / 1000)) + 365n * 86400n
+```
+
+### Refund Expiry
+
+**What it controls:** The deadline for post-capture refunds (`refundPostEscrow`).
+
+**Who it protects:** The merchant — guarantees that after this timestamp, captured funds are final and cannot be clawed back.
+
+**How it works:** After funds are captured (released to the receiver), refund requests can still be submitted until `refundExpiry` passes. Once expired, the merchant's captured funds are fully settled and no longer refundable.
+
+| Scenario | Typical Value | Why |
+|----------|---------------|-----|
+| Digital goods / instant delivery | Short window (e.g., 7 days) | Low dispute risk, merchant wants fast finality |
+| Services / long-term contracts | Longer window (e.g., 90 days) | Higher dispute risk, payer needs more protection |
+| No post-capture refunds | `0` or past timestamp | Merchant accepts no chargebacks after capture |
+
+```typescript
+// 30-day post-capture refund window
+refundExpiry: BigInt(Math.floor(Date.now() / 1000)) + 30n * 86400n
+
+// No post-capture refunds (default: effectively never expires)
+refundExpiry: MAX_UINT48
+```
+
+<Note>
+`refundExpiry` only applies to **post-capture** refunds. While funds are still in escrow (before capture), the operator can always void/refund regardless of this timestamp.
+</Note>
+
+## Authorization Expiry vs Escrow Period
+
+These are two independent time mechanisms that are easy to confuse:
+
+| | Authorization Expiry | Escrow Period |
+|---|---|---|
+| **Set by** | Per-payment in PaymentInfo | Per-operator at deployment |
+| **Type** | Absolute timestamp | Duration in seconds |
+| **Enforced by** | Base escrow contract | [EscrowPeriod](/contracts/conditions/escrow-period) plugin (release condition) |
+| **What it blocks** | Operator capture (after expiry) | Merchant release (during period) |
+| **Who can act** | Payer calls `reclaim()` | No one — merchant must wait |
+
+The escrow period says "merchant can't release before 7 days." Authorization expiry says "payer can reclaim after N days." They don't validate against each other.
+
+<Warning>
+If `authorizationExpiry` is shorter than the escrow period, the payer can reclaim before the merchant ever gets a chance to release. For marketplace payments, set `authorizationExpiry` to `type(uint48).max` and rely on the escrow period for timing.
+</Warning>
+
+### Example: Marketplace (Escrow Period Only)
+
+```typescript
+// Operator deployed with 7-day escrow period
+const operatorConfig = {
+  escrowPeriodSeconds: 604800n, // 7 days
+};
+
+// Per-payment: auth expiry disabled, escrow period handles timing
+const paymentInfo = {
+  authorizationExpiry: MAX_UINT48, // never — payer uses refund/freeze instead
+  // ...
+};
+
+// Day 0:   authorize() → EscrowPeriod records timestamp
+// Day 1-6: release() blocked by EscrowPeriod, refund/freeze allowed
+// Day 7+:  release() succeeds
+// Never:   payer can't reclaim (auth expiry = max)
+```
+
+### Example: Subscription (Authorization Expiry Only)
+
+```typescript
+// Operator deployed with no escrow period
+const operatorConfig = {
+  escrowPeriodSeconds: 0n, // instant settlement
+};
+
+// Per-payment: auth expiry = subscription end date
+const now = BigInt(Math.floor(Date.now() / 1000));
+const paymentInfo = {
+  maxAmount: 120_000_000n, // $120 USDC
+  authorizationExpiry: now + 365n * 86400n, // 1 year
+  // ...
+};
+
+// Month 1:  merchant calls release(paymentInfo, 10_000_000n) — captures $10
+// Month 2:  merchant calls release(paymentInfo, 10_000_000n) — captures $10
+// ...
+// Month 8:  payer cancels service
+// Day 365:  authorizationExpiry passes, payer calls reclaim() for remaining $40
+```
+
+## Fee Fields
+
+Fees are enforced on-chain at two checkpoints:
+
+1. **At `authorize()`:** The operator calculates `totalFeeBps = protocolFee + operatorFee`. If this falls outside `[minFeeBps, maxFeeBps]`, the transaction reverts with `FeeBoundsIncompatible`.
+2. **At `release()`:** The fees stored at authorization time are used (not recalculated). This prevents protocol fee changes from affecting already-authorized payments.
+
+```typescript
+// Accept up to 5% total fees
+{ minFeeBps: 0, maxFeeBps: 500 }
+
+// Require exactly 0% fees (free operator)
+{ minFeeBps: 0, maxFeeBps: 0 }
+```
+
+<Note>
+`feeReceiver` in PaymentInfo must equal the operator contract address. The operator accumulates protocol fees internally via `accumulatedProtocolFees[token]` and distributes them separately.
+</Note>
