@@ -23,20 +23,51 @@
             ]
           },
           {
-            "group": "Smart Contracts",
+            "group": "Roadmap",
+            "pages": [
+              "roadmap"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Smart Contracts",
+        "groups": [
+          {
+            "group": "Overview",
             "pages": [
               "contracts/overview",
               "contracts/architecture",
               "contracts/core-contracts",
               "contracts/factories",
-              "contracts/conditions",
-              "contracts/examples"
+              "contracts/fees",
+              "contracts/examples",
+              "contracts/audits",
+              "contracts/license"
             ]
           },
           {
-            "group": "Roadmap",
+            "group": "Conditions",
             "pages": [
-              "roadmap"
+              "contracts/conditions/overview",
+              "contracts/conditions/payer",
+              "contracts/conditions/receiver",
+              "contracts/conditions/static-address",
+              "contracts/conditions/always-true",
+              "contracts/conditions/escrow-period",
+              "contracts/conditions/freeze",
+              "contracts/conditions/combinators",
+              "contracts/conditions/custom"
+            ]
+          },
+          {
+            "group": "Recorders",
+            "pages": [
+              "contracts/recorders/overview",
+              "contracts/recorders/authorization-time",
+              "contracts/recorders/payment-index",
+              "contracts/recorders/combinator",
+              "contracts/recorders/custom"
             ]
           }
         ]
@@ -130,6 +161,7 @@
       "vscode"
     ]
   },
+  "redirects": [],
   "footer": {
     "socials": {
       "x": "https://x.com/x402rorg",

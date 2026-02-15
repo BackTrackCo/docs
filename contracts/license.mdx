@@ -1,0 +1,72 @@
+---
+title: "License"
+description: "BUSL-1.1 licensing terms, permissions, and restrictions for x402r smart contracts"
+icon: "scale-balanced"
+---
+
+## Why BUSL-1.1?
+
+We want the code to be fully readable and usable on-chain — you can integrate with deployed x402r contracts, build on top of them, and inspect every line of source. The license protects against forks that compete with or commoditize the protocol (e.g., stripping fees and redeploying), so that protocol fees can continue funding development, audits, and new features for everyone building on x402r.
+
+BUSL-1.1 protects against that while keeping the code open. After the Change Date, everything converts to MIT and is fully permissionless. This is the same approach used by Uniswap, Aave, and other major DeFi protocols.
+
+## License Terms
+
+All Solidity source files in `x402r-contracts/src/` are licensed under the **Business Source License 1.1**.
+
+| Parameter | Value |
+|-----------|-------|
+| **License** | [BUSL-1.1](https://mariadb.com/bsl11/) |
+| **SPDX Identifier** | `BUSL-1.1` |
+| **Licensor** | Ali Abdoli and Vrajang Parikh |
+| **Licensed Work** | x402r-contracts |
+| **Copyright** | 2025-2026 |
+| **Change Date** | December 9, 2029 |
+| **Change License** | MIT License |
+
+## What Can You Do?
+
+### On-Chain
+
+You can freely interact with x402r contracts that are already deployed:
+
+- **Integrate** — call x402r contracts from your own contracts or dApps
+- **Build** — create applications, services, and protocols on top of x402r
+- **Deploy via factories** — use x402r's official factories (e.g., `PaymentOperatorFactory`, `EscrowPeriodFactory`) to deploy your own operator instances with your own configuration
+
+### Off-Chain
+
+You can freely work with the source code:
+
+- **Read and learn** from the code
+- **Fork and modify** for local development and testing
+- **Redistribute** the source code
+- **Deploy locally** — spin up Anvil, Hardhat, or any local/test environment for integration testing
+
+### The One Restriction
+
+<Warning>
+Do not deploy x402r contracts outside of the official factories — whether modified or unmodified.
+</Warning>
+
+Deploying through x402r's factories is the intended path and is always allowed. What you cannot do:
+- Take the source code and deploy your own instances outside of the factories
+- Deploy a modified fork (e.g., removing fees, changing parameters) to any production chain
+- Remove or modify the license notice
+
+Deploying to local chains, testnets, and private forks for **development and testing** is fine.
+
+### Change Date
+
+On **December 9, 2029** (or 4 years after the first public release of each version, whichever comes first), the license automatically converts to the **MIT License** — at which point you can deploy, fork, and do anything you want.
+
+## Summary
+
+| | Now | After Dec 9, 2029 |
+|---|---|---|
+| **License** | BUSL-1.1 | MIT |
+| **Integrate on-chain** | Free | Free |
+| **Build on top** | Free | Free |
+| **Deploy via factories** | Free | Free |
+| **Deploy to local/testnet** | Free | Free |
+| **Deploy outside factories** | Not allowed | Free |

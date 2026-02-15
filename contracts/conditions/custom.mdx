@@ -1,0 +1,107 @@
+---
+title: "Custom Conditions"
+description: "Build your own condition contracts for specialized authorization logic"
+icon: "wrench"
+---
+
+## Overview
+
+You can create custom conditions for specialized logic beyond what the built-in conditions provide. Implement the `ICondition` interface and follow the security rules below.
+
+## ICondition Rules
+
+From the `ICondition.sol` NatSpec:
+
+1. **MUST NOT revert** — return `false` to deny, never `revert`
+2. **Should be `view` or `pure`** — no state-changing operations
+3. **No external calls** — avoid calling other contracts to prevent reentrancy risks
+4. **Return `true` to allow, `false` to deny**
+
+The operator converts a `false` return into a `ConditionNotMet` revert.
+
+## Example: TimeOfDayCondition
+
+A condition that only allows actions during specific hours (UTC):
+
+```solidity
+contract TimeOfDayCondition is ICondition {
+    uint256 public immutable startHour;  // e.g., 9 (9 AM)
+    uint256 public immutable endHour;    // e.g., 17 (5 PM)
+
+    constructor(uint256 _startHour, uint256 _endHour) {
+        startHour = _startHour;
+        endHour = _endHour;
+    }
+
+    function check(
+        PaymentInfo calldata payment,
+        uint256,
+        address caller
+    ) external view returns (bool) {
+        uint256 hour = (block.timestamp / 3600) % 24;
+        return hour >= startHour && hour < endHour;
+    }
+}
+```
+
+Usage — deploy via a factory and use in operator config:
+
+```typescript
+// Deploy via your custom factory
+const businessHours = await timeOfDayConditionFactory.write.deploy([9, 17]);
+
+// Use in operator config
+config.releaseCondition = businessHours;
+```
+
+## Security Checklist
+
+Before deploying a custom condition:
+
+- [ ] Returns `false` instead of reverting on denial
+- [ ] Declared as `view` or `pure`
+- [ ] No external calls to untrusted contracts
+- [ ] No state modifications
+- [ ] Handles edge cases (zero address, zero amount, uninitialized payments)
+- [ ] Comprehensive test coverage with Forge tests
+
+<Warning>
+Custom conditions with bugs can lead to **permanently locked funds** (if `check()` always returns `false`) or **unauthorized access** (if `check()` always returns `true`). Test thoroughly on testnet before mainnet deployment.
+</Warning>
+
+## Testing
+
+Test custom conditions with Forge:
+
+```solidity
+contract TimeOfDayConditionTest is Test {
+    TimeOfDayCondition condition;
+
+    function setUp() public {
+        condition = new TimeOfDayCondition(9, 17);
+    }
+
+    function test_allowsDuringBusinessHours() public {
+        // Set block.timestamp to 10 AM UTC
+        vm.warp(10 * 3600);
+        assertTrue(condition.check(paymentInfo, 0, caller));
+    }
+
+    function test_deniesOutsideBusinessHours() public {
+        // Set block.timestamp to 8 PM UTC
+        vm.warp(20 * 3600);
+        assertFalse(condition.check(paymentInfo, 0, caller));
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Conditions Overview" icon="filter" href="/contracts/conditions/overview">
+    Review the condition system architecture.
+  </Card>
+  <Card title="Custom Recorders" icon="database" href="/contracts/recorders/custom">
+    Build custom state recorders.
+  </Card>
+</CardGroup>

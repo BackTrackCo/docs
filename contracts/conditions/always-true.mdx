@@ -1,0 +1,62 @@
+---
+title: "AlwaysTrueCondition"
+description: "Allow anyone to call an action with no restrictions"
+icon: "check"
+---
+
+## Overview
+
+AlwaysTrueCondition allows anyone to call the action — no restrictions applied.
+
+**Type:** Singleton (deployed once, reused by all operators)
+
+**Address (Base Sepolia):** `0x785cC83DEa3d46D5509f3bf7496EAb26D42EE610`
+
+**Address (Base Mainnet):** `0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178`
+
+## Logic
+
+```solidity
+function check(PaymentInfo calldata payment, uint256, address caller)
+    external pure returns (bool)
+{
+    return true;
+}
+```
+
+## When to Use
+
+| Slot | Use Case |
+|------|----------|
+| `AUTHORIZE_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
+
+<Warning>
+**Use with caution for release/refund slots.** Setting `RELEASE_CONDITION` or `REFUND_IN_ESCROW_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
+</Warning>
+
+## AlwaysTrueCondition vs `address(0)`
+
+Both allow any caller, but there's a subtle difference:
+
+| | `address(0)` | AlwaysTrueCondition |
+|---|---|---|
+| **Behavior** | Skips condition check entirely | Calls `check()` which returns `true` |
+| **Gas** | Slightly cheaper (no external call) | Minimal overhead (~200 gas) |
+| **Intent** | "No condition configured" | "Explicitly open to all" |
+
+Use `address(0)` when you simply don't need a condition. Use AlwaysTrueCondition when you want to make the "open access" intent explicit in your configuration.
+
+## Gas
+
+**Cost:** Minimal — `pure` function returning a constant.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="PayerCondition" icon="user" href="/contracts/conditions/payer">
+    Restrict to payer only.
+  </Card>
+  <Card title="Examples" icon="code" href="/contracts/examples">
+    See configurations using AlwaysTrueCondition.
+  </Card>
+</CardGroup>

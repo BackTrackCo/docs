@@ -1,0 +1,149 @@
+---
+title: "Conditions Overview"
+description: "Pluggable condition system for flexible payment authorization and state tracking"
+icon: "filter"
+---
+
+## What Are Conditions?
+
+Conditions are pluggable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots** — one per action:
+
+| Slot | Controls |
+|------|----------|
+| `AUTHORIZE_CONDITION` | Who can authorize payments |
+| `CHARGE_CONDITION` | Who can charge partial amounts |
+| `RELEASE_CONDITION` | Who can release from escrow |
+| `REFUND_IN_ESCROW_CONDITION` | Who can refund during escrow |
+| `REFUND_POST_ESCROW_CONDITION` | Who can refund after release |
+
+## ICondition Interface
+
+```solidity
+interface ICondition {
+    function check(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
+        address caller
+    ) external view returns (bool allowed);
+}
+```
+
+**Parameters:**
+- `paymentInfo` — The payment information struct
+- `amount` — The amount involved in the action (0 for authorization-only checks like refund request status updates)
+- `caller` — The address attempting the action
+
+**Return:** `true` if the caller is authorized, `false` otherwise.
+
+## Default Behavior
+
+**Condition slot = `address(0)`** — always returns `true` (allow). The action is unrestricted.
+
+This means you only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
+
+## Singleton vs Per-Deployment
+
+| Type | Examples | Deploy Strategy |
+|------|----------|-----------------|
+| **Singleton** | [PayerCondition](/contracts/conditions/payer), [ReceiverCondition](/contracts/conditions/receiver), [AlwaysTrueCondition](/contracts/conditions/always-true) | Deployed once, reuse everywhere |
+| **Per-deployment** | [StaticAddressCondition](/contracts/conditions/static-address), [EscrowPeriod](/contracts/conditions/escrow-period), [Freeze](/contracts/conditions/freeze) | Deploy per use case via [factories](/contracts/factories) |
+| **Composable** | [And/Or/Not](/contracts/conditions/combinators) | Combine existing conditions via factories |
+
+## Security Rules
+
+<Warning>
+**Conditions MUST NOT revert.** Return `false` to deny — never `revert`. The operator converts `false` into a `ConditionNotMet` error.
+</Warning>
+
+- Conditions should be `view` or `pure` to prevent reentrancy attacks
+- Never make external state-changing calls inside a condition
+- Test thoroughly — edge cases in authorization logic can lead to locked funds
+
+## Configuration Patterns
+
+Conditions compose to create flexible authorization policies. Here are common patterns:
+
+### Open Authorization, Restricted Release
+
+```solidity
+config = {
+    authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
+    authorizeRecorder: escrowRecorder,          // Record time
+    releaseCondition: releaseCondition,         // Restricted
+    // ...
+};
+```
+
+### Payer-Only Actions
+
+```solidity
+config = {
+    authorizeCondition: PAYER_CONDITION,        // Only payer
+    releaseCondition: PAYER_CONDITION,          // Only payer
+    // ...
+};
+```
+
+### Arbiter-Controlled
+
+```solidity
+config = {
+    authorizeCondition: ARBITER_CONDITION,      // Only arbiter
+    chargeCondition: ARBITER_CONDITION,         // Only arbiter
+    releaseCondition: ARBITER_CONDITION,        // Only arbiter
+    refundInEscrowCondition: ARBITER_CONDITION, // Only arbiter
+    refundPostEscrowCondition: ARBITER_CONDITION,
+    // ...
+};
+```
+
+For complete configuration examples, see the [Examples](/contracts/examples) page.
+
+## Gas Optimization
+
+### Singleton Reuse
+
+Singleton conditions are deployed once and reused by all operators. Reference the existing addresses — don't deploy new instances:
+
+```typescript
+// Good: Reference the singleton address
+const config1 = { authorizeCondition: PAYER_CONDITION };
+const config2 = { authorizeCondition: PAYER_CONDITION }; // Same address
+```
+
+### Stateless Conditions
+
+Prefer stateless conditions when possible:
+
+```solidity
+// Stateless: No storage reads (pure)
+function check(PaymentInfo calldata payment, uint256, address caller)
+    external pure returns (bool)
+{
+    return caller == payment.receiver;  // Pure computation
+}
+
+// Stateful: Storage reads cost gas (view)
+function check(PaymentInfo calldata payment, uint256, address caller)
+    external view returns (bool)
+{
+    return allowList[caller];  // SLOAD costs gas
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Recorders" icon="database" href="/contracts/recorders/overview">
+    Learn about the state recording system.
+  </Card>
+  <Card title="Combinators" icon="puzzle-piece" href="/contracts/conditions/combinators">
+    Compose conditions with And/Or/Not logic.
+  </Card>
+  <Card title="Custom Conditions" icon="wrench" href="/contracts/conditions/custom">
+    Build your own condition contracts.
+  </Card>
+  <Card title="Examples" icon="code" href="/contracts/examples">
+    See complete configuration examples.
+  </Card>
+</CardGroup>

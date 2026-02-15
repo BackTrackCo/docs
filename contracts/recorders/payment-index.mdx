@@ -1,0 +1,72 @@
+---
+title: "PaymentIndexRecorder"
+description: "Index payments by sequential count for on-chain queries and multiple refund requests"
+icon: "list-ol"
+---
+
+## Overview
+
+PaymentIndexRecorder records a sequential index for each payment action, enabling multiple refund requests per payment. Each time `record()` is called, the index increments by 1.
+
+## When to Use
+
+- You need on-chain payment lookups **without a subgraph**
+- You need to support **multiple refund requests** per payment (each keyed by nonce)
+- Other contracts need to read the payment index on-chain
+
+**Skip when:** You're using a subgraph for payment queries — the subgraph can derive indexes from events without the on-chain gas cost.
+
+## State
+
+```solidity
+mapping(bytes32 paymentInfoHash => uint256 count) public paymentIndex;
+```
+
+## Methods
+
+```solidity
+function record(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address caller
+) external {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    paymentIndex[hash]++;
+}
+
+function getPaymentIndex(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) external view returns (uint256) {
+    return paymentIndex[escrow.getHash(paymentInfo)];
+}
+```
+
+## Integration with RefundRequest
+
+The `nonce` parameter in `RefundRequest.requestRefund()` corresponds to the payment index. This allows one refund request per charge/action:
+
+```typescript
+// After two charges on the same payment:
+// paymentIndex = 2
+
+// Refund request for first charge
+await refundRequest.requestRefund(paymentInfo, amount1, 0); // nonce 0
+
+// Refund request for second charge
+await refundRequest.requestRefund(paymentInfo, amount2, 1); // nonce 1
+```
+
+## Gas
+
+**Cost:** ~20k gas per `record()` call (one `SSTORE` for the counter increment).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="RecorderCombinator" icon="layer-group" href="/contracts/recorders/combinator">
+    Combine with other recorders in a single slot.
+  </Card>
+  <Card title="Recorders Overview" icon="database" href="/contracts/recorders/overview">
+    Compare recording strategies.
+  </Card>
+</CardGroup>

@@ -1,0 +1,106 @@
+---
+title: "EscrowPeriod"
+description: "Time-lock condition that records authorization time and enforces escrow windows"
+icon: "clock"
+---
+
+## Overview
+
+EscrowPeriod is a dual-purpose contract — it functions as both a **recorder** and a **condition**:
+
+- **As a recorder:** Records the `block.timestamp` when a payment is authorized
+- **As a condition:** Returns `true` only after the escrow period has elapsed
+
+Use the **same address** for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots on the operator.
+
+**Type:** Per-deployment via [EscrowPeriodFactory](/contracts/factories)
+
+## Architecture
+
+```mermaid
+flowchart LR
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP -->|implements| IC[ICondition]
+    ATR -->|implements| IR[IRecorder]
+```
+
+EscrowPeriod extends [AuthorizationTimeRecorder](/contracts/recorders/authorization-time) and adds `ICondition` implementation. You don't need to deploy AuthorizationTimeRecorder separately — use EscrowPeriod directly.
+
+## Logic
+
+```solidity
+// ICondition — returns true when escrow period has passed
+function check(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256,
+    address
+) external view returns (bool allowed) {
+    return !isDuringEscrowPeriod(paymentInfo);
+}
+
+// View function to check if still in escrow period
+function isDuringEscrowPeriod(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) public view returns (bool) {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    uint256 authTime = authorizationTimes[hash];
+    if (authTime == 0) return false;
+    return block.timestamp < authTime + ESCROW_PERIOD;
+}
+```
+
+**Checks:**
+1. Payment was authorized (has a recorded timestamp)
+2. Current time >= authorization time + escrow period
+
+## Deployment
+
+Deploy via [EscrowPeriodFactory](/contracts/factories):
+
+```typescript
+const escrowPeriodAddress = await escrowPeriodFactory.write.deploy([
+  7 * 24 * 60 * 60,    // 7 days in seconds
+  zeroHash             // bytes32(0) = operator-only
+]);
+```
+
+Then configure the operator:
+
+```typescript
+const config = {
+  authorizeRecorder: escrowPeriodAddress,   // Record auth time
+  releaseCondition: escrowPeriodAddress,    // Check escrow passed
+  // ...
+};
+```
+
+## Composition with Freeze
+
+For freeze functionality, deploy a separate [Freeze](/contracts/conditions/freeze) condition and compose via [AndCondition](/contracts/conditions/combinators):
+
+```solidity
+// Escrow period only:  releaseCondition = escrowPeriod
+// Freeze only:         releaseCondition = freeze
+// Both:                releaseCondition = AndCondition([escrowPeriod, freeze])
+```
+
+## Use Cases
+
+- **Time-lock releases** — 7-day escrow for e-commerce
+- **Delayed fund access** — Grace period before receiver can access funds
+- **Buyer protection** — Give payers time to freeze or request refunds
+
+## Gas
+
+**Cost:** ~20k gas per `record()` call (one `SSTORE` for the timestamp). The `check()` call is a `view` function with one `SLOAD`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Freeze" icon="snowflake" href="/contracts/conditions/freeze">
+    Add freeze protection to escrow periods.
+  </Card>
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Deploy EscrowPeriod via factory.
+  </Card>
+</CardGroup>

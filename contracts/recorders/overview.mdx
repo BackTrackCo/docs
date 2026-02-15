@@ -1,0 +1,101 @@
+---
+title: "Recorders Overview"
+description: "State recording system for tracking payment lifecycle events"
+icon: "database"
+---
+
+## What Are Recorders?
+
+Recorders are pluggable contracts that update state **after** an action successfully executes on a PaymentOperator. Each operator has **5 recorder slots** — one per action:
+
+| Slot | Records After |
+|------|---------------|
+| `AUTHORIZE_RECORDER` | Authorization (e.g., timestamp) |
+| `CHARGE_RECORDER` | Charge event |
+| `RELEASE_RECORDER` | Release from escrow |
+| `REFUND_IN_ESCROW_RECORDER` | In-escrow refund |
+| `REFUND_POST_ESCROW_RECORDER` | Post-escrow refund |
+
+## IRecorder Interface
+
+```solidity
+interface IRecorder {
+    function record(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
+        address caller
+    ) external;
+}
+```
+
+**Parameters:**
+- `paymentInfo` — The payment information struct
+- `amount` — The amount involved in the action
+- `caller` — The address that executed the action (msg.sender on operator)
+
+## Default Behavior
+
+**Recorder slot = `address(0)`** — no-op (does nothing). No state is recorded.
+
+This means you only need to set recorders for slots where you want state tracking. Leave the rest as `address(0)`.
+
+## BaseRecorder
+
+All built-in recorders extend `BaseRecorder`, which verifies that the caller is an authorized operator. This prevents unauthorized contracts from writing state.
+
+## Choosing a Recording Strategy
+
+Not every payment needs on-chain recorders. Choose based on your use case:
+
+### Events Only (~0 Extra Gas)
+
+The operator already emits events (`AuthorizationCreated`, `ReleaseExecuted`, etc.) for every action. If you only need payment history for analytics or display, skip recorders entirely and index events off-chain.
+
+**Best for:** Micropayments, high-volume payments where gas overhead matters, simple UIs.
+
+### Events + Subgraph (Best Queries)
+
+Index operator events with a subgraph for rich queries (payment history by payer, receiver, status, date range). No on-chain recorder gas cost.
+
+**Best for:** Analytics dashboards, payment history, multi-payment queries.
+
+**Trade-off:** Requires subgraph infrastructure (semi-centralized).
+
+### On-Chain Recorders (~20k Gas per Write)
+
+Use recorders when you need **on-chain reads** — other contracts or conditions that depend on recorded state. [EscrowPeriod](/contracts/conditions/escrow-period) is the most common example: it records authorization time so the release condition can check if the escrow window has passed.
+
+**Best for:** Escrow enforcement, dispute evidence, decentralized frontends, on-chain composability.
+
+**Trade-off:** ~20k gas per `SSTORE` operation.
+
+### Decision Table
+
+| Need | Strategy | Recorder Slots |
+|------|----------|---------------|
+| Payment history for UI | Events only | `address(0)` |
+| Rich queries, analytics | Events + Subgraph | `address(0)` |
+| Time-locked releases | On-chain | [EscrowPeriod](/contracts/conditions/escrow-period) on `AUTHORIZE_RECORDER` |
+| On-chain payment index | On-chain | [PaymentIndexRecorder](/contracts/recorders/payment-index) |
+| Multiple data points | On-chain | [RecorderCombinator](/contracts/recorders/combinator) |
+
+<Tip>
+For most configurations, you only need a recorder on the `AUTHORIZE_RECORDER` slot (for [EscrowPeriod](/contracts/conditions/escrow-period)). Leave other recorder slots as `address(0)`.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AuthorizationTimeRecorder" icon="clock" href="/contracts/recorders/authorization-time">
+    Record authorization timestamps.
+  </Card>
+  <Card title="PaymentIndexRecorder" icon="list-ol" href="/contracts/recorders/payment-index">
+    Index payments for on-chain queries.
+  </Card>
+  <Card title="RecorderCombinator" icon="layer-group" href="/contracts/recorders/combinator">
+    Chain multiple recorders into one slot.
+  </Card>
+  <Card title="Custom Recorders" icon="wrench" href="/contracts/recorders/custom">
+    Build your own recorder.
+  </Card>
+</CardGroup>
