@@ -97,6 +97,18 @@ These operations only happen when a payment is disputed. Most payments never tou
 This indexing enables efficient off-chain queries but costs more gas upfront. On Base, this is still < $0.01.
 </Accordion>
 
+### Off-chain optimized dispute
+
+If the refund request, evidence, and arbiter approval are handled off-chain, the on-chain cost drops significantly:
+
+| Path | On-chain steps | Gas | vs transfer | Cost on Base |
+|------|---------------|-----|------------|-------------|
+| **Off-chain optimized** | freeze + refundInEscrow | 110,575 | 10.7x | < $0.005 |
+| **Off-chain optimized (post-escrow)** | freeze + refundPostEscrow | 99,118 | 9.6x | < $0.005 |
+| **Fully on-chain** | all 7 steps | 1,078,145 | 104.6x | < $0.05 |
+
+The off-chain optimized path costs ~10x less gas than doing everything on-chain.
+
 ## Off-Chain Operations (Zero Gas)
 
 | Operation | Mechanism | Who |
