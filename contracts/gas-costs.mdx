@@ -6,7 +6,7 @@ icon: "gas-pump"
 
 ## Overview
 
-x402r adds escrow, refund windows, and dispute resolution on top of [Base Commerce Payments](https://github.com/coinbase/commerce-payments). This page shows the **measured gas cost** of every on-chain operation so you can evaluate the overhead.
+x402r adds escrow, refund windows, and dispute resolution on top of [Base Commerce Payments](https://github.com/coinbase/commerce-payments). Here you'll find the **measured gas cost** of every on-chain operation so you can evaluate the overhead.
 
 All numbers are from Foundry simulations (`forge test`) with optimizer enabled (200 runs, via IR). The benchmark test is at [`test/gas/GasBenchmark.t.sol`](https://github.com/BackTrackCo/x402r-contracts/blob/main/test/gas/GasBenchmark.t.sol).
 
@@ -14,7 +14,7 @@ All numbers are from Foundry simulations (`forge test`) with optimizer enabled (
 The buyer never pays gas. They only sign an off-chain ERC-3009 authorization. All on-chain transactions are submitted by the facilitator, merchant, or other parties.
 </Note>
 
-### What you'll pay on Base
+## What you'll pay on Base
 
 | Role | Operations | Gas | Cost on Base |
 |------|-----------|-----|-------------|
@@ -26,17 +26,19 @@ Disputes are rare and add < $0.05 total — see [Dispute Path](#dispute-path) be
 
 ## Happy Path
 
-The happy path has **2 on-chain transactions**: `authorize` (at purchase time) and `release` (after the escrow period expires).
+The happy path has **2 required on-chain transactions** (`authorize` and `release`), plus an optional `distributeFees` call.
 
 | Operation | Gas | vs transfer | Who Calls | When |
 |-----------|-----|------------|-----------|------|
 | `authorize()` | 181,544 | 17.6x | Facilitator | At purchase (HTTP 402 settlement) |
 | `release()` | 150,262 | 14.6x | Anyone | After escrow period expires |
-| `distributeFees()` | 57,191 | 5.5x | Anyone | Batch across payments whenever you want |
+| `distributeFees()` | 57,191 | 5.5x | Anyone | Call once to distribute accumulated fees across all settled payments |
+
+The **vs transfer** column shows multiples of a cold ERC-20 `transfer()` (10,305 gas) — the absolute floor for moving tokens on-chain.
 
 In production, the merchant typically calls `release()`, but the function has no caller restriction beyond the configured release condition (EscrowPeriod + Freeze). After the escrow period passes and the payment isn't frozen, anyone can trigger it.
 
-An escrow authorization is inherently more work than a raw ERC-20 transfer (10,305 gas): it validates payment info, checks fee bounds, locks fees, transfers tokens into escrow, and records state. The per-plugin section below shows exactly where the gas goes.
+An escrow authorization is inherently more work than a raw ERC-20 transfer: it validates payment info, checks fee bounds, locks fees, transfers tokens into escrow, and records state. The per-plugin section below shows exactly where the gas goes.
 
 ## Per-Plugin Gas Costs
 
