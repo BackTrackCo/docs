@@ -74,7 +74,7 @@ The EscrowPeriod recorder is the single most expensive plugin on `authorize` bec
 
 ## Dispute Path
 
-These operations only happen when a payment is disputed. Most payments never touch this path. In practice, most disputes can be resolved off-chain — the merchant simply issues a refund voluntarily. These on-chain operations exist as a fallback when off-chain resolution fails.
+These operations only happen when a payment is disputed. Most payments never touch this path. The buyer freezes the payment on-chain, but the refund request, evidence submission, and arbiter approval can all happen off-chain — only the final refund transfer needs to go on-chain.
 
 | Operation | Gas | vs transfer | Who Calls | Notes |
 |-----------|-----|------------|-----------|-------|
