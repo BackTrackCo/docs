@@ -74,7 +74,7 @@ The EscrowPeriod recorder is the single most expensive plugin on `authorize` bec
 
 ## Dispute Path
 
-These operations only happen when a payment is disputed. Most payments never touch this path.
+These operations only happen when a payment is disputed. Most payments never touch this path. The dispute process (freeze, evidence, arbiter approval) is fully on-chain — only the actual refund transfer requires the merchant's cooperation (via `ReceiverRefundCollector` approval) or funds still being in escrow.
 
 | Operation | Gas | vs transfer | Who Calls | Notes |
 |-----------|-----|------------|-----------|-------|
