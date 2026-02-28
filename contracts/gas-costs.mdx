@@ -40,6 +40,10 @@ In production, the merchant typically calls `release()`, but the function has no
 
 An escrow authorization is inherently more work than a raw ERC-20 transfer: it validates payment info, checks fee bounds, locks fees, transfers tokens into escrow, and records state. The per-plugin section below shows exactly where the gas goes.
 
+<Warning>
+**Facilitators: set a gas limit.** The facilitator pays gas for `authorize()`, but the operator chooses which conditions and recorders are configured. Each plugin slot adds cost, and custom plugins can run arbitrary computation. Simulate the transaction with `eth_estimateGas` before submitting and reject operators whose `authorize()` exceeds a reasonable threshold (e.g., 300,000 gas). The full x402r configuration uses ~181,000 — anything significantly above that warrants investigation.
+</Warning>
+
 ## Per-Plugin Gas Costs
 
 The PaymentOperator is configured with pluggable conditions (checked before an action) and recorders (called after). You choose which plugins to use. Here's the marginal cost of each, measured by diffing adjacent configurations.
