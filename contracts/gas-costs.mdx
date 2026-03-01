@@ -86,6 +86,16 @@ If the refund request, evidence, and arbiter approval are handled off-chain, the
 
 The off-chain optimized path costs ~10x less gas than doing everything on-chain.
 
+### Off-chain operations (zero gas)
+
+| Operation | Mechanism | Who |
+|-----------|-----------|-----|
+| Payment authorization | ERC-3009 signature | Buyer |
+| Arbiter refund approval | EIP-712 signature | Arbiter |
+| Evidence documents | IPFS (only CID stored on-chain) | Any party |
+
+The arbiter never submits a transaction. Their approval is an EIP-712 signature that anyone can relay on-chain.
+
 ### Fully on-chain dispute
 
 If off-chain resolution fails, every step can be executed on-chain as a fallback:
@@ -110,16 +120,6 @@ If off-chain resolution fails, every step can be executed on-chain as a fallback
 
 This indexing enables efficient off-chain queries but costs more gas upfront. On Base, this is still < $0.01.
 </Accordion>
-
-## Off-Chain Operations (Zero Gas)
-
-| Operation | Mechanism | Who |
-|-----------|-----------|-----|
-| Payment authorization | ERC-3009 signature | Buyer |
-| Arbiter refund approval | EIP-712 signature | Arbiter |
-| Evidence documents | IPFS (only CID stored on-chain) | Any party |
-
-The arbiter never submits a transaction. Their approval is an EIP-712 signature that anyone can relay on-chain.
 
 ## Summary
 
