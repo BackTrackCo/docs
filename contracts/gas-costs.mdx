@@ -19,8 +19,9 @@ The buyer never pays gas. They only sign an off-chain ERC-3009 authorization. Al
 | Role | Operations | Gas | Cost on Base |
 |------|-----------|-----|-------------|
 | **Facilitator** | `authorize()` | 181,544 | < $0.005 |
-| **Merchant** | `release()` + `distributeFees()` | 207,453 | < $0.01 |
-| **Happy path total** | authorize + release + distributeFees | 388,997 | **< $0.01** |
+| **Merchant** | `release()` | 150,262 | < $0.005 |
+| **Happy path total** | authorize + release | 331,806 | **< $0.01** |
+| + optional | `distributeFees()` | 57,191 | < $0.001 |
 
 Disputes are rare and add < $0.05 total — see [Dispute Path](#dispute-path) below.
 
