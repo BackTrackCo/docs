@@ -21,19 +21,17 @@ The buyer never pays gas. They only sign an off-chain ERC-3009 authorization. Al
 | **Facilitator** | `authorize()` | 181,544 | < $0.005 |
 | **Merchant** | `release()` | 150,262 | < $0.005 |
 | **Happy path total** | authorize + release | 331,806 | **< $0.01** |
-| + optional | `distributeFees()` | 57,191 | < $0.001 |
 
 Disputes are rare and add < $0.05 total — see [Dispute Path](#dispute-path) below.
 
 ## Happy Path
 
-The happy path has **2 required on-chain transactions** (`authorize` and `release`), plus an optional `distributeFees` call.
+The happy path has **2 on-chain transactions**: `authorize` (at purchase time) and `release` (after the escrow period expires).
 
 | Operation | Gas | vs transfer | Who Calls | When |
 |-----------|-----|------------|-----------|------|
 | `authorize()` | 181,544 | 17.6x | Facilitator | At purchase (HTTP 402 settlement) |
 | `release()` | 150,262 | 14.6x | Anyone | After escrow period expires |
-| `distributeFees()` | 57,191 | 5.5x | Anyone | Call once to distribute accumulated fees across all settled payments |
 
 The **vs transfer** column shows multiples of a cold ERC-20 `transfer()` (10,305 gas) — the absolute floor for moving tokens on-chain.
 
@@ -132,7 +130,6 @@ The arbiter never submits a transaction. Their approval is an EIP-712 signature 
 | + fees | 252,941 | 24.5x | < $0.005 |
 | + fees + simple condition | 257,391 | 25.0x | < $0.005 |
 | **+ fees + EscrowPeriod + Freeze (x402r full)** | **331,806** | **32.2x** | **< $0.01** |
-| x402r full + fee distribution | 388,997 | 37.7x | < $0.01 |
 | x402r full dispute path (7 txns) | 1,078,145 | 104.6x | < $0.05 |
 
 The full x402r happy path uses ~32x the gas of a single ERC-20 transfer — but on Base L2, the absolute cost stays under a penny. The overhead comes from escrow validation, fee locking, cross-contract storage writes, and condition checks, all detailed in the per-plugin breakdown above.
