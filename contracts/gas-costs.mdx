@@ -93,15 +93,16 @@ If the parties choose to handle the dispute fully on-chain instead:
 
 | Operation | Gas | vs transfer | Who Calls | Notes |
 |-----------|-----|------------|-----------|-------|
+| `authorize()` | 181,544 | 17.6x | Facilitator | Already paid during happy path |
 | `freeze()` | 44,651 | 4.3x | Buyer | Locks payment during escrow window |
+| `release()` | 150,262 | 14.6x | Anyone | Already paid during happy path |
 | `requestRefund()` | 421,689 | 40.9x | Buyer | Creates refund request with multi-index storage |
 | `submitEvidence()` | 135,597 | 13.2x | Any party | Stores IPFS CID on-chain |
 | `approveWithSignature()` | 89,935 | 8.7x | Anyone | Relays arbiter's off-chain EIP-712 signature |
-| `refundInEscrow()` | 65,924 | 6.4x | Anyone | Returns funds from escrow before release |
 | `refundPostEscrow()` | 54,467 | 5.3x | Anyone | Pulls funds from merchant wallet via ReceiverRefundCollector |
 | **Total** | **1,078,145** | **104.6x** | | |
 
-Total dispute cost on Base fully on-chain: **< $0.05**.
+This total includes the happy path steps (`authorize` + `release`) since those have already been paid. The dispute-only overhead is 746,339 gas (< $0.02 on Base).
 
 <Accordion title="Why is requestRefund so expensive?">
 `requestRefund()` at 421,689 gas is the most expensive operation because it writes to **multiple storage mappings** for indexing:
