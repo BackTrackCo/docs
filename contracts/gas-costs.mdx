@@ -130,7 +130,8 @@ The arbiter never submits a transaction. Their approval is an EIP-712 signature 
 | + fees | 252,941 | 24.5x | < $0.005 |
 | + fees + simple condition | 257,391 | 25.0x | < $0.005 |
 | **+ fees + EscrowPeriod + Freeze (x402r full)** | **331,806** | **32.2x** | **< $0.01** |
-| x402r full dispute path (7 txns) | 1,078,145 | 104.6x | < $0.05 |
+| x402r dispute (off-chain optimized) | 110,575 | 10.7x | < $0.005 |
+| x402r dispute (fully on-chain, 7 txns) | 1,078,145 | 104.6x | < $0.05 |
 
 The full x402r happy path uses ~32x the gas of a single ERC-20 transfer — but on Base L2, the absolute cost stays under a penny. The overhead comes from escrow validation, fee locking, cross-contract storage writes, and condition checks, all detailed in the per-plugin breakdown above.
 
