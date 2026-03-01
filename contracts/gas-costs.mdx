@@ -51,7 +51,7 @@ The PaymentOperator is configured with pluggable conditions (checked before an a
 
 | Configuration | Gas | Marginal Cost | Plugin |
 |---------------|-----|---------------|--------|
-| Bare Commerce Payments | 117,250 | — | No plugins, no fees |
+| PaymentOperator (no plugins, no fees) | 117,250 | — | All conditions, recorders, and fee calculator set to `address(0)` |
 | + Fee calculation | 135,961 | **+18,711** | `StaticFeeCalculator` — calculates protocol + operator fees, validates bounds, locks fees in `authorizedFees[hash]` |
 | + EscrowPeriod recorder | 162,744 | **+26,783** | `EscrowPeriod.record()` — stores `authorizationTime[hash] = block.timestamp` (cold SSTORE to cross-contract slot) |
 
@@ -61,7 +61,7 @@ The EscrowPeriod recorder is the single most expensive plugin on `authorize` bec
 
 | Configuration | Gas | Marginal Cost | Plugin |
 |---------------|-----|---------------|--------|
-| Bare Commerce Payments | 77,926 | — | No plugins, no fees |
+| PaymentOperator (no plugins, no fees) | 77,926 | — | All conditions, recorders, and fee calculator set to `address(0)` |
 | + Fee retrieval | 116,980 | **+39,055** | Reads locked fees from `authorizedFees[hash]`, calculates protocol share, accumulates in `accumulatedProtocolFees[token]` |
 | + ReceiverCondition | 121,430 | **+4,450** | Pure calldata comparison: `caller == paymentInfo.receiver` — no storage reads |
 | + EscrowPeriod condition | 122,520 | **+5,540** | Cross-contract SLOAD: reads `authorizationTime[hash]`, compares against `block.timestamp` |
@@ -121,7 +121,7 @@ This indexing enables efficient off-chain queries but costs more gas upfront. On
 | Scenario | Gas | vs transfer | Cost on Base |
 |----------|-----|------------|-------------|
 | ERC-20 transfer (baseline) | 10,305 | 1x | < $0.001 |
-| Bare Commerce Payments (authorize + release) | 195,176 | 18.9x | < $0.005 |
+| PaymentOperator, no plugins (authorize + release) | 195,176 | 18.9x | < $0.005 |
 | + fees | 252,941 | 24.5x | < $0.005 |
 | + fees + simple condition | 257,391 | 25.0x | < $0.005 |
 | **+ fees + EscrowPeriod + Freeze (x402r full)** | **331,806** | **32.2x** | **< $0.01** |
