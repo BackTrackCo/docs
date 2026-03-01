@@ -1,0 +1,147 @@
+---
+title: "Gas Costs"
+description: "Simulated gas measurements for every on-chain operation, with per-plugin overhead breakdown"
+icon: "gas-pump"
+---
+
+## Overview
+
+x402r adds escrow, refund windows, and dispute resolution on top of [Base Commerce Payments](https://github.com/base/commerce-payments). Here you'll find the **measured gas cost** of every on-chain operation so you can evaluate the overhead.
+
+All numbers are from Foundry simulations (`forge test`) with optimizer enabled (200 runs, via IR). The benchmark test is at [`test/gas/GasBenchmark.t.sol`](https://github.com/BackTrackCo/x402r-contracts/blob/main/test/gas/GasBenchmark.t.sol).
+
+<Note>
+The buyer never pays gas. They only sign an off-chain ERC-3009 authorization. All on-chain transactions are submitted by the facilitator, merchant, or other parties.
+</Note>
+
+## What you'll pay on Base
+
+| Role | Operations | Gas | Cost on Base |
+|------|-----------|-----|-------------|
+| **Facilitator** | `authorize()` | 181,544 | < $0.005 |
+| **Merchant** | `release()` | 150,262 | < $0.005 |
+| **Happy path total** | authorize + release | 331,806 | **< $0.01** |
+
+Disputes are rare and add < $0.005 with off-chain resolution — see [Dispute Path](#dispute-path) below.
+
+## Happy Path
+
+The happy path has **2 on-chain transactions**: `authorize` (at purchase time) and `release` (after the escrow period expires).
+
+| Operation | Gas | vs transfer | Who Calls | When |
+|-----------|-----|------------|-----------|------|
+| `authorize()` | 181,544 | 17.6x | Facilitator | At purchase (HTTP 402 settlement) |
+| `release()` | 150,262 | 14.6x | Anyone | After escrow period expires |
+
+The **vs transfer** column shows multiples of a cold ERC-20 `transfer()` (10,305 gas) — the absolute floor for moving tokens on-chain.
+
+In production, the merchant typically calls `release()`, but the function has no caller restriction beyond the configured release condition (EscrowPeriod + Freeze). After the escrow period passes and the payment isn't frozen, anyone can trigger it.
+
+An escrow authorization is inherently more work than a raw ERC-20 transfer: it validates payment info, checks fee bounds, locks fees, transfers tokens into escrow, and records state. The per-plugin section below shows exactly where the gas goes.
+
+<Warning>
+**Facilitators: set a gas limit.** The facilitator pays gas for `authorize()`, but the operator chooses which conditions and recorders are configured. Each plugin slot adds cost, and custom plugins can run arbitrary computation. Simulate the transaction with `eth_estimateGas` before submitting and reject operators whose `authorize()` exceeds a reasonable threshold (e.g., 300,000 gas). The full x402r configuration uses ~181,000 — anything significantly above that warrants investigation.
+</Warning>
+
+## Per-Plugin Gas Costs
+
+The PaymentOperator is configured with pluggable conditions (checked before an action) and recorders (called after). You choose which plugins to use. Here's the marginal cost of each, measured by diffing adjacent configurations.
+
+### authorize()
+
+| Configuration | Gas | Marginal Cost | Plugin |
+|---------------|-----|---------------|--------|
+| Commerce Payments escrow (no operator) | 78,353 | — | Raw `AuthCaptureEscrow.authorize()` — validates payment, escrows tokens via `PreApprovalPaymentCollector` |
+| + PaymentOperator layer | 117,250 | **+38,897** | Operator dispatch, plugin slot checks, access control — all conditions, recorders, and fee calculator set to `address(0)` |
+| + Fee calculation | 135,961 | **+18,711** | `StaticFeeCalculator` — calculates protocol + operator fees, validates bounds, locks fees in `authorizedFees[hash]` |
+| + EscrowPeriod recorder | 162,744 | **+26,783** | `EscrowPeriod.record()` — stores `authorizationTime[hash] = block.timestamp` (cold SSTORE to cross-contract slot) |
+
+The EscrowPeriod recorder is the single most expensive plugin on `authorize` because it writes to a new storage slot in the EscrowPeriod contract.
+
+### release()
+
+| Configuration | Gas | Marginal Cost | Plugin |
+|---------------|-----|---------------|--------|
+| Commerce Payments escrow (no operator) | 66,365 | — | Raw `AuthCaptureEscrow.capture()` — validates authorization, distributes tokens to receiver |
+| + PaymentOperator layer | 77,926 | **+11,561** | Operator dispatch, plugin slot checks, access control — all conditions, recorders, and fee calculator set to `address(0)` |
+| + Fee retrieval | 116,980 | **+39,054** | Reads locked fees from `authorizedFees[hash]`, calculates protocol share, accumulates in `accumulatedProtocolFees[token]` |
+| + ReceiverCondition | 121,430 | **+4,450** | Pure calldata comparison: `caller == paymentInfo.receiver` — no storage reads |
+| + EscrowPeriod condition | 122,520 | **+5,540** | Cross-contract SLOAD: reads `authorizationTime[hash]`, compares against `block.timestamp` |
+| + Freeze + AndCondition | 142,961 | **+20,441** | AndCondition combinator loop + `Freeze.check()` reads `frozenUntil[hash]` + internal `isDuringEscrowPeriod()` |
+
+<Tip>
+**Simple conditions are nearly free.** `ReceiverCondition` and `PayerCondition` cost ~4,500 gas — they only compare calldata fields. Cross-contract conditions like `EscrowPeriod` cost ~5,500 due to a cold SLOAD. The `Freeze` condition is the most expensive single condition (+20,441) because of the AndCondition combinator overhead, its own `frozenUntil` storage read, and an internal escrow period check.
+</Tip>
+
+## Dispute Path
+
+These operations only happen when a payment is disputed. Most payments never touch this path.
+
+### Off-chain resolution
+
+The refund request, evidence submission, and arbiter approval can all happen off-chain. The only on-chain steps are `freeze()` (to lock the payment during the escrow window) and `refundInEscrow()` (to return funds). The arbiter never submits a transaction — their approval is an EIP-712 signature that anyone can relay.
+
+| On-chain step | Gas | vs transfer | Who Calls |
+|--------------|-----|------------|-----------|
+| `freeze()` | 44,651 | 4.3x | Buyer |
+| `refundInEscrow()` | 65,924 | 6.4x | Anyone |
+| **Total** | **110,575** | **10.7x** | |
+
+Total dispute cost on Base with off-chain resolution: **< $0.005**.
+
+### Fully on-chain fallback
+
+If the parties choose to handle the dispute fully on-chain instead:
+
+| Operation | Gas | vs transfer | Who Calls | Notes |
+|-----------|-----|------------|-----------|-------|
+| `authorize()` | 181,544 | 17.6x | Facilitator | Already paid during happy path |
+| `freeze()` | 44,651 | 4.3x | Buyer | Locks payment during escrow window |
+| `release()` | 150,262 | 14.6x | Anyone | Already paid during happy path |
+| `requestRefund()` | 421,689 | 40.9x | Buyer | Creates refund request with multi-index storage |
+| `submitEvidence()` | 135,597 | 13.2x | Any party | Stores IPFS CID on-chain |
+| `approveWithSignature()` | 89,935 | 8.7x | Anyone | Relays arbiter's off-chain EIP-712 signature |
+| `refundPostEscrow()` | 54,467 | 5.3x | Anyone | Pulls funds from merchant wallet via ReceiverRefundCollector |
+| **Total** | **1,078,145** | **104.6x** | | |
+
+This total includes the happy path steps (`authorize` + `release`) since those have already been paid. The dispute-only overhead is 746,339 gas (< $0.02 on Base).
+
+<Accordion title="Why is requestRefund so expensive?">
+`requestRefund()` at 421,689 gas is the most expensive operation because it writes to **multiple storage mappings** for indexing:
+
+- Refund request data (status, amount, payment hash)
+- Payer index (`payerRefundRequests[payer][n]`)
+- Receiver index (`receiverRefundRequests[receiver][n]`)
+- Operator index (`operatorRefundRequests[operator][n]`)
+- Counter increments for each index
+
+This indexing enables efficient off-chain queries but costs more gas upfront. On Base, this is still < $0.01.
+</Accordion>
+
+## Summary
+
+| Scenario | Gas | vs transfer | Cost on Base |
+|----------|-----|------------|-------------|
+| ERC-20 transfer (baseline) | 10,305 | 1x | < $0.001 |
+| Commerce Payments escrow, no operator (authorize + capture) | 144,718 | 14.0x | < $0.005 |
+| + PaymentOperator layer, no plugins | 195,176 | 18.9x | < $0.005 |
+| + fees | 252,941 | 24.5x | < $0.005 |
+| + fees + simple condition | 257,391 | 25.0x | < $0.005 |
+| **+ fees + EscrowPeriod + Freeze (x402r full)** | **331,806** | **32.2x** | **< $0.01** |
+| x402r dispute (off-chain optimized) | 110,575 | 10.7x | < $0.005 |
+| x402r dispute (fully on-chain, 7 txns) | 1,078,145 | 104.6x | < $0.05 |
+
+The full x402r happy path uses ~32x the gas of a single ERC-20 transfer — but on Base L2, the absolute cost stays under a penny. The overhead comes from escrow validation, fee locking, cross-contract storage writes, and condition checks, all detailed in the per-plugin breakdown above.
+
+<Info>
+All numbers above assume one payment per transaction. Batching multiple operations in a single transaction (via a multicall contract) can reduce per-payment costs by 37–80% due to warm EVM access — contract addresses and shared storage only need to be loaded once. The benchmark test includes warm measurements for reference.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Fee System" icon="coins" href="./fees">
+    How protocol and operator fees are calculated and distributed
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="./architecture">
+    How conditions, recorders, and escrow fit together
+  </Card>
+</CardGroup>
