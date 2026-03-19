@@ -1,0 +1,29 @@
+---
+title: "ReceiverRefundCollector"
+description: "Pulls funds from receiver for post-escrow refunds"
+icon: "arrow-rotate-left"
+---
+
+## Overview
+
+- **Type:** Singleton (one per network)
+- **Purpose:** Collect tokens from the receiver to refund the payer after escrow release
+- **Address:** `0xE5500a38BE45a6C598420fbd7867ac85EC451A07` (all chains)
+
+## Features
+
+- **Post-escrow refunds** - Pulls funds from the receiver's wallet after funds have already been released
+- **Receiver approval required** - The receiver must have approved the collector contract or provided a signature
+- **Operator integration** - Called by `operator.refundPostEscrow()` via the token collector interface
+
+## How It Works
+
+After funds have been released to the receiver (state: `Released`), refunds require pulling tokens back from the receiver's wallet. The `ReceiverRefundCollector` handles this by:
+
+1. Operator calls `refundPostEscrow(paymentInfo, amount, receiverRefundCollector, collectorData)`
+2. The collector transfers tokens from the receiver to the escrow contract
+3. The escrow contract returns tokens to the payer
+
+<Note>
+The receiver must have pre-approved the `ReceiverRefundCollector` for token transfers, or the `collectorData` must contain a valid receiver signature authorizing the refund.
+</Note>

@@ -71,20 +71,33 @@ sequenceDiagram
 
 ## Architecture
 
-x402r consists of three main components:
+x402r consists of these core components:
 
 | Component | Purpose |
 |-----------|---------|
-| **PaymentOperator** | Manages payment authorization, release, charge, and refunds |
+| **PaymentOperator** | Manages payment authorization, release, charge, and refunds with pluggable conditions |
+| **AuthCaptureEscrow** | Holds ERC-20 tokens during the payment lifecycle (from commerce-payments) |
+| **Conditions & Recorders** | Pluggable authorization checks (before action) and state updates (after action) |
+| **EscrowPeriod & Freeze** | Time-based release and freeze policies for buyer protection |
 | **RefundRequest** | Handles refund request lifecycle and approvals |
-| **EscrowPeriod** | Tracks escrow timing for time-based release conditions |
+
+All protocol contracts use unified CREATE3 addresses — same address on every supported chain.
 
 ## Supported Networks
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
-| Base Sepolia | 84532 | Supported |
-| Base Mainnet | 8453 | Supported |
+| Base | 8453 | Supported |
+| Ethereum | 1 | Supported |
+| Polygon | 137 | Supported |
+| Arbitrum One | 42161 | Supported |
+| Optimism | 10 | Supported |
+| Celo | 42220 | Supported |
+| Avalanche C-Chain | 43114 | Supported |
+| Monad | 143 | Supported |
+| Linea | 59144 | Supported |
+| Base Sepolia | 84532 | Testnet |
+| Ethereum Sepolia | 11155111 | Testnet |
 
 ## Resources
 

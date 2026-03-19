@@ -6,33 +6,70 @@ icon: "file-contract"
 
 ## Overview
 
-The **escrow scheme** for x402 v2 leverages the [Base Commerce Payments Protocol](https://github.com/base/commerce-payments) to enable secure, conditional fund handling using the auth/capture pattern.
+The **escrow scheme** for x402 v2 uses the [Commerce Payments Protocol](https://github.com/base/commerce-payments) contract stack to enable secure, conditional fund handling. The client signs a single ERC-3009 authorization. The facilitator submits it to an operator, which handles token collection, escrow locking, and fee distribution in one transaction.
 
 <Note>
-This proposal is based on [Agentokratia's escrow proposal (#834)](https://github.com/coinbase/x402/issues/834) and extends it to support arbitrary operator implementations using audited on-chain escrow contracts.
+This spec is based on the [escrow scheme proposal (Issue #1011)](https://github.com/coinbase/x402/issues/1011) and the [spec PR (#1425)](https://github.com/coinbase/x402/pull/1425). It uses audited on-chain escrow contracts from the Commerce Payments Protocol.
 </Note>
 
-## Auth/Capture Pattern
+## Settlement Methods
 
-The escrow scheme provides four primitives:
+The scheme supports two settlement paths:
+
+| Method | Behavior |
+|:-------|:---------|
+| `authorize` (default) | Funds held in escrow. Can be captured, voided, reclaimed, or refunded. |
+| `charge` | Funds sent directly to receiver. Refundable post-settlement. |
+
+### Authorize (Default)
+
+```
+AUTHORIZE -> RESOURCE DELIVERED -> CAPTURE / VOID -> (REFUND)
+```
 
 <Steps>
   <Step title="Authorize">
-    Lock funds in escrow at request time. Client signs ERC-3009 authorization, facilitator calls `escrow.authorize()` to pull tokens into escrow contract.
+    Client authorization is submitted — funds locked in escrow via `operator.authorize()`. The operator calls the token collector to execute `receiveWithAuthorization` with the client's ERC-3009 signature, then routes funds into the escrow contract.
   </Step>
 
-  <Step title="Capture">
-    Release earned amount to receiver. Operator calls `escrow.release()` based on configured conditions (time elapsed, work verified, etc.).
+  <Step title="Resource Delivered">
+    Server returns the resource (HTTP 200).
   </Step>
 
-  <Step title="Void">
-    Return unused funds to payer. Operator calls `escrow.void()` for full refunds during escrow period.
+  <Step title="Capture or Void">
+    The operator can capture (release funds to receiver via `operator.release()`) or void (return escrowed funds to client). Capture conditions are configurable per operator (time-locked, arbiter-approved, etc.).
   </Step>
 
   <Step title="Reclaim">
-    Payer safety valve if operator disappears. After `authorizationExpiry`, payer can reclaim funds directly without operator approval.
+    If `authorizationExpiry` passes without capture, the client can reclaim funds directly from escrow without operator approval.
+  </Step>
+
+  <Step title="Refund (Optional)">
+    After capture, the operator can refund within the `refundExpiry` window via `operator.refundPostEscrow()`.
   </Step>
 </Steps>
+
+### Charge
+
+```
+CHARGE -> RESOURCE DELIVERED -> (REFUND)
+```
+
+<Steps>
+  <Step title="Charge">
+    Client authorization is submitted — funds sent directly to receiver via `operator.charge()`. No escrow hold.
+  </Step>
+
+  <Step title="Resource Delivered">
+    Server returns the resource (HTTP 200).
+  </Step>
+
+  <Step title="Refund (Optional)">
+    The operator can refund within the `refundExpiry` window via `operator.refundPostEscrow()`.
+  </Step>
+</Steps>
+
+No capture, void, or reclaim — funds are never held in escrow.
 
 ## Visual Flow
 
@@ -48,7 +85,7 @@ sequenceDiagram
     Server->>Receiver: 2. Immediate Transfer
     Server->>Client: 3. Deliver Resource
 
-    Note over Client,Receiver: ⚠️ No recourse after payment - Payment is final
+    Note over Client,Receiver: No recourse after payment - Payment is final
 ```
 
 ### Escrow Payment (Deferred Settlement)
@@ -56,19 +93,35 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Escrow as Escrow Contract
-    participant Operator
     participant Server
+    participant Facilitator
+    participant Operator
+    participant Escrow
     participant Receiver
 
-    Client->>Escrow: 1. Authorize (Lock funds)
-    Server->>Client: 2. Deliver Resource
-    Note over Escrow,Operator: 3. Hold until conditions met
-    Operator->>Escrow: 4. release()
-    Escrow->>Receiver: 5. Transfer funds
+    Client->>Server: GET /resource
+    Server-->>Client: 402 PaymentRequired
+    Note over Client: Signs ERC-3009 authorization
 
-    Note over Client,Escrow: Alt: Client can reclaim after expiry
-    Note over Client,Receiver: ✓ Protected until conditions met - Funds held safely, refundable
+    Client->>Server: PaymentPayload with signature
+    Server->>Facilitator: verify + settle
+    Facilitator->>Operator: authorize(paymentInfo, amount, tokenCollector, signature)
+    Operator->>Escrow: Lock funds in escrow
+    Facilitator-->>Server: Settlement confirmed
+    Server-->>Client: 200 OK + resource
+
+    Note over Operator,Escrow: Later: operator releases based on conditions
+
+    alt Successful completion
+        Operator->>Escrow: release(paymentInfo, amount)
+        Escrow->>Receiver: Transfer funds (minus fees)
+    else Void (full refund in escrow)
+        Operator->>Escrow: void(paymentInfo)
+        Escrow->>Client: Return to payer
+    else Authorization expired
+        Client->>Escrow: reclaim()
+        Escrow->>Client: Return to payer (no operator needed)
+    end
 ```
 
 ### Key Differences
@@ -78,7 +131,8 @@ sequenceDiagram
 | **Settlement** | Immediate on request | Deferred until conditions met |
 | **Payer Protection** | None (payment final) | Refundable until capture |
 | **Resource Delivery** | After payment clears | Immediately after authorization |
-| **Recourse** | No recourse | Can reclaim after expiry |
+| **Recourse** | No recourse | Reclaim after expiry, refund via operator |
+| **Fee System** | None | Configurable (min/max bounds, client-signed) |
 | **Use Case** | Trusted, low-value, instant | High-value, variable cost, disputes |
 
 ## Operator Flexibility
@@ -95,7 +149,7 @@ The **operator** is the key abstraction. Different implementations enable differ
 
 ## Message Format
 
-### PaymentRequired (402 Response)
+### PaymentRequirements (402 Response)
 
 Server sends this to request payment:
 
@@ -105,23 +159,20 @@ Server sends this to request payment:
   "accepts": [{
     "scheme": "escrow",
     "network": "eip155:8453",
-    "amount": "10000000",
+    "amount": "1000000",
     "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "payTo": "0xReceiver...",
+    "payTo": "0xReceiverAddress",
+    "maxTimeoutSeconds": 60,
     "extra": {
       "name": "USDC",
       "version": "2",
-      "escrowAddress": "0xEscrow...",
-      "operatorAddress": "0xOperator...",
-      "authorizeAddress": "0xOperator...",
-      "tokenCollector": "0xCollector...",
-      "minDeposit": "5000000",
-      "maxDeposit": "100000000",
-      "authorizationExpirySeconds": 259200,
-      "refundExpirySeconds": 31536000,
+      "escrowAddress": "0xe050bB89eD43BB02d71343063824614A7fb80B77",
+      "operatorAddress": "0xOperatorAddress",
+      "tokenCollector": "0xcE66Ab399EDA513BD12760b6427C87D6602344a7",
+      "settlementMethod": "authorize",
       "minFeeBps": 0,
-      "maxFeeBps": 0,
-      "feeReceiver": "0xFeeReceiver..."
+      "maxFeeBps": 1000,
+      "feeReceiver": "0xOperatorAddress"
     }
   }]
 }
@@ -134,28 +185,41 @@ Client sends this with signed authorization:
 ```json
 {
   "x402Version": 2,
-  "scheme": "escrow",
+  "resource": {
+    "url": "https://api.example.com/resource",
+    "method": "GET"
+  },
+  "accepted": {
+    "scheme": "escrow",
+    "network": "eip155:8453",
+    "amount": "1000000",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0xReceiverAddress",
+    "maxTimeoutSeconds": 60,
+    "extra": { "..." }
+  },
   "payload": {
     "authorization": {
-      "from": "0xPayer...",
-      "to": "0xCollector...",
-      "value": "10000000",
+      "from": "0xPayerAddress",
+      "to": "0xcE66Ab399EDA513BD12760b6427C87D6602344a7",
+      "value": "1000000",
       "validAfter": "0",
-      "validBefore": "1734567890",
-      "nonce": "0x..."
+      "validBefore": "1740672154",
+      "nonce": "0xf374...3480"
     },
-    "signature": "0x...",
+    "signature": "0x2d6a...571c",
     "paymentInfo": {
-      "operator": "0xOperator...",
-      "receiver": "0xReceiver...",
+      "operator": "0xOperatorAddress",
+      "receiver": "0xReceiverAddress",
       "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      "maxAmount": "10000000",
+      "maxAmount": "1000000",
+      "preApprovalExpiry": 1740672154,
       "authorizationExpiry": 4294967295,
       "refundExpiry": 281474976710655,
       "minFeeBps": 0,
-      "maxFeeBps": 0,
-      "feeReceiver": "0xFeeReceiver...",
-      "salt": "0x..."
+      "maxFeeBps": 1000,
+      "feeReceiver": "0xOperatorAddress",
+      "salt": "0x0000...0001"
     }
   }
 }
@@ -167,78 +231,104 @@ Client sends this with signed authorization:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `name` | string | EIP-712 domain name for the token (e.g., `"USDC"`) |
+| `version` | string | EIP-712 domain version (e.g., `"2"`) |
 | `escrowAddress` | address | AuthCaptureEscrow contract address on the specified network |
-| `operatorAddress` | address | Address with capture/void authority (stored in PaymentInfo.operator) |
-| `tokenCollector` | address | ERC-3009/Permit2 token collector contract address |
+| `operatorAddress` | address | Operator contract address (stored in PaymentInfo.operator) |
+| `tokenCollector` | address | ERC-3009 token collector contract address |
 
 ### Optional Extra Fields
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `authorizeAddress` | address | Where facilitator calls authorize() | `operatorAddress` if operator is a contract, `escrowAddress` if operator is an EOA |
-| `minDeposit` | uint256 | Minimum accepted deposit amount (wei) | No minimum |
-| `maxDeposit` | uint256 | Maximum accepted deposit amount (wei) | No maximum |
-| `authorizationExpirySeconds` | uint32 | Seconds until payer can reclaim funds | `type(uint32).max` (effectively never) |
-| `refundExpirySeconds` | uint48 | Seconds until refunds are no longer allowed | `type(uint48).max` (effectively never) |
+| `settlementMethod` | `"authorize"` \| `"charge"` | Settlement path | `"authorize"` |
 | `minFeeBps` | uint16 | Minimum fee in basis points | `0` |
 | `maxFeeBps` | uint16 | Maximum fee in basis points | `0` |
-| `feeReceiver` | address | Address receiving fees | `operatorAddress` |
+| `feeReceiver` | address | Address receiving fees | `address(0)` (flexible) |
+| `preApprovalExpirySeconds` | uint48 | ERC-3009 signature validity / pre-approval deadline (seconds from now) | `type(uint48).max` |
+| `authorizationExpirySeconds` | uint48 | Deadline for capturing escrowed funds (seconds from now) | `type(uint48).max` |
+| `refundExpirySeconds` | uint48 | Deadline for refund requests (seconds from now) | `type(uint48).max` |
 
 <Note>
-**Fee Configuration:** Fees are enforced on-chain in the PaymentInfo struct. The operator contract cannot charge more than `maxFeeBps` or less than `minFeeBps`.
+**Fee Configuration:** Fees are enforced on-chain in the PaymentInfo struct. The operator contract cannot charge more than `maxFeeBps` or less than `minFeeBps`. If `feeReceiver` is set, the actual fee recipient at capture/charge must match.
 </Note>
 
-## Authorization vs Capture
+## Nonce Derivation
 
-Understanding the two-phase process:
+The ERC-3009 nonce is deterministically derived from the payment parameters:
 
-### Phase 1: Authorization (HTTP Request)
-
-```typescript
-// Client signs ERC-3009 authorization
-const authorization = {
-  from: payerAddress,
-  to: tokenCollectorAddress,
-  value: maxAmount,
-  validAfter: 0,
-  validBefore: deadline,
-  nonce: randomNonce()
-};
-
-const signature = await signERC3009(authorization);
-
-// Send to server in PaymentPayload
-await fetch('/resource', {
-  headers: {
-    'X-Payment': JSON.stringify({
-      x402Version: 2,
-      scheme: 'escrow',
-      payload: { authorization, signature, paymentInfo }
-    })
-  }
-});
-
-// Server calls facilitator to settle
-// Facilitator calls escrow.authorize() on-chain
-// Funds locked in escrow contract
+```
+nonce = keccak256(abi.encode(chainId, escrowAddress, paymentInfoHash))
 ```
 
-### Phase 2: Capture (After Work)
+This ties the off-chain signature to the specific chain, escrow contract, and payment terms — preventing cross-chain or cross-contract replay. The nonce is consumed on-chain at settlement.
 
-```typescript
-// Later: operator decides to release funds
-// This could be:
-// - Immediate (for exact-like behavior)
-// - After time period (escrow period elapsed)
-// - After verification (arbiter approved)
-// - Batch settlement (multiple captures from one authorization)
+## Verification Logic
 
-await operator.release(paymentId);
-// or
-await operator.charge(paymentId, partialAmount);
-// or
-await operator.void(paymentId); // full refund
+The facilitator performs these checks in order:
+
+1. **Type guard** — Verify `payload` contains `authorization`, `signature`, and `paymentInfo` fields
+2. **Scheme match** — Verify `scheme === "escrow"`
+3. **Network match** — Verify network format is `eip155:<chainId>` and matches between requirements and payload
+4. **Extra validation** — Verify `extra` contains required fields (`escrowAddress`, `operatorAddress`, `tokenCollector`)
+5. **Time window** — Verify `validBefore > now + 6s` (not expired) and `validAfter <= now` (active)
+6. **ERC-3009 signature** — Recover signer from EIP-712 typed data (`ReceiveWithAuthorization` primary type) and verify matches `authorization.from`
+7. **Amount** — Verify `authorization.value >= requirements.amount`
+8. **Recipient match** — Verify `authorization.to === extra.tokenCollector`
+9. **Token match** — Verify `paymentInfo.token === requirements.asset`
+10. **Receiver match** — Verify `paymentInfo.receiver === requirements.payTo`
+11. **Simulate** — Call `operator.authorize(...)` or `operator.charge(...)` via `eth_call` to verify success
+
+### EIP-6492 Support
+
+For smart wallet clients, the signature may be EIP-6492 wrapped (containing deployment bytecode). The facilitator extracts the inner ECDSA signature for verification. The on-chain `ERC6492SignatureHandler` in the token collector handles wallet deployment during settlement.
+
+## Settlement Logic
+
+Settlement is performed by the facilitator calling the operator:
+
+1. **Re-verify** the payload (catch expired/invalid payloads before spending gas)
+2. **Determine function** — `settlementMethod === "charge" ? "charge" : "authorize"`
+3. **Call operator** — `operator.<fn>(paymentInfo, amount, tokenCollector, collectorData)`
+4. **Wait for receipt** — Confirm transaction success (60s timeout)
+5. **Return result** — Transaction hash, network, and payer address
+
+The operator handles:
+
+- Calling the token collector to execute `receiveWithAuthorization` with the client's ERC-3009 signature
+- Routing funds to escrow (authorize) or directly to receiver (charge)
+- Validating fee bounds against the client-signed `PaymentInfo`
+
+## PaymentInfo Struct
+
+This struct is signed by the client and validated on-chain:
+
+```solidity
+struct PaymentInfo {
+    address operator;           // Operator address
+    address payer;              // Client wallet (authorization.from)
+    address receiver;           // Fund recipient (payTo)
+    address token;              // ERC-20 token address
+    uint120 maxAmount;          // Maximum authorized amount
+    uint48  preApprovalExpiry;  // ERC-3009 validBefore / pre-approval deadline
+    uint48  authorizationExpiry;// Capture deadline (authorize path only)
+    uint48  refundExpiry;       // Refund request deadline
+    uint16  minFeeBps;          // Minimum acceptable fee (basis points)
+    uint16  maxFeeBps;          // Maximum acceptable fee (basis points)
+    address feeReceiver;        // Fee recipient (address(0) = flexible)
+    uint256 salt;               // Client-provided entropy
+}
 ```
+
+### Expiry Ordering
+
+The contract enforces: `preApprovalExpiry <= authorizationExpiry <= refundExpiry`
+
+| Expiry | Enforced At | Effect |
+|:-------|:------------|:-------|
+| `preApprovalExpiry` | `authorize()` / `charge()` | Blocks settlement after this time |
+| `authorizationExpiry` | `capture()` | Blocks capture; enables `reclaim()` |
+| `refundExpiry` | `refund()` | Blocks refund requests |
 
 ## Safety Guarantees
 
@@ -246,19 +336,19 @@ The escrow contract enforces invariants on-chain:
 
 <CardGroup cols={2}>
   <Card title="No Overcharging" icon="shield-check">
-    Operator cannot capture more than authorized `maxAmount`. Attempting to exceed the limit reverts the transaction.
+    Settlement amount is capped by client-signed `maxAmount`. Attempting to exceed the limit reverts the transaction.
   </Card>
 
-  <Card title="No Double-Spend" icon="lock">
-    Funds are locked at authorization. Payer cannot use the same tokens elsewhere until void/reclaim.
+  <Card title="Replay Prevention" icon="lock">
+    Each payment has a unique nonce derived from `(chainId, escrowAddress, paymentInfoHash)`. The nonce is consumed on-chain at settlement.
   </Card>
 
   <Card title="Payer Reclaim" icon="clock">
-    If `authorizationExpiry` is set, payer can reclaim funds after expiry without operator approval.
+    After `authorizationExpiry`, payer can reclaim escrowed funds directly without operator approval.
   </Card>
 
   <Card title="Fee Bounds" icon="receipt">
-    Min/max fee bounds in PaymentInfo are enforced on-chain. Operator must respect these limits.
+    Min/max fee bounds in PaymentInfo are client-signed and enforced on-chain. The operator must respect these limits.
   </Card>
 </CardGroup>
 
@@ -266,66 +356,33 @@ The escrow contract enforces invariants on-chain:
 **Operator Trust Required:** The operator contract controls when and how much to release. Choose operators carefully and understand their release conditions. See [Operators](/contracts/overview#payment-operator) for details.
 </Warning>
 
-## Sequence Diagram
+## Error Codes
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
-    participant Facilitator
-    participant TokenCollector
-    participant Escrow
-    participant Operator
+### Verification Errors
 
-    Client->>Server: GET /resource
-    Server-->>Client: 402 PaymentRequired
-    Note over Server,Client: includes escrowAddress, operatorAddress, etc.
+| Error Code | Description |
+|:-----------|:------------|
+| `invalid_payload_format` | Payload missing `authorization`, `signature`, or `paymentInfo` |
+| `unsupported_scheme` | Scheme is not `escrow` |
+| `network_mismatch` | Payload network does not match requirements |
+| `invalid_network` | Network format is not `eip155:<chainId>` |
+| `invalid_escrow_extra` | Missing required extra fields (`escrowAddress`, `operatorAddress`, `tokenCollector`) |
+| `authorization_expired` | `validBefore <= now + 6s` |
+| `authorization_not_yet_valid` | `validAfter > now` |
+| `invalid_escrow_signature` | ERC-3009 signature verification failed |
+| `amount_mismatch` | `authorization.value !== requirements.amount` |
+| `token_collector_mismatch` | `authorization.to !== extra.tokenCollector` |
+| `token_mismatch` | `paymentInfo.token !== requirements.asset` |
+| `receiver_mismatch` | `paymentInfo.receiver !== requirements.payTo` |
+| `insufficient_balance` | Payer balance is less than required amount |
+| `simulation_failed` | Settlement simulation via `eth_call` failed |
 
-    Note over Client: User signs ERC-3009 authorization
-    Client->>Client: signERC3009(authorization)
+### Settlement Errors
 
-    Client->>Server: PaymentPayload with signature
-    Server->>Facilitator: verify(signature, paymentInfo)
-    Facilitator->>Facilitator: Validate signature & amounts
-
-    Facilitator->>TokenCollector: transferWithAuthorization()
-    TokenCollector->>Escrow: Transfer tokens to escrow
-    Note over Escrow: Tokens locked in escrow
-
-    Facilitator->>Escrow: authorize(paymentId, ...)
-    Note over Escrow: Payment state = InEscrow
-
-    Facilitator-->>Server: Settlement confirmed
-    Server-->>Client: 200 OK + resource
-
-    Note over Operator,Escrow: Later: operator releases funds based on conditions
-
-    alt Successful completion
-        Operator->>Escrow: release(paymentId)
-        Escrow->>Operator: Transfer to receiver
-        Note over Escrow: Payment state = Released
-    else Refund needed
-        Operator->>Escrow: void(paymentId)
-        Escrow->>Client: Return to payer
-        Note over Escrow: Payment state = Settled
-    else Authorization expired
-        Client->>Escrow: reclaim(paymentId)
-        Escrow->>Client: Return to payer
-        Note over Escrow: Payer reclaims without operator
-    end
-```
-
-## Self-Hosted Facilitator
-
-x402r ships a self-hosted facilitator service at `x402r-sdk/examples/facilitator/` that implements x402's facilitator protocol for escrow payments. This service:
-
-1. Exposes a `/supported` endpoint with escrow scheme configuration (operator, escrow, and token collector addresses)
-2. Verifies payment signatures via `/verify`
-3. Settles payments on-chain via `/settle` by calling `authorize()` on the PaymentOperator
-
-Merchant servers use x402's standard `paymentMiddleware` with an `HTTPFacilitatorClient` pointing to this service, so they don't need to handle blockchain interactions directly.
-
-See [Examples](/sdk/examples) for the complete setup guide.
+| Error Code | Description |
+|:-----------|:------------|
+| `verification_failed` | Re-verification before settlement failed |
+| `transaction_reverted` | On-chain transaction reverted after confirmation |
 
 ## vs Exact Scheme
 
@@ -355,8 +412,11 @@ See [Comparison](/x402-integration/comparison) for detailed trade-offs.
 
 ## References
 
-- [Base Commerce Payments Protocol](https://blog.base.dev/commerce-payments-protocol)
+- [Escrow Scheme Proposal (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
+- [Escrow Scheme Specification (PR #1425)](https://github.com/coinbase/x402/pull/1425)
+- [Commerce Payments Protocol](https://blog.base.dev/commerce-payments-protocol)
 - [AuthCaptureEscrow Contract](https://github.com/base/commerce-payments)
 - [EIP-3009: Transfer With Authorization](https://eips.ethereum.org/EIPS/eip-3009)
 - [x402r Operator Contracts](https://github.com/BackTrackCo/x402r-contracts)
+- [x402r Escrow Scheme](https://github.com/BackTrackCo/x402r-scheme)
 - [x402 Protocol](https://github.com/coinbase/x402)

@@ -38,13 +38,23 @@
             "pages": [
               "contracts/overview",
               "contracts/architecture",
-              "contracts/core-contracts",
+              "contracts/periphery/auth-capture-escrow",
+              "contracts/payment-operator",
               "contracts/factories",
               "contracts/fees",
               "contracts/gas-costs",
               "contracts/examples",
               "contracts/audits",
               "contracts/license"
+            ]
+          },
+          {
+            "group": "Periphery",
+            "pages": [
+              "contracts/periphery/overview",
+              "contracts/periphery/refund-request",
+              "contracts/periphery/refund-request-evidence",
+              "contracts/periphery/receiver-refund-collector"
             ]
           },
           {
