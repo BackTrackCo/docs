@@ -106,16 +106,25 @@ x402r extends commerce-payments with flexible payment capabilities:
 - MEV protection via private mempool support
 - Composable via `AndCondition([escrowPeriod, freeze])`
 
-### 4. Factory Pattern
+### 4. Arbiter & Evidence System
 
-**PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
+**RefundRequestEvidence** - On-chain evidence submission with IPFS CIDs and arbiter EIP-712 signature approval
+
+### 5. Factory Pattern
+
+**PaymentOperatorFactory** - Deploys operators with deterministic CREATE3 addresses
 
 **EscrowPeriodFactory** - Deploys EscrowPeriod contracts
 
 **FreezeFactory** - Deploys Freeze condition contracts
 
+Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, RecorderCombinator.
+
+All factories use **unified CREATE3 addresses** — same address on every supported chain.
+
 **Benefits:**
 - Predictable addresses for off-chain address generation
+- Cross-chain address consistency (same config = same address on every chain)
 - Shared configuration reduces deployment costs
 - Idempotent deployments (same config = same address)
 - Owner controls all deployed instances via factory
@@ -126,11 +135,12 @@ x402r extends commerce-payments with flexible payment capabilities:
 |---------|------------------|-------|
 | **Refunds** | Manual void/reclaim | Structured refund requests with configurable approval |
 | **Escrow Period** | Not enforced | Configurable time-lock before release |
-| **Dispute Resolution** | Not built-in | Optional arbiter workflow via conditions |
-| **Authorization** | Operator-based only | Pluggable conditions (access, time, combinators) |
+| **Dispute Resolution** | Not built-in | Arbiter workflow via conditions, signatures, and evidence |
+| **Authorization** | Operator-based only | Pluggable conditions (access, time, signature, combinators) |
 | **Freeze Mechanism** | Not available | Configurable freeze during escrow period |
-| **Deployment** | Direct deployment | Factory pattern with CREATE2 |
-| **Fees** | Not enforced | Configurable protocol and operator fees |
+| **Deployment** | Direct deployment | Factory pattern with unified CREATE3 (same address every chain) |
+| **Fees** | Not enforced | Additive protocol + operator fees with 7-day timelock |
+| **Multi-chain** | Per-chain deployment | Unified CREATE3 addresses across 11 chains |
 
 ## Use Cases
 
@@ -184,7 +194,7 @@ Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelo
 
 For a detailed view of how all contracts interact, see [Architecture](/contracts/architecture).
 
-To understand individual contracts, see [Core Contracts](/contracts/core-contracts).
+To understand the core operator, see [PaymentOperator](/contracts/payment-operator). For supporting contracts, see [Periphery](/contracts/periphery/overview).
 
 For factory deployment patterns, see [Factories](/contracts/factories).
 
@@ -194,8 +204,8 @@ For factory deployment patterns, see [Factories](/contracts/factories).
   <Card title="Architecture" icon="diagram-project" href="/contracts/architecture">
     View system architecture diagrams and payment flows.
   </Card>
-  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
-    Learn about PaymentOperator, RefundRequest, and other core contracts.
+  <Card title="PaymentOperator" icon="file-contract" href="/contracts/payment-operator">
+    Learn about the core operator contract.
   </Card>
   <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator using the SDK.

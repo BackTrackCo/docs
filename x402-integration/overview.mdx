@@ -118,23 +118,22 @@ sequenceDiagram
     participant Client
     participant Server
     participant Facilitator
-    participant Escrow
     participant Operator
+    participant Escrow
 
     Client->>Server: GET /resource
     Server-->>Client: 402 Payment Required
     Note over Client: Signs ERC-3009 authorization
     Client->>Server: Payment payload
     Server->>Facilitator: Verify & settle
-    Facilitator->>Escrow: authorize(paymentId, amount)
-    Note over Escrow: Funds locked
+    Facilitator->>Operator: authorize(paymentInfo, amount, tokenCollector, signature)
+    Operator->>Escrow: Lock funds in escrow
     Facilitator-->>Server: Settlement confirmed
     Server-->>Client: 200 OK + resource
 
-    Note over Server,Operator: Later: capture or void
-    Server->>Operator: capture(paymentId)
-    Operator->>Escrow: release(paymentId)
-    Note over Escrow: Funds released to receiver
+    Note over Operator,Escrow: Later: capture or void
+    Operator->>Escrow: release(paymentInfo, amount)
+    Note over Escrow: Funds released to receiver (minus fees)
 ```
 
 ## Use Cases

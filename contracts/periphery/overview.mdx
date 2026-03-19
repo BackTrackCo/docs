@@ -1,0 +1,70 @@
+---
+title: "Periphery Overview"
+description: "Supporting contracts that extend the PaymentOperator: escrow, refund requests, token collectors, and more"
+icon: "puzzle-piece"
+---
+
+## What Are Periphery Contracts?
+
+Periphery contracts support the [PaymentOperator](/contracts/payment-operator) but are not the operator itself. They handle escrow storage, token collection, refund workflows, and evidence submission.
+
+## Contract Map
+
+| Contract | Role | Type |
+|----------|------|------|
+| [Commerce Payments](/contracts/periphery/auth-capture-escrow) | AuthCaptureEscrow + ERC3009PaymentCollector (base layer) | Singleton |
+| [RefundRequest](/contracts/periphery/refund-request) | Tracks refund request lifecycle and approvals | Singleton |
+| [RefundRequestEvidence](/contracts/periphery/refund-request-evidence) | On-chain evidence submission for disputes | Singleton |
+| [ReceiverRefundCollector](/contracts/periphery/receiver-refund-collector) | Pulls funds from receiver for post-escrow refunds | Singleton |
+
+## Contract Addresses
+
+All periphery contracts use **unified CREATE3 addresses** — the same address on every supported chain.
+
+| Contract | Address |
+|----------|---------|
+| AuthCaptureEscrow | `0xe050bB89eD43BB02d71343063824614A7fb80B77` |
+| ERC3009PaymentCollector | `0xcE66Ab399EDA513BD12760b6427C87D6602344a7` |
+| ProtocolFeeConfig | `0x7e868A42a458fa2443b6259419aA6A8a161E08c8` |
+| ReceiverRefundCollector | `0xE5500a38BE45a6C598420fbd7867ac85EC451A07` |
+| RefundRequestEvidence | `0xF97aAB816b7cbe53025454ad05b03cf5C361F1BA` |
+
+### Factories
+
+| Factory | Address |
+|---------|---------|
+| PaymentOperatorFactory | `0x4D9BC2Ba2D0d9AFb6B63E3afBbfC95143E6E8Da9` |
+| EscrowPeriodFactory | `0x15DB06aADEB3a39D47756Bf864a173cc48bafe24` |
+| FreezeFactory | `0xdf129EFFE040c3403aca597c0F0bb704859a78Fd` |
+| StaticFeeCalculatorFactory | `0x6CDdBdB46e2d7Caae31A6b213B59a1412d7f16Ac` |
+| StaticAddressConditionFactory | `0xfB09350b200fda7dDd06565F5296A0CA625311d5` |
+| AndConditionFactory | `0x5a1F3b6d030D25a2B86aAE469Ae1216ef3be308D` |
+| OrConditionFactory | `0x101B2fac8cdC6348E541A0ef087275dA62AA13A0` |
+| NotConditionFactory | `0x1D58f97843579356863d3393ebe24feEd76ceefF` |
+| RecorderCombinatorFactory | `0xACf2b5e21CFc14135C9cD43ebE96a481F184C1A1` |
+
+### Condition Singletons
+
+| Condition | Address |
+|-----------|---------|
+| PayerCondition | `0x33F5F1154A02d0839266EFd23Fd3b85a3505bB4B` |
+| ReceiverCondition | `0xF41974A853940Ff4c18d46B6565f973c1180E171` |
+| AlwaysTrueCondition | `0xb295df7E7f786fd84D614AB26b1f2e86026C3483` |
+
+<Note>
+All addresses are available programmatically via `@x402r/core`'s `getChainConfig(chainId)`. See [SDK Installation](/sdk/installation) for details.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Commerce Payments" icon="vault" href="/contracts/periphery/auth-capture-escrow">
+    AuthCaptureEscrow and ERC3009PaymentCollector.
+  </Card>
+  <Card title="RefundRequest" icon="rotate-left" href="/contracts/periphery/refund-request">
+    Refund request lifecycle and approvals.
+  </Card>
+  <Card title="PaymentOperator" icon="file-contract" href="/contracts/payment-operator">
+    The core operator contract.
+  </Card>
+</CardGroup>
