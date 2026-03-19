@@ -1,14 +1,12 @@
 ---
-title: "Core Contracts"
-description: "Detailed explanation of PaymentOperator, RefundRequest, and AuthCaptureEscrow"
+title: "PaymentOperator"
+description: "The core payment operator contract with pluggable conditions and fee management"
 icon: "file-contract"
 ---
 
-## PaymentOperator
+## Overview
 
 The main payment operator contract with pluggable conditions for flexible authorization logic.
-
-### Overview
 
 - **Type:** Operator instance (one per fee recipient + configuration)
 - **Deployment:** Via PaymentOperatorFactory
@@ -16,7 +14,7 @@ The main payment operator contract with pluggable conditions for flexible author
 - **Configuration:** 10 slots for conditions and recorders
 - **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
-### Immutable Fields
+## Immutable Fields
 
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
@@ -25,7 +23,7 @@ ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG; // Shared protocol fee c
 IFeeCalculator public immutable FEE_CALCULATOR; // Operator fee calculator
 ```
 
-### State
+## State
 
 ```solidity
 // Fee tracking for accurate distribution
@@ -35,7 +33,7 @@ mapping(address token => uint256) public accumulatedProtocolFees;
 mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ```
 
-### 10-Slot Configuration
+## 10-Slot Configuration
 
 <Accordion title="Condition Slots (Before Actions)">
 1. **AUTHORIZE_CONDITION** - Who can authorize payments
@@ -57,9 +55,9 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 **Default:** `address(0)` = no recording (no-op)
 </Accordion>
 
-### Key Methods
+## Key Methods
 
-#### authorize()
+### authorize()
 
 Authorizes a payment and locks funds in escrow.
 
@@ -92,7 +90,7 @@ function authorize(
 **Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
 </Tip>
 
-#### charge()
+### charge()
 
 Direct charge - collects payment and immediately transfers to receiver (no escrow hold).
 
@@ -125,7 +123,7 @@ function charge(
 Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refundPostEscrow()`.
 </Note>
 
-#### release()
+### release()
 
 Releases funds from escrow to receiver (capture).
 
@@ -156,7 +154,7 @@ function release(
 **DAO example:** StaticAddressCondition(daoMultisig)
 </Note>
 
-#### refundInEscrow()
+### refundInEscrow()
 
 Refunds payment while still in escrow (partial void).
 
@@ -186,7 +184,7 @@ function refundInEscrow(
 **Subscription example:** address(0) - no refunds
 </Note>
 
-#### refundPostEscrow()
+### refundPostEscrow()
 
 Refunds payment after it has been released (captured).
 
@@ -219,11 +217,11 @@ function refundPostEscrow(
 **Most configurations:** address(0) - no post-escrow refunds
 </Note>
 
-### Fee System (Modular, Additive)
+## Fee System (Modular, Additive)
 
 Fees are additive and modular: `totalFee = protocolFee + operatorFee`
 
-#### Fee Architecture
+### Fee Architecture
 
 ```solidity
 // Shared protocol fee config (timelocked, swappable calculator)
@@ -243,8 +241,8 @@ mapping(address token => uint256) public accumulatedProtocolFees;
 **Example Fee Calculation (Additive):**
 
 For a 1000 USDC payment:
-- **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC → goes to `protocolFeeRecipient`
-- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC → goes to `FEE_RECIPIENT`
+- **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC -> goes to `protocolFeeRecipient`
+- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC -> goes to `FEE_RECIPIENT`
 - **Total Fee:** 5 bps (0.05%) = 0.50 USDC
 - **Receiver Gets:** 999.50 USDC
 
@@ -265,18 +263,18 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 - Platform Treasury (platform-controlled)
 - DAO Multisig (governance-controlled)
 
-#### Fee Distribution
+### Fee Distribution
 
 Fees accumulate in the operator contract and are distributed via `distributeFees(token)`:
 
 ```solidity
 // Anyone can call to distribute fees for a token
 operator.distributeFees(usdcAddress);
-// Protocol share → protocolFeeRecipient
-// Operator share → FEE_RECIPIENT
+// Protocol share -> protocolFeeRecipient
+// Operator share -> FEE_RECIPIENT
 ```
 
-#### Protocol Fee Changes (7-day Timelock)
+### Protocol Fee Changes (7-day Timelock)
 
 Protocol fee calculator changes require a 7-day timelock on `ProtocolFeeConfig`:
 
@@ -294,347 +292,24 @@ protocolFeeConfig.executeCalculator();
 Protocol fee changes require 7-day timelock. Operator fees are immutable (set at deploy time).
 </Warning>
 
-### Security Features
+## Security Features
 
 - **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
 - **Ownership** - Solady's Ownable with 2-step transfer
 - **Timelock** - 7-day delay on protocol fee changes (operator fees are immutable)
 - **Immutable Core** - Escrow, conditions, and fee configuration cannot be changed
 
----
-
-## RefundRequest
-
-Manages refund requests independent of operator implementation.
-
-### Overview
-
-- **Type:** Singleton (one per network)
-- **Deployment:** Direct deployment (no factory)
-- **Purpose:** Track refund request lifecycle
-
-### Request Types
-
-<Tabs>
-  <Tab title="In-Escrow Refunds">
-    **Who can request:** Payer, Receiver, OR Arbiter
-
-    **Typical flow:**
-    1. Payer suspects fraud, requests refund
-    2. Arbiter investigates
-    3. Arbiter approves or denies request
-    4. If approved, arbiter calls `operator.refundInEscrow()`
-
-    **Use cases:**
-    - Buyer remorse
-    - Seller fraud
-    - Payment error
-  </Tab>
-
-  <Tab title="Post-Escrow Refunds">
-    **Who can request:** Receiver only
-
-    **Typical flow:**
-    1. Receiver realizes product defect after release
-    2. Receiver requests refund
-    3. Arbiter investigates
-    4. If approved, arbiter calls `operator.refundPostEscrow()`
-
-    **Use cases:**
-    - Product defects discovered later
-    - Service not as described
-    - Voluntary refund by merchant
-  </Tab>
-</Tabs>
-
-### Request Status States
-
-```mermaid
-stateDiagram-v2
-    [*] --> Pending
-    Pending --> Approved: Arbiter approves
-    Pending --> Denied: Arbiter denies
-    Pending --> Cancelled: Requester cancels
-    Approved --> [*]: Arbiter executes refund via operator
-
-    note right of Approved
-        Arbiter must call
-        operator.refundInEscrow()
-        or operator.refundPostEscrow()
-    end note
-```
-
-### Key Methods
-
-#### requestRefund()
-
-Creates a new refund request.
-
-```solidity
-function requestRefund(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint120 amount,
-    uint256 nonce
-) external
-```
-
-**Parameters:**
-- `paymentInfo` - Payment info struct
-- `amount` - Amount being requested for refund
-- `nonce` - Record index (from PaymentIndexRecorder) identifying which charge/action
-
-**Access Control:** Only the payer who made the authorization can request
-
-<Note>
-Each refund request is keyed by `(paymentInfoHash, nonce)` where nonce is the record index. This allows multiple refund requests per payment (one per charge/action).
-</Note>
-
-#### updateStatus()
-
-Approve or deny a refund request.
-
-```solidity
-function updateStatus(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 nonce,
-    RequestStatus newStatus
-) external
-```
-
-**Parameters:**
-- `paymentInfo` - Payment info struct
-- `nonce` - Record index identifying which refund request
-- `newStatus` - The new status (`Approved` or `Denied`)
-
-**Access:** Receiver can always approve/deny. While in escrow, anyone passing the operator's `REFUND_IN_ESCROW_CONDITION` can also approve/deny.
-
-**Valid transitions:**
-- `Pending` → `Approved`
-- `Pending` → `Denied`
-
-#### cancelRefundRequest()
-
-Payer cancels their own request.
-
-```solidity
-function cancelRefundRequest(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 nonce
-) external
-```
-
-**Parameters:**
-- `paymentInfo` - Payment info struct
-- `nonce` - Record index identifying which refund request
-
-**Access:** Only the payer who created the request
-
-**Valid transition:**
-- `Pending` → `Cancelled`
-
-### Usage Example
-
-```typescript
-// 1. Payer requests refund (nonce 0 = first action on this payment)
-await refundRequest.requestRefund(paymentInfo, requestedAmount, 0);
-// Status: Pending
-
-// 2. Receiver (or arbiter) reviews and approves
-await refundRequest.updateStatus(
-  paymentInfo,
-  0,  // nonce
-  RequestStatus.Approved
-);
-// Status: Approved
-
-// 3. Execute refund via operator (separate transaction)
-await operator.refundInEscrow(paymentInfo, refundAmount);
-// Funds returned to payer
-```
-
-<Note>
-RefundRequest is **advisory only**. Approval does not automatically execute refunds - the authorized party must call the operator's refund function.
-</Note>
-
----
-
-## AuthCaptureEscrow
-
-Base escrow contract from commerce-payments library.
-
-### Overview
-
-- **Type:** Singleton (one per network)
-- **Source:** [commerce-payments](https://github.com/BackTrackCo/commerce-payments) (x402r fork)
-- **Purpose:** Hold ERC-20 tokens during payment lifecycle
-- **Access:** Operator-based (only registered operators can manage payments)
-
-<Note>
-x402r uses a forked version of commerce-payments with added **partial void** support for handling partially completed orders.
-</Note>
-
-### Payment State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> NonExistent
-    NonExistent --> InEscrow: authorize()
-    InEscrow --> Released: release()
-    InEscrow --> Settled: void() / refundInEscrow()
-    Released --> Settled: reclaim() / refundPostEscrow()
-    Settled --> [*]
-
-    note right of InEscrow
-        Funds locked in escrow
-        Payer can reclaim after expiry
-    end note
-
-    note right of Released
-        Funds transferred to receiver
-        Can still refund post-escrow
-    end note
-
-    note right of Settled
-        Terminal state
-        No further actions possible
-    end note
-```
-
-### Key Methods
-
-#### authorize()
-
-Locks tokens in escrow. Called by operator.
-
-```solidity
-function authorize(
-    bytes32 paymentId,
-    address payer,
-    address receiver,
-    uint256 amount,
-    address token,
-    address operator
-) external onlyOperator
-```
-
-**Requires:** Payer has approved escrow contract for `amount` of `token`
-
-<Note>
-The base escrow contract uses individual parameters (paymentId, payer, receiver, etc.) while the PaymentOperator wraps them in a `PaymentInfo` struct. The operator translates between the two formats internally.
-</Note>
-
-#### release()
-
-Releases tokens to receiver. Called by operator.
-
-```solidity
-function release(
-    bytes32 paymentId
-) external onlyOperator returns (uint256 amount)
-```
-
-**State change:** `InEscrow` → `Released`
-
-#### void()
-
-Returns tokens to payer (full refund). Called by operator.
-
-```solidity
-function void(
-    bytes32 paymentId
-) external onlyOperator
-```
-
-**State change:** `InEscrow` → `Settled`
-
-**Use case:** Refund during escrow period
-
-#### reclaim()
-
-Takes tokens back from receiver to give to payer. Called by operator.
-
-```solidity
-function reclaim(
-    bytes32 paymentId,
-    address from,
-    uint256 amount
-) external onlyOperator
-```
-
-**State change:** `Released` → `Settled`
-
-**Use case:** Refund after release
-
-**Requires:** Receiver has approved escrow for `amount`
-
-#### partialVoid()
-
-Returns partial amount to payer.
-
-```solidity
-function partialVoid(
-    bytes32 paymentId,
-    uint256 amount
-) external onlyOperator
-```
-
-**Use case:** Partial refunds for partially fulfilled orders
-
-### Security Features
-
-- **Operator whitelist** - Only registered operators can manage payments
-- **Reentrancy protection** - All state changes protected
-- **Event logging** - Complete audit trail
-
----
-
-## Supporting Contracts
-
-### ERC3009PaymentCollector
-
-Payment collection with gasless meta-transactions.
-
-**Features:**
-- ERC-3009 `transferWithAuthorization()` support
-- Nonce-based replay protection
-- Deadline-based expiry
-- Multicall3 integration
-
-**Use case:** Allow payers to authorize payments via signed messages instead of direct transactions (gasless UX).
-
-### TokenStore
-
-Safe token transfer utilities from commerce-payments.
-
-**Features:**
-- Reentrancy-safe transfers
-- SafeERC20 integration
-- Balance tracking
-
----
-
-## Contract Addresses
-
-### Base Sepolia Testnet
-
-| Contract | Address |
-|----------|---------|
-| AuthCaptureEscrow | [`0xb9488351E48b23D798f24e8174514F28B741Eb4f`](https://sepolia.basescan.org/address/0xb9488351E48b23D798f24e8174514F28B741Eb4f) |
-| ERC3009PaymentCollector | [`0xed02d3E5167BCc9582D851885A89b050AB816a56`](https://sepolia.basescan.org/address/0xed02d3E5167BCc9582D851885A89b050AB816a56) |
-| RefundRequest | [`0x6926c05193c714ED4bA3867Ee93d6816Fdc14128`](https://sepolia.basescan.org/address/0x6926c05193c714ED4bA3867Ee93d6816Fdc14128) |
-| PaymentOperatorFactory | [`0xFa8C4Cb156053b867Ae7489220A29b5939E3Df70`](https://sepolia.basescan.org/address/0xFa8C4Cb156053b867Ae7489220A29b5939E3Df70) |
-
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Factories" icon="industry" href="/contracts/factories">
-    Learn about factory deployment patterns.
+  <Card title="Periphery Contracts" icon="puzzle-piece" href="/contracts/periphery">
+    AuthCaptureEscrow, RefundRequest, and other supporting contracts.
   </Card>
   <Card title="Conditions" icon="filter" href="/contracts/conditions/overview">
     Explore the pluggable condition system.
   </Card>
-  <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
-    Deploy operators using the SDK's deployment utilities.
+  <Card title="Factories" icon="industry" href="/contracts/factories">
+    Deploy operators with factory patterns.
   </Card>
   <Card title="Examples" icon="code" href="/contracts/examples">
     See real-world configuration examples.

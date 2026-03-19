@@ -158,15 +158,18 @@ This example shows marketplace configuration. For subscriptions, you might use `
 // PaymentInfo is from base commerce-payments (AuthCaptureEscrow)
 // Passed as calldata to operator methods - not stored in operator
 struct PaymentInfo {
-    address payer;
-    address receiver;
     address operator;           // The PaymentOperator address
-    uint256 amount;
-    address token;
-    uint48 authorizationExpiry; // When authorization expires
-    uint16 minFeeBps;           // Minimum fee in basis points
-    uint16 maxFeeBps;           // Maximum fee in basis points
+    address payer;              // Client wallet
+    address receiver;           // Fund recipient
+    address token;              // ERC-20 token address
+    uint120 maxAmount;          // Maximum authorized amount
+    uint48  preApprovalExpiry;  // ERC-3009 validBefore / pre-approval deadline
+    uint48  authorizationExpiry;// Capture deadline (authorize path only)
+    uint48  refundExpiry;       // Refund request deadline
+    uint16  minFeeBps;          // Minimum fee in basis points
+    uint16  maxFeeBps;          // Maximum fee in basis points
     address feeReceiver;        // Who receives fees (operator itself)
+    uint256 salt;               // Client-provided entropy
 }
 ```
 
@@ -306,8 +309,8 @@ These events enable off-chain monitoring and indexing.
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Core Contracts" icon="file-contract" href="/contracts/core-contracts">
-    Learn about individual contract implementations.
+  <Card title="PaymentOperator" icon="file-contract" href="/contracts/payment-operator">
+    Learn about the core operator contract.
   </Card>
   <Card title="Conditions" icon="filter" href="/contracts/conditions/overview">
     Explore the condition system and combinators.

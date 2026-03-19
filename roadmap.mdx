@@ -19,9 +19,15 @@ icon: "map"
 - PaymentOperator with pluggable conditions and recorders
 - Partial refund support (partial void)
 - EscrowPeriod and Freeze contracts
-- Factory pattern with CREATE2 deterministic deployment
-- ArbiterRegistry for on-chain arbiter discovery
-- Deployed on Base Sepolia and Base Mainnet
+- Factory pattern with unified CREATE3 deterministic deployment
+- RefundRequestEvidence for on-chain evidence submission
+- Deployed across 11 chains with unified CREATE3 addresses (same address everywhere)
+
+### Escrow Scheme Spec (In Progress)
+
+- [Proposal submitted to coinbase/x402 (Issue #1011)](https://github.com/coinbase/x402/issues/1011)
+- [Spec PR submitted (PR #1425)](https://github.com/coinbase/x402/pull/1425)
+- Reference implementation: [x402r-scheme](https://github.com/BackTrackCo/x402r-scheme)
 
 ### Developer Experience (In Progress)
 
@@ -89,20 +95,24 @@ icon: "map"
 
 ## Contract Status
 
-| Contract | Base Sepolia | Base Mainnet |
-|----------|-------------|--------------|
-| AuthCaptureEscrow | Deployed | Deployed |
-| ERC3009PaymentCollector | Deployed | Deployed |
-| PaymentOperatorFactory | Deployed | Deployed |
-| EscrowPeriodFactory | Deployed | Deployed |
-| FreezeFactory | Deployed | Deployed |
-| RefundRequest | Deployed | Deployed |
-| ArbiterRegistry | Deployed | Deployed |
-| ProtocolFeeConfig | Deployed | Deployed |
-| Condition singletons | Deployed | Deployed |
+All contracts use **unified CREATE3 addresses** — same address on every supported chain (11 chains: Base, Ethereum, Polygon, Arbitrum, Optimism, Celo, Avalanche, Monad, Linea, Base Sepolia, Ethereum Sepolia).
+
+| Contract | Status |
+|----------|--------|
+| AuthCaptureEscrow | Deployed |
+| ERC3009PaymentCollector | Deployed |
+| PaymentOperatorFactory | Deployed |
+| EscrowPeriodFactory | Deployed |
+| FreezeFactory | Deployed |
+| StaticFeeCalculatorFactory | Deployed |
+| All condition/combinator factories | Deployed |
+| ProtocolFeeConfig | Deployed |
+| RefundRequestEvidence | Deployed |
+| ReceiverRefundCollector | Deployed |
+| Condition singletons (Payer, Receiver, AlwaysTrue) | Deployed |
 
 <Note>
-All contract addresses are available in `@x402r/core` via `getNetworkConfig()`. See the [Installation](/sdk/installation) page for details.
+All contract addresses are available in `@x402r/core` via `getChainConfig(chainId)`. See the [Installation](/sdk/installation) page for details.
 </Note>
 
 ## Get Involved

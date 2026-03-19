@@ -46,9 +46,9 @@ Deploys PaymentOperator instances with deterministic addresses.
 
 ### Contract Address
 
-**Base Sepolia:** `0xe01CEd771A30A23a7A4C9c1db604C74D4Dc4ebe8`
+All factories use unified CREATE3 addresses (same on every chain).
 
-**Base Mainnet:** `0xA50F51254E8B08899EdB76Bd24b4DC6A61ba7dE7`
+**PaymentOperatorFactory:** `0x4D9BC2Ba2D0d9AFb6B63E3afBbfC95143E6E8Da9`
 
 ### Configuration Structure
 
@@ -208,9 +208,7 @@ Deploys `EscrowPeriod` contracts - combined recorder and condition for time-base
 
 ### Contract Address
 
-**Base Sepolia:** `0x206D4DbB6E7b876e4B5EFAAD2a04e7d7813FB6ba`
-
-**Base Mainnet:** `0x2714EA3e839Ac50F52B2e2a5788F614cACeE5316`
+**EscrowPeriodFactory:** `0x15DB06aADEB3a39D47756Bf864a173cc48bafe24`
 
 ### Deployment Method
 
@@ -299,8 +297,7 @@ Deploys `Freeze` condition contracts that block release when a payment is frozen
 
 ### Contract Address
 
-**Base Sepolia:** `0x199fed16577773Bb6b2D76CC3cD1c76c22D28835`
-**Base Mainnet:** `0xCAEd9474c06bf9139AC36C874dED838e1Bcb9310`
+**FreezeFactory:** `0xdf129EFFE040c3403aca597c0F0bb704859a78Fd`
 
 ### Deployment Method
 
@@ -355,11 +352,11 @@ const config = {
 
 Use these pre-deployed condition contracts:
 
-| Condition | Address (Base Sepolia) | Address (Base Mainnet) | Description |
-|-----------|------------------------|------------------------|-------------|
-| PayerCondition | `0xBAF68176FF94CAdD403EF7FbB776bbca548AC09D` | `0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8` | Only payer can call |
-| ReceiverCondition | `0x12EDefd4549c53497689067f165c0f101796Eb6D` | `0xed02d3E5167BCc9582D851885A89b050AB816a56` | Only receiver can call |
-| AlwaysTrueCondition | `0x785cC83DEa3d46D5509f3bf7496EAb26D42EE610` | `0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178` | Anyone can call |
+| Condition | Address (all chains) | Description |
+|-----------|---------------------|-------------|
+| PayerCondition | `0x33F5F1154A02d0839266EFd23Fd3b85a3505bB4B` | Only payer can call |
+| ReceiverCondition | `0xF41974A853940Ff4c18d46B6565f973c1180E171` | Only receiver can call |
+| AlwaysTrueCondition | `0xb295df7E7f786fd84D614AB26b1f2e86026C3483` | Anyone can call |
 
 ### Example Deployments
 
