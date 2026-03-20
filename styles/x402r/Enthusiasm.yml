@@ -1,0 +1,10 @@
+extends: existence
+message: "Avoid enthusiasm markers: '%s'"
+level: warning
+ignorecase: true
+tokens:
+  - Amazing
+  - Exciting
+  - Great news
+  - Incredibly
+  - Super easy
