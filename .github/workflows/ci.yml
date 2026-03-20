@@ -22,6 +22,7 @@ jobs:
         uses: errata-ai/vale-action@v2
         with:
           reporter: github-pr-check
+          vale_flags: "--glob='*.mdx'"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
