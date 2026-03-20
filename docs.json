@@ -160,6 +160,12 @@
       "href": "https://github.com/BackTrackCo"
     }
   },
+  "feedback": {
+    "thumbsRating": true
+  },
+  "search": {
+    "prompt": "Search x402r docs..."
+  },
   "contextual": {
     "options": [
       "copy",
@@ -172,7 +178,6 @@
       "vscode"
     ]
   },
-  "redirects": [],
   "footer": {
     "socials": {
       "x": "https://x.com/x402rorg",

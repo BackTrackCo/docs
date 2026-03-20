@@ -1,0 +1,20 @@
+extends: existence
+message: "Avoid filler/marketing language: '%s'"
+level: warning
+ignorecase: true
+tokens:
+  - seamless
+  - robust
+  - comprehensive
+  - empower
+  - revolutionize
+  - unlock the
+  - leverage
+  - easy to use
+  - easy-to-use
+  - cutting-edge
+  - game-changer
+  - next-generation
+  - world-class
+  - best-in-class
+  - state-of-the-art

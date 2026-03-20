@@ -1,0 +1,41 @@
+name: Docs CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check broken links
+        run: npx mintlify@latest broken-links
+
+      - name: Grammar lint (Vale)
+        uses: errata-ai/vale-action@v2
+        with:
+          reporter: github-pr-check
+          vale_flags: "--glob='*.mdx'"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate frontmatter
+        run: |
+          missing=()
+          for file in $(find . -name '*.mdx' -not -path './node_modules/*'); do
+            head -20 "$file" | grep -q '^title:' || missing+=("$file (missing title)")
+            head -20 "$file" | grep -q '^description:' || missing+=("$file (missing description)")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Files with missing frontmatter:"
+            printf '  %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "All MDX files have required frontmatter."
