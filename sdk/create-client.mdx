@@ -1,0 +1,188 @@
+---
+title: "Create a Client"
+description: "Configure and instantiate the x402r client"
+icon: "plug"
+---
+
+## Full Client
+
+`createX402r()` returns a client with all action groups. Pass an `X402rConfig` object with your viem clients and operator address:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createX402r } from '@x402r/sdk'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const client = createX402r({
+  publicClient,
+  walletClient,
+  operatorAddress: '0xYourOperator...',
+  refundRequestAddress: '0xYourRefundRequest...',
+  escrowPeriodAddress: '0xYourEscrowPeriod...',
+})
+```
+
+## Config Reference
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `publicClient` | `PublicClient` | Yes | viem public client for read operations |
+| `walletClient` | `WalletClient` | No | viem wallet client for write operations |
+| `operatorAddress` | `Address` | Yes | Deployed PaymentOperator address |
+| `chainId` | `number` | No | Resolved from `publicClient` if omitted |
+| `network` | `string` | No | CAIP-2 identifier (e.g. `'eip155:84532'`), fallback if `chainId` is not set |
+| `refundRequestAddress` | `Address` | No | Enables `refund` action group |
+| `refundRequestEvidenceAddress` | `Address` | No | Enables `evidence` action group (requires `refundRequestAddress`) |
+| `escrowPeriodAddress` | `Address` | No | Enables `escrow` action group |
+| `freezeAddress` | `Address` | No | Enables `freeze` action group |
+| `paymentIndexRecorderAddress` | `Address` | No | Enables `query` action group |
+| `paymentStore` | `PaymentStore` | No | Pluggable storage for payment lookups |
+| `eventFromBlock` | `bigint` | No | Starting block for event-based payment lookups |
+
+<Note>
+`eventFromBlock` sets the lower bound for scanning on-chain events. Without it, the event fallback provider is disabled. Set this to the block your operator was deployed at.
+</Note>
+
+## Role Presets
+
+Role presets call `createX402r()` internally and return a type-narrowed client. They require `walletClient` in the config.
+
+### Payer
+
+```typescript
+import { createPayerClient } from '@x402r/sdk'
+
+const payer = createPayerClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0xYourOperator...',
+  refundRequestAddress: '0xYourRefundRequest...',
+})
+
+// Type-narrowed: only payer methods are available
+const state = await payer.payment.getState(paymentInfo)
+const tx = await payer.refund?.request(paymentInfo, amount, nonce)
+```
+
+### Merchant
+
+```typescript
+import { createMerchantClient } from '@x402r/sdk'
+
+const merchant = createMerchantClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0xYourOperator...',
+  refundRequestAddress: '0xYourRefundRequest...',
+})
+
+// Type-narrowed: only merchant methods are available
+const tx = await merchant.payment.release(paymentInfo, amount)
+```
+
+### Arbiter
+
+```typescript
+import { createArbiterClient } from '@x402r/sdk'
+
+const arbiter = createArbiterClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0xYourOperator...',
+  refundRequestAddress: '0xYourRefundRequest...',
+})
+
+// Type-narrowed: only arbiter methods are available
+const tx = await arbiter.refund?.approve(paymentInfo, nonce, amount)
+```
+
+<Note>
+Type narrowing is a DX improvement only. On-chain access control is enforced by [conditions](/contracts/conditions/overview), not by the client type.
+</Note>
+
+## Check Conditions
+
+Use `canExecute()` to check if a condition slot permits an action before submitting a transaction:
+
+```typescript
+const allowed = await client.canExecute('authorize', paymentInfo, amount)
+```
+
+This calls `ICondition.check()` on the condition configured for that slot on the operator. Returns `true` if no condition is set (zero address).
+
+## Payment Store
+
+`createMemoryStore()` provides an in-memory `PaymentStore` for development and testing. Data is lost when the process exits.
+
+```typescript
+import { createX402r, createMemoryStore } from '@x402r/sdk'
+
+const client = createX402r({
+  publicClient,
+  operatorAddress: '0xYourOperator...',
+  paymentIndexRecorderAddress: '0xYourRecorder...',
+  paymentStore: createMemoryStore(),
+})
+```
+
+For production, implement the `PaymentStore` interface with your database of choice.
+
+## Action Group Access
+
+Access action groups via dot notation on the client:
+
+```typescript
+// Always available
+await client.payment.getState(paymentInfo)
+await client.operator.getConfig()
+client.watch.onPayment((log) => { /* ... */ })
+
+// Available when the corresponding address is configured
+await client.escrow?.isDuringEscrow(paymentInfo)
+await client.refund?.request(paymentInfo, amount, nonce)
+await client.freeze?.isFrozen(paymentInfo)
+await client.query?.getPayerPayments(payerAddress)
+await client.evidence?.submit(paymentInfo, nonce, cid)
+```
+
+`payment`, `operator`, and `watch` are always defined. The other groups (`escrow`, `refund`, `evidence`, `freeze`, `query`) are `undefined` when their corresponding address is not provided in the config.
+
+## Extend
+
+Add custom methods or fill missing action groups with `.extend()`:
+
+```typescript
+import { queryActions } from '@x402r/sdk'
+
+const extended = client.extend(
+  queryActions('0xRecorderAddress...', { eventFromBlock: 12345n })
+)
+
+// extended.query is now defined
+const payments = await extended.query.getPayerPayments(payerAddress)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="TypeScript" icon="code" href="/sdk/typescript">
+    Type imports, role narrowing, and error types.
+  </Card>
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    On-chain architecture, conditions, and recorders.
+  </Card>
+</CardGroup>

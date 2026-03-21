@@ -1,49 +1,78 @@
 ---
 title: "SDK Overview"
-description: "TypeScript SDK for the X402r refundable payments protocol (experimental)"
+description: "TypeScript SDK for the x402r refundable payments protocol"
 icon: "cube"
 ---
 
-<Warning>
-The X402r SDK is in active development (v0.0.2). APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
-</Warning>
-
-The X402r SDK provides a complete TypeScript implementation for integrating with the X402r refundable payments protocol. It enables clients, merchants, and arbiters to interact with smart contracts for payment authorization, escrow management, and dispute resolution.
+The x402r SDK provides TypeScript bindings for the x402r refundable payments protocol. It covers payment authorization, escrow, dispute resolution, and event monitoring across 12 EVM chains.
 
 ## Packages
 
-The SDK is organized into packages designed for specific roles in the payment ecosystem:
-
 <CardGroup cols={3}>
-  <Card title="@x402r/core" icon="box" href="/sdk/concepts">
-    Shared types, ABIs, network config, deploy utilities, and condition builders.
+  <Card title="@x402r/sdk" icon="box" href="/sdk/create-client">
+    Client factory, role presets, action groups, watch, and extend.
   </Card>
-  <Card title="@x402r/client" icon="user" href="/sdk/client/quickstart">
-    SDK for payers to request refunds, freeze payments, and manage escrow.
+  <Card title="@x402r/core" icon="microchip" href="/sdk/installation">
+    Types, ABIs, chain config, deploy utilities, and low-level viem actions.
   </Card>
-  <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
-    SDK for merchants to release payments, charge, and handle refunds.
-  </Card>
-  <Card title="@x402r/arbiter" icon="gavel" href="/sdk/arbiter/quickstart">
-    SDK for arbiters to resolve disputes and manage refund decisions.
-  </Card>
-  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
-    Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
+  <Card title="@x402r/helpers" icon="wrench">
+    refundable() helper for x402 server integration.
   </Card>
 </CardGroup>
 
-## Network Support
+## Action Groups
 
-| Network | Chain ID | Status |
-|---------|----------|--------|
-| Base Sepolia | 84532 | Tested |
-| Base Mainnet | 8453 | Deployed, not yet tested |
-| Ethereum | 1 | Deployed, not yet tested |
-| Ethereum Sepolia | 11155111 | Deployed, not yet tested |
-| Arbitrum Sepolia | 421614 | Deployed, not yet tested |
-| Polygon | 137 | Deployed, not yet tested |
-| Arbitrum | 42161 | Deployed, not yet tested |
-| Optimism | 10 | Deployed, not yet tested |
-| Avalanche | 43114 | Deployed, not yet tested |
-| Celo | 42220 | Deployed, not yet tested |
-| Monad | 143 | Deployed, not yet tested |
+`createX402r()` returns a client with action groups organized by domain. Some groups require optional contract addresses in the config.
+
+| Group | Methods | Requirement |
+|-------|---------|-------------|
+| `payment` | 9 | Always available |
+| `escrow` | 3 | Requires `escrowPeriodAddress` |
+| `refund` | 15 | Requires `refundRequestAddress` |
+| `evidence` | 4 | Requires `refundRequestEvidenceAddress` |
+| `freeze` | 3 | Requires `freezeAddress` |
+| `query` | 3 | Requires `paymentIndexRecorderAddress` |
+| `operator` | 8 | Always available |
+| `watch` | 4 | Always available |
+
+Groups that require an address are `undefined` when that address is not provided. See [Create a Client](/sdk/create-client) for configuration details.
+
+## Role Presets
+
+Three preset factories narrow the client type for each role:
+
+- `createPayerClient(config)` — payer-scoped methods (request refund, freeze, query state)
+- `createMerchantClient(config)` — merchant-scoped methods (authorize, charge, release, approve refund)
+- `createArbiterClient(config)` — arbiter-scoped methods (deny, refuse, approve refund, unfreeze)
+
+These provide type narrowing for a better DX. They are not a security boundary — on-chain access control is enforced by [conditions](/contracts/conditions/overview).
+
+## Supported Networks
+
+All protocol contracts are deployed at the same addresses on every chain via CREATE3.
+
+| Chain | Chain ID | USDC Address |
+|-------|----------|-------------|
+| Base Sepolia | 84532 | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Ethereum Sepolia | 11155111 | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
+| Arbitrum Sepolia | 421614 | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` |
+| Ethereum | 1 | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+| Base | 8453 | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Polygon | 137 | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
+| Arbitrum One | 42161 | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
+| Optimism | 10 | `0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85` |
+| Celo | 42220 | `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` |
+| Avalanche C-Chain | 43114 | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
+| Monad | 143 | `0x754704Bc059F8C67012fEd69BC8a327a5aafb603` |
+| Linea | 59144 | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/sdk/installation">
+    Install packages and set up viem clients.
+  </Card>
+  <Card title="Create a Client" icon="plug" href="/sdk/create-client">
+    Configure and instantiate the x402r client.
+  </Card>
+</CardGroup>

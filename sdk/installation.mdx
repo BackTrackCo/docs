@@ -1,70 +1,115 @@
 ---
 title: "Installation"
-description: "Install and configure the X402r SDK packages"
+description: "Install the x402r SDK and set up viem clients"
 icon: "download"
 ---
 
 ## Install Packages
 
-Install only the packages you need for your use case:
+For most use cases, install `@x402r/sdk` and `viem`:
 
-<Tabs>
-  <Tab title="Client (Payer)">
-    ```bash
-    npm install @x402r/client @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Merchant">
-    ```bash
-    npm install @x402r/merchant @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Arbiter">
-    ```bash
-    npm install @x402r/arbiter @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Helpers Only">
-    ```bash
-    npm install @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-</Tabs>
-
-## Setup viem Clients
-
-Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clients/public). All SDK classes require these as constructor arguments.
-
-## Contract Addresses
-
-Get the deployed contract addresses from the network config:
-
-```typescript
-import { getNetworkConfig } from '@x402r/core';
-
-const config = getNetworkConfig('eip155:84532'); // Base Sepolia
-
-console.log(config.authCaptureEscrow); // Escrow contract
-console.log(config.refundRequest);     // RefundRequest contract
-console.log(config.arbiterRegistry);   // ArbiterRegistry contract
-console.log(config.usdc);             // USDC token address
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk viem
 ```
 
+```bash pnpm
+pnpm add @x402r/sdk viem
+```
+
+```bash bun
+bun add @x402r/sdk viem
+```
+</CodeGroup>
+
+For low-level access (types, ABIs, deploy utilities, config only):
+
+<CodeGroup>
+```bash npm
+npm install @x402r/core viem
+```
+
+```bash pnpm
+pnpm add @x402r/core viem
+```
+
+```bash bun
+bun add @x402r/core viem
+```
+</CodeGroup>
+
+For x402 server integration (marking payment options as refundable):
+
+<CodeGroup>
+```bash npm
+npm install @x402r/helpers @x402r/evm
+```
+
+```bash pnpm
+pnpm add @x402r/helpers @x402r/evm
+```
+
+```bash bun
+bun add @x402r/helpers @x402r/evm
+```
+</CodeGroup>
+
 <Note>
-Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.
+`@x402r/evm` is a peer dependency of `@x402r/helpers`. It provides the escrow scheme types used by the `refundable()` helper.
 </Note>
+
+## Create viem Clients
+
+All SDK methods operate through viem's `PublicClient` and `WalletClient`. Create them for your target chain:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
+```
 
 <Warning>
 Never commit private keys to version control. Use environment variables or a secrets manager.
 </Warning>
 
+## Get Chain Config
+
+Retrieve USDC addresses, factory addresses, and condition singletons for any supported chain:
+
+```typescript
+import { getChainConfig } from '@x402r/sdk'
+
+const config = getChainConfig(84532) // Base Sepolia
+
+console.log(config.usdc)                    // USDC token address
+console.log(config.factories.paymentOperator) // PaymentOperator factory
+console.log(config.conditions.payer)        // Payer condition singleton
+```
+
+<Note>
+V2 uses numeric `chainId` (e.g. `84532`). The CAIP-2 format (`'eip155:84532'`) is only needed for `toNetworkId()` / `fromNetworkId()` interop.
+</Note>
+
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
-    Learn about payment states, escrow, and the refund lifecycle.
+  <Card title="Create a Client" icon="plug" href="/sdk/create-client">
+    Configure and instantiate the x402r client.
   </Card>
-  <Card title="Examples" icon="code" href="/sdk/examples">
-    Working examples for merchants, clients, and arbiters.
+  <Card title="TypeScript" icon="code" href="/sdk/typescript">
+    Type imports, role narrowing, and error types.
   </Card>
 </CardGroup>
