@@ -4,7 +4,7 @@ description: "Subscribe to real-time refund, release, and freeze events with the
 icon: "bell"
 ---
 
-The `X402rMerchant` class provides three subscription methods for watching blockchain events in real-time. Each returns an object with an `unsubscribe` function for cleanup.
+The `createMerchantClient` factory provides subscription methods for watching blockchain events in real-time. Each returns an unsubscribe function for cleanup.
 
 ## Watch Refund Requests
 
@@ -47,13 +47,13 @@ interface RefundRequestEventLog {
 ```
 
 <Note>
-`watchRefundRequests()` requires the `refundRequestAddress` to be configured when creating the `X402rMerchant` instance.
+`watchRefundRequests()` requires the `refundRequestAddress` to be configured when creating the merchant client.
 </Note>
 
 ### Example: Auto-respond to Small Refund Requests
 
 ```typescript
-import { X402rMerchant } from '@x402r/merchant';
+import { createMerchantClient } from '@x402r/sdk';
 import { RequestStatus } from '@x402r/core';
 
 const AUTO_APPROVE_THRESHOLD = BigInt('5000000'); // 5 USDC

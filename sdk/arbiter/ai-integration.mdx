@@ -68,8 +68,8 @@ interface DecisionResult {
 Use `createWebhookHandler` to connect your evaluation function to the arbiter:
 
 ```typescript
-import { createWebhookHandler } from '@x402r/arbiter';
-import type { CaseEvaluationContext, DecisionResult } from '@x402r/arbiter';
+import { createWebhookHandler } from '@x402r/sdk';
+import type { CaseEvaluationContext, DecisionResult } from '@x402r/sdk';
 
 const handler = createWebhookHandler({
   arbiter,
@@ -96,8 +96,8 @@ Setting `autoSubmitDecision: true` calls `approveRefundRequest` or `denyRefundRe
 
 ```typescript
 interface WebhookHandlerConfig {
-  /** X402rArbiter instance */
-  arbiter: X402rArbiter;
+  /** Arbiter client instance */
+  arbiter: ArbiterClient;
 
   /** Your evaluation function */
   evaluationHook: ArbiterHook;
@@ -127,8 +127,8 @@ interface WebhookResult extends DecisionResult {
 The most common pattern combines `watchNewCases` with the webhook handler to automatically evaluate incoming refund requests:
 
 ```typescript
-import { X402rArbiter, createWebhookHandler } from '@x402r/arbiter';
-import type { CaseEvaluationContext, DecisionResult, RefundRequestEventLog } from '@x402r/arbiter';
+import { createArbiterClient, createWebhookHandler } from '@x402r/sdk';
+import type { CaseEvaluationContext, DecisionResult } from '@x402r/sdk';
 import { PaymentState, RequestStatus } from '@x402r/core';
 import type { PaymentInfo } from '@x402r/core';
 

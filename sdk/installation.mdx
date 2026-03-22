@@ -9,22 +9,17 @@ icon: "download"
 Install only the packages you need for your use case:
 
 <Tabs>
-  <Tab title="Client (Payer)">
+  <Tab title="SDK (all roles)">
     ```bash
-    npm install @x402r/client @x402r/core viem
+    npm install @x402r/sdk @x402r/core viem
     ```
   </Tab>
-  <Tab title="Merchant">
+  <Tab title="SDK + Helpers">
     ```bash
-    npm install @x402r/merchant @x402r/helpers @x402r/core viem
+    npm install @x402r/sdk @x402r/helpers @x402r/core viem
     ```
   </Tab>
-  <Tab title="Arbiter">
-    ```bash
-    npm install @x402r/arbiter @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Helpers Only">
+  <Tab title="Helpers only">
     ```bash
     npm install @x402r/helpers @x402r/core viem
     ```
@@ -35,23 +30,22 @@ Install only the packages you need for your use case:
 
 Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clients/public). All SDK classes require these as constructor arguments.
 
-## Contract Addresses
+## Contract addresses
 
-Get the deployed contract addresses from the network config:
+Get the deployed contract addresses from the chain config:
 
 ```typescript
-import { getNetworkConfig } from '@x402r/core';
+import { getChainConfig } from '@x402r/core';
 
-const config = getNetworkConfig('eip155:84532'); // Base Sepolia
+const config = getChainConfig(84532); // Base Sepolia
 
 console.log(config.authCaptureEscrow); // Escrow contract
-console.log(config.refundRequest);     // RefundRequest contract
 console.log(config.arbiterRegistry);   // ArbiterRegistry contract
 console.log(config.usdc);             // USDC token address
 ```
 
 <Note>
-Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.
+`getChainConfig()` takes a numeric chain ID. Use `fromNetworkId('eip155:84532')` to convert a CAIP-2 network identifier to a chain ID, or `toNetworkId(84532)` for the reverse.
 </Note>
 
 <Warning>

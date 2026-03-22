@@ -4,7 +4,7 @@ description: "Release funds, charge payments, process refunds, and query escrow 
 icon: "coins"
 ---
 
-The `X402rMerchant` class provides methods for managing the full payment lifecycle: releasing escrowed funds, charging directly for subscriptions, processing refunds, and querying operator configuration.
+The `createMerchantClient` factory provides methods for managing the full payment lifecycle: releasing escrowed funds, charging directly for subscriptions, processing refunds, and querying operator configuration.
 
 ## Payment Operations
 
@@ -13,10 +13,10 @@ The `X402rMerchant` class provides methods for managing the full payment lifecyc
 Use `release()` to transfer escrowed funds to the receiver (merchant). The `amount` parameter is **required** and specifies the exact amount to release in token units.
 
 ```typescript
-import { X402rMerchant } from '@x402r/merchant';
+import { createMerchantClient } from '@x402r/sdk';
 
 // Release 10 USDC (6 decimals) from escrow
-const { txHash } = await merchant.release(paymentInfo, BigInt('10000000'));
+const txHash = await merchant.release(paymentInfo, BigInt('10000000'));
 console.log('Released:', txHash);
 ```
 
@@ -114,7 +114,7 @@ if (capturableAmount > 0n) {
 ```
 
 <Info>
-`getPaymentAmounts()` requires the `escrowAddress` to be configured when creating the `X402rMerchant` instance.
+`getPaymentAmounts()` reads amounts directly from the PaymentOperator contract.
 </Info>
 
 ### Get Operator Configuration

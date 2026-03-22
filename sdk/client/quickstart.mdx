@@ -8,22 +8,20 @@ icon: "rocket"
 The Client SDK is experimental. APIs will change as the refund and dispute system design evolves.
 </Warning>
 
-The `@x402r/client` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
+The `@x402r/sdk` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
 
 ## Setup
 
 ```typescript
-import { X402rClient } from '@x402r/client';
-import { getNetworkConfig } from '@x402r/core';
+import { createPayerClient } from '@x402r/sdk';
+import { getChainConfig } from '@x402r/core';
 
-const networkConfig = getNetworkConfig('eip155:84532')!;
+const chainConfig = getChainConfig(84532); // Base Sepolia
 
-const client = new X402rClient({
+const client = createPayerClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...', // Your PaymentOperator address
-  refundRequestAddress: networkConfig.refundRequest,
-  escrowAddress: networkConfig.authCaptureEscrow,
 });
 ```
 
@@ -31,20 +29,31 @@ const client = new X402rClient({
 
 The Client SDK currently supports:
 
-- **`requestRefund()`** — Submit a refund request for a payment in escrow
-- **`getRefundStatus()`** — Check the status of a refund request
-- **`freezePayment()`** — Freeze a payment to prevent release during a dispute
-- **`isFrozen()`** — Check if a payment is frozen
-- **`isDuringEscrowPeriod()`** — Check if a payment is still in its escrow window
-- **`getAuthorizationTime()`** — Get when a payment was authorized
-- **`getPaymentState()`** — Derive the lifecycle state of a payment
-- **`paymentExists()`** — Check if a payment has been authorized
-- **`isInEscrow()`** — Check if a payment has capturable funds
-- **`getPaymentDetails()`** — Retrieve full PaymentInfo from event logs
-- **`getPayerPayments()`** — List all payments for the connected wallet
-- **`submitEvidence()`** — Attach evidence (IPFS CID) to a refund request
-- **`getEvidence()`** — Retrieve a single evidence entry by index
-- **`getAllEvidence()`** — Retrieve all evidence for a refund request
+**Payment actions:**
+- **`authorize()`** — Authorize a payment with escrow
+- **`charge()`** — Charge a payment directly
+- **`release()`** — Release escrowed funds
+- **`refundInEscrow()`** — Refund funds while in escrow
+- **`getState()`** — Derive the lifecycle state of a payment
+- **`getAmounts()`** — Get capturable and refundable amounts
+
+**Refund actions** (requires `refundRequestAddress` in config):
+- **`refund.request()`** — Submit a refund request
+- **`refund.cancel()`** — Cancel a pending refund request
+- **`refund.get()`** — Get full refund request data
+- **`refund.getStatus()`** — Check refund request status
+- **`refund.has()`** — Check if a refund request exists
+- **`refund.getPayerRequests()`** — List refund requests by payer
+
+**Escrow actions** (requires `escrowPeriodAddress` via extend or config):
+- **`escrow.isDuringEscrow()`** — Check if payment is in escrow window
+- **`escrow.getAuthorizationTime()`** — Get when a payment was authorized
+- **`escrow.getDuration()`** — Get the escrow period duration
+
+**Watch actions:**
+- **`watch.onPayment()`** — Watch for payment events
+- **`watch.onRefundRequest()`** — Watch for refund request events
+- **`watch.onRefundExecuted()`** — Watch for refund execution events
 
 ## Try It Now
 

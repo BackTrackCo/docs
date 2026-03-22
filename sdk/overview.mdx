@@ -16,23 +16,17 @@ The SDK is organized into packages designed for specific roles in the payment ec
 
 <CardGroup cols={3}>
   <Card title="@x402r/core" icon="box" href="/sdk/concepts">
-    Shared types, ABIs, network config, deploy utilities, and condition builders.
+    Shared types, ABIs, chain config, deploy utilities, and condition builders.
   </Card>
-  <Card title="@x402r/client" icon="user" href="/sdk/client/quickstart">
-    SDK for payers to request refunds, freeze payments, and manage escrow.
-  </Card>
-  <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
-    SDK for merchants to release payments, charge, and handle refunds.
-  </Card>
-  <Card title="@x402r/arbiter" icon="gavel" href="/sdk/arbiter/quickstart">
-    SDK for arbiters to resolve disputes and manage refund decisions.
+  <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
+    High-level SDK with role-scoped clients (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r` factory.
   </Card>
   <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
     Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
   </Card>
 </CardGroup>
 
-## Network Support
+## Network support
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
@@ -46,3 +40,5 @@ The SDK is organized into packages designed for specific roles in the payment ec
 | Avalanche | 43114 | Deployed, not yet tested |
 | Celo | 42220 | Deployed, not yet tested |
 | Monad | 143 | Deployed, not yet tested |
+| Linea | 59144 | Deployed, not yet tested |
+| SKALE Base | 1187947933 | Deployed, not yet tested |
