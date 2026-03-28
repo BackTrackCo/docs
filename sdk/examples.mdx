@@ -78,8 +78,8 @@ import { deployMarketplaceOperator } from '@x402r/core/deploy';
 const result = await deployMarketplaceOperator(
   walletClient,
   publicClient,
-  'eip155:84532',
   {
+    chainId: 84532,               // Base Sepolia
     feeRecipient: account.address,
     arbiter: arbiterAddress,
     escrowPeriodSeconds: 604800n, // 7 days
@@ -88,7 +88,24 @@ const result = await deployMarketplaceOperator(
 );
 ```
 
-See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
+You can also deploy a simpler delivery protection operator for content verification use cases:
+
+```typescript
+import { deployDeliveryProtectionOperator } from '@x402r/core/deploy';
+
+const result = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: arbiterAddress,
+    feeRecipient: account.address,
+    escrowPeriodSeconds: 604800n,
+  }
+);
+```
+
+See [Deploy an operator](/sdk/deploy-operator) for the full guide.
 
 ## Server Examples
 
