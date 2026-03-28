@@ -1,70 +1,116 @@
 ---
 title: "Installation"
-description: "Install and configure the X402r SDK packages"
+description: "Install the x402r SDK and set up viem clients"
 icon: "download"
 ---
 
-## Install Packages
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk viem
+```
+```bash pnpm
+pnpm add @x402r/sdk viem
+```
+```bash bun
+bun add @x402r/sdk viem
+```
+</CodeGroup>
 
-Install only the packages you need for your use case:
+This installs the full SDK and [viem](https://viem.sh), the only peer dependency.
 
-<Tabs>
-  <Tab title="Client (Payer)">
-    ```bash
-    npm install @x402r/client @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Merchant">
-    ```bash
-    npm install @x402r/merchant @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Arbiter">
-    ```bash
-    npm install @x402r/arbiter @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Helpers Only">
-    ```bash
-    npm install @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-</Tabs>
+<Accordion title="Other install paths">
+  Low-level access to types, ABIs, and deploy utilities without the client factory:
 
-## Setup viem Clients
+  <CodeGroup>
+  ```bash npm
+  npm install @x402r/core viem
+  ```
+  ```bash pnpm
+  pnpm add @x402r/core viem
+  ```
+  ```bash bun
+  bun add @x402r/core viem
+  ```
+  </CodeGroup>
 
-Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clients/public). All SDK classes require these as constructor arguments.
+  x402 server integration — marks payment options as refundable:
 
-## Contract Addresses
+  <CodeGroup>
+  ```bash npm
+  npm install @x402r/helpers @x402r/evm
+  ```
+  ```bash pnpm
+  pnpm add @x402r/helpers @x402r/evm
+  ```
+  ```bash bun
+  bun add @x402r/helpers @x402r/evm
+  ```
+  </CodeGroup>
 
-Get the deployed contract addresses from the network config:
+  <Note>
+  `@x402r/evm` is a peer dependency of `@x402r/helpers`. It provides escrow scheme types used by the `refundable()` helper.
+  </Note>
+</Accordion>
+
+## Set Up viem Clients
+
+The SDK operates through viem's `PublicClient` (reads) and `WalletClient` (writes). Create both for your target chain:
 
 ```typescript
-import { getNetworkConfig } from '@x402r/core';
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
 
-const config = getNetworkConfig('eip155:84532'); // Base Sepolia
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
 
-console.log(config.authCaptureEscrow); // Escrow contract
-console.log(config.refundRequest);     // RefundRequest contract
-console.log(config.arbiterRegistry);   // ArbiterRegistry contract
-console.log(config.usdc);             // USDC token address
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
 ```
 
-<Note>
-Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.
-</Note>
-
 <Warning>
-Never commit private keys to version control. Use environment variables or a secrets manager.
+Never commit private keys. Use environment variables or a secrets manager.
 </Warning>
+
+For custom transports, batch config, or other client options, see the [viem client docs](https://viem.sh/docs/clients/public).
+
+## Get Chain Config
+
+```typescript
+import { getChainConfig } from '@x402r/sdk'
+
+const config = getChainConfig(84532) // Base Sepolia
+```
+
+Returns protocol addresses, USDC, factory addresses, and condition singletons for the chain:
+
+```typescript
+config.usdc              // 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+config.authCaptureEscrow // escrow contract (same on every chain)
+config.factories         // 12 factory addresses (same on every chain)
+config.conditions        // 3 condition singletons (same on every chain)
+```
+
+USDC is the only address that differs between chains. Everything else is identical via CREATE3.
+
+<Note>
+V2 uses numeric chain IDs (`84532`). The CAIP-2 format (`'eip155:84532'`) is only needed for `toNetworkId()` / `fromNetworkId()` interop.
+</Note>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
-    Learn about payment states, escrow, and the refund lifecycle.
+  <Card title="Create a Client" icon="plug" href="/sdk/create-client">
+    Pick between `createX402r()` and role presets.
   </Card>
-  <Card title="Examples" icon="code" href="/sdk/examples">
-    Working examples for merchants, clients, and arbiters.
+  <Card title="TypeScript" icon="code" href="/sdk/typescript">
+    Type imports, role narrowing, and error types.
   </Card>
 </CardGroup>

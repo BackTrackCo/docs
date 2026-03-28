@@ -1,0 +1,148 @@
+---
+title: "TypeScript"
+description: "Type imports, role narrowing tables, and error types"
+icon: "code"
+---
+
+TypeScript 5.0+ with `strict: true` and `moduleResolution: "bundler"` or `"node16"`.
+
+## Type Imports
+
+Client types and action group interfaces from `@x402r/sdk`:
+
+```typescript
+import type {
+  X402r,
+  X402rConfig,
+  PayerClient,
+  MerchantClient,
+  ArbiterClient,
+  PaymentActions,
+  RefundActions,
+  EscrowActions,
+  EvidenceActions,
+  FreezeActions,
+  QueryActions,
+  OperatorActions,
+  WatchActions,
+  PaymentStore,
+  ResolvedConfig,
+} from '@x402r/sdk'
+```
+
+Domain types re-exported from `@x402r/core`:
+
+```typescript
+import type {
+  PaymentInfo,
+  PaymentAmounts,
+  ConditionSlot,
+  OperatorSlots,
+  FeeAddresses,
+  FeeCalculationResult,
+  RefundRequestData,
+  EvidenceEntry,
+  X402rChainConfig,
+} from '@x402r/sdk' // re-exported — no need to depend on @x402r/core directly
+```
+
+## Role Narrowing
+
+Each role preset restricts which methods appear in autocomplete via TypeScript `Pick` types. The runtime client is identical — narrowing is a DX convenience only, not a security boundary.
+
+### PayerClient
+
+| Group | Available Methods |
+|-------|-------------------|
+| `payment` | `getState`, `getAmounts` |
+| `refund` | `request`, `cancel`, `get`, `getByKey`, `getStatus`, `has`, `getStoredPaymentInfo`, `getPayerRequests`, `getCancelCount`, `getCancelledAmount` |
+| `freeze` | `freeze`, `isFrozen` |
+| `evidence` | All |
+| `escrow` | All |
+| `query` | All |
+| `operator` | `getConfig`, `getFeeAddresses` |
+| `watch` | All |
+
+### MerchantClient
+
+| Group | Available Methods |
+|-------|-------------------|
+| `payment` | `authorize`, `charge`, `release`, `refundInEscrow`, `refundPostEscrow`, `approvePostEscrowRefund`, `getPostEscrowRefundAllowance`, `getState`, `getAmounts` |
+| `refund` | `get`, `getByKey`, `getStatus`, `has`, `getStoredPaymentInfo`, `getReceiverRequests`, `getCancelCount`, `getCancelledAmount` |
+| `freeze` | `isFrozen` |
+| `evidence` | All |
+| `escrow` | All |
+| `query` | All |
+| `operator` | All |
+| `watch` | All |
+
+### ArbiterClient
+
+| Group | Available Methods |
+|-------|-------------------|
+| `payment` | `refundInEscrow`, `getState`, `getAmounts` |
+| `refund` | `deny`, `refuse`, `get`, `getByKey`, `getStatus`, `has`, `getStoredPaymentInfo`, `getOperatorRequests`, `getCancelCount`, `getCancelledAmount` |
+| `freeze` | `unfreeze`, `isFrozen` |
+| `evidence` | All |
+| `escrow` | All |
+| `query` | All |
+| `operator` | `getConfig`, `getFeeAddresses`, `getAccumulatedProtocolFees`, `distributeFees` |
+| `watch` | All |
+
+<Note>
+A payer *could* use `createX402r()` and call `payment.authorize()`, but the on-chain condition would revert the transaction. Type narrowing prevents mistakes; [conditions](/contracts/conditions/overview) enforce access.
+</Note>
+
+## Conditional Action Groups
+
+`escrow`, `refund`, `evidence`, `freeze`, and `query` are typed as `T | undefined`. They are `undefined` when the corresponding address is not in the config:
+
+```typescript
+const client = createX402r({
+  publicClient,
+  operatorAddress: '0x...',
+  // no escrowPeriodAddress
+})
+
+client.escrow // EscrowActions | undefined
+
+// Use optional chaining
+const inEscrow = await client.escrow?.isDuringEscrow(paymentInfo)
+```
+
+This reflects the protocol: these contracts are periphery. Not every operator deploys all of them. If you know the address exists, provide it in the config and the group will be defined.
+
+`payment`, `operator`, and `watch` are always defined.
+
+## Error Types
+
+Three error classes, all extending `X402rError`:
+
+| Error | When |
+|-------|------|
+| `ValidationError` | Missing `walletClient` on a role preset. `refundRequestEvidenceAddress` without `refundRequestAddress`. Chain cannot be determined from config. |
+| `ConfigError` | `chainId` is not in the supported chains list. |
+| `ContractCallError` | A contract read or write call fails on-chain (revert, out of gas, etc.). |
+
+```typescript
+import { ValidationError, ConfigError, ContractCallError } from '@x402r/sdk'
+
+try {
+  const payer = createPayerClient({ publicClient, operatorAddress: '0x...' })
+} catch (e) {
+  if (e instanceof ValidationError) {
+    // "walletClient is required for createPayerClient"
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
+    Get operator and condition addresses for your client config.
+  </Card>
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    On-chain architecture, conditions, and recorders.
+  </Card>
+</CardGroup>

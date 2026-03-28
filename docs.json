@@ -91,10 +91,10 @@
             "pages": [
               "sdk/overview",
               "sdk/installation",
-              "sdk/concepts",
+              "sdk/create-client",
+              "sdk/typescript",
               "sdk/deploy-operator",
-              "sdk/examples",
-              "sdk/limitations"
+              "sdk/examples"
             ]
           },
           {
