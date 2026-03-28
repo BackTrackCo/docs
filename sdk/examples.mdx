@@ -16,10 +16,10 @@ The SDK includes working examples in the `x402r-sdk/` repository. Each is a stan
     Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
   </Card>
   <Card title="server-express" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express">
-    Express merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
+    Express merchant server using `EscrowServerScheme` and `HTTPFacilitatorClient` to accept escrow payments via x402 middleware.
   </Card>
   <Card title="server-hono" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/hono">
-    Hono merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
+    Hono merchant server using `EscrowServerScheme` and `HTTPFacilitatorClient` to accept escrow payments via x402 middleware.
   </Card>
   <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/merchant-cli">
     CLI tool for merchants to release payments, approve/deny refunds, and query escrow state.
@@ -92,9 +92,9 @@ See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
 
 ## Server Examples
 
-Demonstrates minimal merchant servers (Express and Hono variants) that use `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` via x402's standard middleware:
+Demonstrates minimal merchant servers (Express and Hono variants) that use `EscrowServerScheme` and `HTTPFacilitatorClient` via x402's standard middleware:
 
-1. Returns 402 with `refundable()` payment options
+1. Returns 402 with inline escrow payment options
 2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
 3. Delegates on-chain settlement to the facilitator after the handler runs
 4. Returns weather data after successful payment
@@ -105,8 +105,8 @@ Demonstrates minimal merchant servers (Express and Hono variants) that use `Escr
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator with escrow and freeze support.
   </Card>
-  <Card title="refundable() Helper" icon="wrench" href="/sdk/helpers/refundable">
-    Mark payment options as refundable with escrow configuration.
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
     Understand the payment lifecycle and key concepts.
