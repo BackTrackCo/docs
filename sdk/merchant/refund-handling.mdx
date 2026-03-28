@@ -1,23 +1,21 @@
 ---
-title: "Refund Handling"
-description: "Process, approve, deny, and manage refund requests with the Merchant SDK"
+title: "Refund handling"
+description: "Process, deny, and manage refund requests with the Merchant SDK"
 icon: "rotate-left"
 ---
 
-The `X402rMerchant` class provides a complete set of methods for handling refund requests from payers. Every refund-related method requires a `nonce: bigint` parameter that identifies which specific charge the refund targets.
+The merchant client provides methods for handling refund requests from payers. In v3, refund approval happens automatically when you call `payment.refundInEscrow()` — the RefundRequest IRecorder plugin auto-approves any pending request during execution.
 
 <Note>
-The `nonce` parameter corresponds to the record index from the `PaymentIndexRecorder`. For the first charge against a payment, the nonce is `0n`. Each subsequent charge increments the nonce.
+Each payment supports one refund request, keyed by `paymentInfoHash`. There is no nonce parameter — one request per payment.
 </Note>
 
-## Refund Request Queries
+## Refund request queries
 
-### Check If a Refund Request Exists
-
-Use `hasRefundRequest()` to check whether a payer has submitted a refund request for a specific payment and nonce.
+### Check if a refund request exists
 
 ```typescript
-const hasRequest = await merchant.hasRefundRequest(paymentInfo, 0n);
+const hasRequest = await merchant.refund.has(paymentInfo);
 
 if (hasRequest) {
   console.log('Refund request exists for this payment');
@@ -26,21 +24,19 @@ if (hasRequest) {
 }
 ```
 
-### Get Refund Request Status
-
-Use `getRefundStatus()` to retrieve the current status of a refund request. Returns a `RequestStatus` enum value.
+### Get refund request status
 
 ```typescript
 import { RequestStatus } from '@x402r/core';
 
-const status = await merchant.getRefundStatus(paymentInfo, 0n);
+const status = await merchant.refund.getStatus(paymentInfo);
 
 switch (status) {
   case RequestStatus.Pending:
     console.log('Awaiting your decision');
     break;
   case RequestStatus.Approved:
-    console.log('You approved this refund');
+    console.log('Auto-approved via refundInEscrow');
     break;
   case RequestStatus.Denied:
     console.log('You denied this refund');
@@ -51,118 +47,59 @@ switch (status) {
 }
 ```
 
-### Get Full Refund Request Data
-
-Use `getRefundRequest()` to retrieve the complete refund request data, including the amount and status.
+### Get full refund request data
 
 ```typescript
-import type { RefundRequestData } from '@x402r/core';
-
-const request: RefundRequestData = await merchant.getRefundRequest(paymentInfo, 0n);
+const request = await merchant.refund.get(paymentInfo);
 
 console.log('Payment hash:', request.paymentInfoHash);
-console.log('Nonce:', request.nonce);
 console.log('Requested amount:', request.amount);
 console.log('Status:', request.status);
 ```
 
-The `RefundRequestData` type contains:
+### Get refund request by key
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `paymentInfoHash` | `0x${string}` | Hash of the PaymentInfo struct |
-| `nonce` | `bigint` | Record index this refund targets |
-| `amount` | `bigint` | Amount requested for refund (uint120) |
-| `status` | `RequestStatus` | Current status (Pending, Approved, Denied, Cancelled) |
-
-### Get Refund Request by Composite Key
-
-Use `getRefundRequestByKey()` to look up a refund request directly by its composite key (the `keccak256(paymentInfoHash, nonce)` value returned from paginated queries).
+Use `getByKey()` to look up a refund request directly by its `paymentInfoHash` (returned from paginated queries).
 
 ```typescript
-const request = await merchant.getRefundRequestByKey(compositeKey);
+const request = await merchant.refund.getByKey(paymentInfoHash);
 
 console.log('Amount:', request.amount);
 console.log('Status:', request.status);
 ```
 
-## Paginated Refund Request Listing
+## Paginated refund request listing
 
-### Get Pending Refund Requests
+### Get refund requests for a receiver
 
-Use `getPendingRefundRequests()` to retrieve paginated refund request keys for the current receiver address. This method uses the wallet address associated with your `X402rMerchant` instance.
+Use `getReceiverRequests()` to retrieve paginated refund request keys for a receiver address.
 
 ```typescript
+const receiverAddress = walletClient.account.address;
+
 // Get the first 10 refund request keys
-const { keys, total } = await merchant.getPendingRefundRequests(0n, 10n);
+const { keys, total } = await merchant.refund.getReceiverRequests(
+  receiverAddress,
+  0n,   // offset
+  10n   // count
+);
 
 console.log(`Showing ${keys.length} of ${total} total refund requests`);
 
-// Look up each request by its composite key
 for (const key of keys) {
-  const request = await merchant.getRefundRequestByKey(key);
-  console.log(`Key: ${key}`);
-  console.log(`  Amount: ${request.amount}`);
-  console.log(`  Status: ${request.status}`);
+  const request = await merchant.refund.getByKey(key);
+  console.log(`Key: ${key}, Amount: ${request.amount}, Status: ${request.status}`);
 }
 ```
 
-For pagination, adjust the `offset` and `count` parameters:
+## Refund request actions
+
+### Deny a refund request
+
+Use `refund.deny()` to deny a pending refund request. This changes the request status to `Denied`.
 
 ```typescript
-// Page through all refund requests, 20 at a time
-const pageSize = 20n;
-let offset = 0n;
-let hasMore = true;
-
-while (hasMore) {
-  const { keys, total } = await merchant.getPendingRefundRequests(offset, pageSize);
-
-  for (const key of keys) {
-    const request = await merchant.getRefundRequestByKey(key);
-    // Process each request...
-  }
-
-  offset += pageSize;
-  hasMore = offset < total;
-}
-```
-
-### Get Refund Request Count
-
-Use `getRefundRequestCount()` to get the total number of refund requests targeting the current receiver.
-
-```typescript
-const count = await merchant.getRefundRequestCount();
-console.log(`Total refund requests: ${count}`);
-
-if (count > 0n) {
-  const { keys } = await merchant.getPendingRefundRequests(0n, count);
-  console.log(`Retrieved all ${keys.length} request keys`);
-}
-```
-
-## Refund Request Actions
-
-### Approve a Refund Request
-
-Use `approveRefundRequest()` to approve a pending refund request. This changes the request status to `Approved`.
-
-```typescript
-const { txHash } = await merchant.approveRefundRequest(paymentInfo, 0n);
-console.log('Refund approved:', txHash);
-```
-
-<Warning>
-Approving a refund request changes its status but does **not** transfer funds. You must also call `refundInEscrow()` or `refundPostEscrow()` to execute the actual token transfer.
-</Warning>
-
-### Deny a Refund Request
-
-Use `denyRefundRequest()` to deny a pending refund request. This changes the request status to `Denied`.
-
-```typescript
-const { txHash } = await merchant.denyRefundRequest(paymentInfo, 0n);
+const txHash = await merchant.refund.deny(paymentInfo);
 console.log('Refund denied:', txHash);
 ```
 
@@ -170,60 +107,37 @@ console.log('Refund denied:', txHash);
 If you deny a request, the payer may escalate to an arbiter for dispute resolution. Consider providing a reason off-chain to reduce escalation risk.
 </Info>
 
-## Freeze Management
+### Refund in escrow (auto-approves)
 
-### Check If a Payment Is Frozen
-
-Use `isFrozen()` to check whether a payment has been frozen by the payer or an arbiter. Frozen payments cannot be released until unfrozen.
+Instead of a separate approve step, you call `payment.refundInEscrow()` directly. The RefundRequest recorder plugin auto-approves any pending request during execution.
 
 ```typescript
-const freezeAddress: `0x${string}` = '0xFreezeContract...';
-
-const frozen = await merchant.isFrozen(paymentInfo, freezeAddress);
-
-if (frozen) {
-  console.log('Payment is frozen - cannot release until unfrozen');
-} else {
-  console.log('Payment is not frozen');
-}
+const txHash = await merchant.payment.refundInEscrow(paymentInfo, request.amount);
+console.log('Refund executed (request auto-approved):', txHash);
 ```
 
-### Unfreeze a Payment
-
-Use `unfreezePayment()` to remove a freeze on a payment. Only the receiver (merchant) or an authorized party can unfreeze.
-
-```typescript
-const freezeAddress: `0x${string}` = '0xFreezeContract...';
-
-const { txHash } = await merchant.unfreezePayment(paymentInfo, freezeAddress);
-console.log('Payment unfrozen:', txHash);
-```
-
-## Complete Refund Workflow
+## Complete refund workflow
 
 Here is a full workflow showing how to detect a refund request, review it, make a decision, and execute the refund if approved.
 
 ```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rMerchant } from '@x402r/merchant';
-import { getNetworkConfig, RequestStatus } from '@x402r/core';
+import { createMerchantClient } from '@x402r/sdk';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo } from '@x402r/core';
 
 async function handleRefundWorkflow(
-  merchant: X402rMerchant,
-  paymentInfo: PaymentInfo,
-  nonce: bigint
+  merchant: ReturnType<typeof createMerchantClient>,
+  paymentInfo: PaymentInfo
 ) {
   // Step 1: Check if a refund request exists
-  const hasRequest = await merchant.hasRefundRequest(paymentInfo, nonce);
+  const hasRequest = await merchant.refund.has(paymentInfo);
   if (!hasRequest) {
-    console.log('No refund request for this payment/nonce');
+    console.log('No refund request for this payment');
     return;
   }
 
   // Step 2: Get the full request data
-  const request = await merchant.getRefundRequest(paymentInfo, nonce);
+  const request = await merchant.refund.get(paymentInfo);
   console.log(`Refund request: ${request.amount} tokens, status: ${request.status}`);
 
   // Step 3: Only process pending requests
@@ -232,82 +146,68 @@ async function handleRefundWorkflow(
     return;
   }
 
-  // Step 4: Check if the payment is frozen
-  const freezeAddress: `0x${string}` = '0xFreezeContract...';
-  const frozen = await merchant.isFrozen(paymentInfo, freezeAddress);
-  if (frozen) {
-    console.log('Payment is frozen - resolve dispute before processing refund');
-    return;
-  }
+  // Step 4: Check available amounts
+  const amounts = await merchant.payment.getAmounts(paymentInfo);
+  console.log(`Available to refund: ${amounts.refundableAmount}`);
 
-  // Step 5: Check available amounts
-  const { capturableAmount, refundableAmount } = await merchant.getPaymentAmounts(paymentInfo);
-  console.log(`Available to refund: ${refundableAmount}`);
+  // Step 5: Make a decision
+  const shouldRefund = request.amount <= amounts.refundableAmount;
 
-  // Step 6: Make a decision
-  const shouldApprove = request.amount <= refundableAmount;
-
-  if (shouldApprove) {
-    // Approve the request
-    const { txHash: approveTx } = await merchant.approveRefundRequest(paymentInfo, nonce);
-    console.log('Approved:', approveTx);
-
-    // Execute the refund from escrow
-    const { txHash: refundTx } = await merchant.refundInEscrow(paymentInfo, request.amount);
-    console.log('Refund executed:', refundTx);
+  if (shouldRefund) {
+    // Execute the refund (auto-approves the request)
+    const txHash = await merchant.payment.refundInEscrow(paymentInfo, request.amount);
+    console.log('Refund executed:', txHash);
   } else {
     // Deny the request
-    const { txHash: denyTx } = await merchant.denyRefundRequest(paymentInfo, nonce);
-    console.log('Denied:', denyTx);
+    const txHash = await merchant.refund.deny(paymentInfo);
+    console.log('Denied:', txHash);
   }
 }
 ```
 
-## Refund Request Lifecycle
+## Refund request lifecycle
 
 ```mermaid
 sequenceDiagram
-    participant P as Payer (Client SDK)
-    participant R as RefundRequest Contract
-    participant M as Merchant (Merchant SDK)
+    participant P as Payer
+    participant R as RefundRequest (IRecorder)
+    participant M as Merchant
     participant O as PaymentOperator
 
-    P->>R: requestRefund(paymentInfo, amount, nonce)
+    P->>R: refund.request(paymentInfo, amount)
     R-->>M: RefundRequested event
 
-    M->>R: hasRefundRequest(paymentInfo, nonce)
+    M->>R: refund.has(paymentInfo)
     R-->>M: true
-    M->>R: getRefundRequest(paymentInfo, nonce)
+    M->>R: refund.get(paymentInfo)
     R-->>M: RefundRequestData
 
     M->>M: Review request (policy check)
 
-    alt Approve
-        M->>R: approveRefundRequest(paymentInfo, nonce)
-        M->>O: refundInEscrow(paymentInfo, amount)
+    alt Refund
+        M->>O: payment.refundInEscrow(paymentInfo, amount)
+        O->>R: record() auto-approves pending request
         O->>P: Funds returned to payer
     else Deny
-        M->>R: denyRefundRequest(paymentInfo, nonce)
+        M->>R: refund.deny(paymentInfo)
         Note over P: Payer may escalate to arbiter
     end
 ```
 
-## Method Reference
+## Method reference
 
 | Method | Parameters | Returns | Description |
 |--------|-----------|---------|-------------|
-| `hasRefundRequest` | `paymentInfo, nonce: bigint` | `Promise<boolean>` | Check if refund request exists |
-| `getRefundStatus` | `paymentInfo, nonce: bigint` | `Promise<RequestStatus>` | Get request status |
-| `getRefundRequest` | `paymentInfo, nonce: bigint` | `Promise<RefundRequestData>` | Get full request data |
-| `approveRefundRequest` | `paymentInfo, nonce: bigint` | `Promise<{ txHash }>` | Approve a pending request |
-| `denyRefundRequest` | `paymentInfo, nonce: bigint` | `Promise<{ txHash }>` | Deny a pending request |
-| `getPendingRefundRequests` | `offset: bigint, count: bigint` | `Promise<{ keys, total }>` | Paginated request keys |
-| `getRefundRequestCount` | _(none)_ | `Promise<bigint>` | Total requests for receiver |
-| `getRefundRequestByKey` | `compositeKey: hex` | `Promise<RefundRequestData>` | Look up by composite key |
-| `unfreezePayment` | `paymentInfo, freezeAddress: hex` | `Promise<{ txHash }>` | Remove payment freeze |
-| `isFrozen` | `paymentInfo, freezeAddress: hex` | `Promise<boolean>` | Check if payment is frozen |
+| `refund.has` | `paymentInfo` | `Promise<boolean>` | Check if refund request exists |
+| `refund.getStatus` | `paymentInfo` | `Promise<RefundRequestStatus>` | Get request status |
+| `refund.get` | `paymentInfo` | `Promise<RefundRequestData>` | Get full request data |
+| `refund.deny` | `paymentInfo` | `Promise<Hash>` | Deny a pending request |
+| `refund.getReceiverRequests` | `receiver, offset, count` | `Promise<{ keys, total }>` | Paginated request keys |
+| `refund.getByKey` | `paymentInfoHash` | `Promise<RefundRequestData>` | Look up by key |
+| `payment.refundInEscrow` | `paymentInfo, amount, data?` | `Promise<Hash>` | Refund and auto-approve |
+| `freeze.isFrozen` | `paymentInfo` | `Promise<boolean>` | Check if payment is frozen |
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Event Subscriptions" icon="bell" href="/sdk/merchant/subscriptions">

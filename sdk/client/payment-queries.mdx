@@ -1,108 +1,68 @@
 ---
-title: "Payment Queries"
+title: "Payment queries"
 description: "Query payment states and details with the Client SDK"
 icon: "magnifying-glass"
 ---
 
-The Client SDK provides five methods for querying payment state and history. These read directly from the escrow contract and on-chain event logs.
+The payer client provides methods for querying payment state and retrieving payment information.
 
-## getPaymentState
+## getState
 
 Derive the lifecycle state of a payment from the escrow contract (amounts and expiry).
 
 ```typescript
-import { PaymentState } from '@x402r/core';
+const [hasCollected, capturableAmount, refundableAmount] = await client.payment.getState(paymentInfo);
 
-const state = await client.getPaymentState(paymentInfo);
-
-// PaymentState enum:
-// 0 = NonExistent  - Payment has never been authorized
-// 1 = InEscrow     - Funds locked, capturableAmount > 0
-// 2 = Released     - Funds released to receiver, may still be refundable
-// 3 = Settled      - No funds in escrow or refundable
-// 4 = Expired      - Authorization expired, payer can reclaim
-```
-
-```typescript
-getPaymentState(paymentInfo: PaymentInfo): Promise<PaymentState>
-```
-
-## paymentExists
-
-Check whether a payment has been collected by reading the escrow's `hasCollectedPayment` flag.
-
-```typescript
-const exists = await client.paymentExists(paymentInfoHash);
-if (exists) {
-  console.log('Payment found');
-}
-```
-
-```typescript
-paymentExists(paymentInfoHash: `0x${string}`): Promise<boolean>
-```
-
-## isInEscrow
-
-Check if a payment currently has capturable funds in escrow.
-
-```typescript
-const inEscrow = await client.isInEscrow(paymentInfoHash);
-if (inEscrow) {
+if (capturableAmount > 0n) {
   console.log('Payment has funds in escrow');
 }
 ```
 
 ```typescript
-isInEscrow(paymentInfoHash: `0x${string}`): Promise<boolean>
+getState(paymentInfo: PaymentInfo): Promise<readonly [boolean, bigint, bigint]>
 ```
 
-## getPaymentDetails
+## getAmounts
 
-Retrieve the full `PaymentInfo` struct by scanning `AuthorizationCreated` events for the given hash.
+Get the capturable and refundable amounts for a payment.
 
 ```typescript
-const details = await client.getPaymentDetails(paymentInfoHash);
+const amounts = await client.payment.getAmounts(paymentInfo);
 
-console.log('Payer:', details.payer);
-console.log('Receiver:', details.receiver);
-console.log('Amount:', details.maxAmount);
+console.log('Capturable:', amounts.capturableAmount);
+console.log('Refundable:', amounts.refundableAmount);
 ```
 
 ```typescript
-getPaymentDetails(
-  paymentInfoHash: `0x${string}`,
-  fromBlock?: bigint
-): Promise<PaymentInfo>
+getAmounts(paymentInfo: PaymentInfo): Promise<PaymentAmounts>
+```
+
+## Query payments
+
+If you configured a `paymentIndexRecorderAddress` or `paymentStore`, you can use the query action group to look up payments.
+
+```typescript
+import { createPayerClient, queryActions } from '@x402r/sdk';
+
+const client = createPayerClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...',
+  paymentIndexRecorderAddress: '0x...',
+}).extend(queryActions('0xRecorderAddress...'));
+
+// Get all payments where you are the payer
+const payments = await client.query.getPayerPayments(payerAddress);
+
+// Get a specific payment by hash
+const payment = await client.query.getPayment(paymentInfoHash);
 ```
 
 <Note>
-This method scans event logs. Pass `fromBlock` to limit the scan range if your RPC limits `eth_getLogs` responses (Base Sepolia typically caps at 10,000 blocks).
+The query plugin uses a tiered provider stack: in-memory store, on-chain recorder, then event logs (if `eventFromBlock` is configured). The first provider returning results wins.
 </Note>
 
-## getPayerPayments
-
-List all payments where the connected wallet is the payer, by scanning `AuthorizationCreated` events.
-
-```typescript
-const payments = await client.getPayerPayments();
-
-for (const { hash, paymentInfo } of payments) {
-  console.log(`Payment ${hash}: ${paymentInfo.maxAmount}`);
-}
-```
-
-```typescript
-getPayerPayments(
-  fromBlock?: bigint
-): Promise<Array<{ hash: `0x${string}`; paymentInfo: PaymentInfo }>>
-```
-
-<Note>
-Like `getPaymentDetails`, this scans event logs. Pass `fromBlock` to limit the range for large histories.
-</Note>
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Refund Operations" icon="rotate-left" href="/sdk/client/refund-operations">

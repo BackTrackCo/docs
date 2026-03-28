@@ -8,43 +8,47 @@ icon: "rocket"
 The Client SDK is experimental. APIs will change as the refund and dispute system design evolves.
 </Warning>
 
-The `@x402r/client` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
+The `@x402r/sdk` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
 
 ## Setup
 
 ```typescript
-import { X402rClient } from '@x402r/client';
-import { getNetworkConfig } from '@x402r/core';
+import { createPayerClient } from '@x402r/sdk';
 
-const networkConfig = getNetworkConfig('eip155:84532')!;
-
-const client = new X402rClient({
+const client = createPayerClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...', // Your PaymentOperator address
-  refundRequestAddress: networkConfig.refundRequest,
-  escrowAddress: networkConfig.authCaptureEscrow,
+  // Optional: enable escrow, freeze, and refund features
+  escrowPeriodAddress: '0x...',
+  freezeAddress: '0x...',
 });
 ```
 
-## Available Methods
+Refund and evidence addresses are resolved automatically from the chain config.
 
-The Client SDK currently supports:
+## Available methods
 
-- **`requestRefund()`** — Submit a refund request for a payment in escrow
-- **`getRefundStatus()`** — Check the status of a refund request
-- **`freezePayment()`** — Freeze a payment to prevent release during a dispute
-- **`isFrozen()`** — Check if a payment is frozen
-- **`isDuringEscrowPeriod()`** — Check if a payment is still in its escrow window
-- **`getAuthorizationTime()`** — Get when a payment was authorized
-- **`getPaymentState()`** — Derive the lifecycle state of a payment
-- **`paymentExists()`** — Check if a payment has been authorized
-- **`isInEscrow()`** — Check if a payment has capturable funds
-- **`getPaymentDetails()`** — Retrieve full PaymentInfo from event logs
-- **`getPayerPayments()`** — List all payments for the connected wallet
-- **`submitEvidence()`** — Attach evidence (IPFS CID) to a refund request
-- **`getEvidence()`** — Retrieve a single evidence entry by index
-- **`getAllEvidence()`** — Retrieve all evidence for a refund request
+The payer client exposes action groups:
+
+- **`client.payment.getState()`** — Derive the lifecycle state of a payment
+- **`client.payment.getAmounts()`** — Get capturable and refundable amounts
+- **`client.refund.request()`** — Submit a refund request for a payment
+- **`client.refund.cancel()`** — Cancel a pending refund request
+- **`client.refund.getStatus()`** — Check the status of a refund request
+- **`client.refund.has()`** — Check if a refund request exists
+- **`client.refund.get()`** — Get full refund request data
+- **`client.refund.getByKey()`** — Look up by paymentInfoHash
+- **`client.refund.getStoredPaymentInfo()`** — Retrieve stored PaymentInfo
+- **`client.refund.getPayerRequests()`** — List refund requests by payer
+- **`client.freeze.freeze()`** — Freeze a payment to prevent release
+- **`client.freeze.isFrozen()`** — Check if a payment is frozen
+- **`client.escrow.isDuringEscrow()`** — Check if still in escrow window
+- **`client.escrow.getAuthorizationTime()`** — Get when payment was authorized
+- **`client.escrow.getDuration()`** — Get the escrow period duration
+- **`client.evidence.submit()`** — Attach evidence (IPFS CID) to a refund
+- **`client.evidence.get()`** — Retrieve a single evidence entry by index
+- **`client.evidence.getBatch()`** — Retrieve multiple evidence entries
 
 ## Try It Now
 

@@ -1,58 +1,53 @@
 ---
-title: "Decision Submission"
+title: "Decision submission"
 description: "Submit decisions on refund requests and execute refunds with the Arbiter SDK"
 icon: "gavel"
 ---
 
-The Arbiter SDK provides methods for reviewing refund requests, making decisions, and executing refunds for disputed payments.
+The arbiter client provides methods for reviewing refund requests, making decisions, and executing refunds for disputed payments. In v3, there is no separate approve step — calling `payment.refundInEscrow()` both executes the refund and auto-approves the pending request.
 
-## Approve a Refund Request
+## Execute refund in escrow
 
-Approve a pending refund request. This updates the on-chain status but does not transfer funds.
-
-```typescript
-const { txHash } = await arbiter.approveRefundRequest(paymentInfo, 0n);
-console.log('Refund approved:', txHash);
-```
-
-<Note>
-Approving a refund request updates the request status to `Approved` but does not transfer funds. You must call `executeRefundInEscrow()` separately to move funds back to the payer.
-</Note>
-
-## Deny a Refund Request
-
-Deny a pending refund request:
+Execute a refund to transfer funds back to the payer. This also auto-approves any pending refund request via the IRecorder plugin.
 
 ```typescript
-const { txHash } = await arbiter.denyRefundRequest(paymentInfo, 0n);
-console.log('Refund denied:', txHash);
-```
-
-## Execute Refund in Escrow
-
-After approving a refund request, execute the actual fund transfer back to the payer:
-
-```typescript
-// Full refund (defaults to paymentInfo.maxAmount)
-const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
+// Full refund
+const txHash = await arbiter.payment.refundInEscrow(
+  paymentInfo,
+  paymentInfo.maxAmount
+);
 console.log('Full refund executed:', txHash);
 
 // Partial refund
 const partialAmount = BigInt('500000'); // 0.5 USDC
-const { txHash: partialTx } = await arbiter.executeRefundInEscrow(paymentInfo, partialAmount);
+const partialTx = await arbiter.payment.refundInEscrow(paymentInfo, partialAmount);
 console.log('Partial refund executed:', partialTx);
 ```
 
-<Tip>
-When no `amount` is provided, `executeRefundInEscrow` defaults to `paymentInfo.maxAmount`, issuing a full refund.
-</Tip>
+## Deny a refund request
 
-## Check If a Refund Request Exists
-
-Verify whether a refund request has been submitted for a given payment and nonce:
+Deny a pending refund request:
 
 ```typescript
-const hasRequest = await arbiter.hasRefundRequest(paymentInfo, 0n);
+const txHash = await arbiter.refund.deny(paymentInfo);
+console.log('Refund denied:', txHash);
+```
+
+## Refuse a refund request
+
+Refuse a pending refund request (similar to deny, but signals a different intent):
+
+```typescript
+const txHash = await arbiter.refund.refuse(paymentInfo);
+console.log('Refund refused:', txHash);
+```
+
+## Check if a refund request exists
+
+Verify whether a refund request has been submitted for a given payment:
+
+```typescript
+const hasRequest = await arbiter.refund.has(paymentInfo);
 
 if (!hasRequest) {
   console.log('No refund request found for this payment');
@@ -60,47 +55,35 @@ if (!hasRequest) {
 }
 ```
 
-## Get Refund Request Data
+## Get refund request data
 
 Retrieve the full refund request data, including amount and status:
 
 ```typescript
 import { RequestStatus } from '@x402r/core';
 
-const request = await arbiter.getRefundRequest(paymentInfo, 0n);
+const request = await arbiter.refund.get(paymentInfo);
 
 console.log('Payment hash:', request.paymentInfoHash);
-console.log('Nonce:', request.nonce);
 console.log('Refund amount:', request.amount);
 console.log('Status:', RequestStatus[request.status]);
 ```
 
-The `RefundRequestData` type contains:
-
-```typescript
-interface RefundRequestData {
-  paymentInfoHash: `0x${string}`;
-  nonce: bigint;
-  amount: bigint;
-  status: RequestStatus;
-}
-```
-
-## Get Refund Request Status
+## Get refund request status
 
 Query the current status of a specific refund request:
 
 ```typescript
 import { RequestStatus } from '@x402r/core';
 
-const status = await arbiter.getRefundStatus(paymentInfo, 0n);
+const status = await arbiter.refund.getStatus(paymentInfo);
 
 switch (status) {
   case RequestStatus.Pending:
     console.log('Awaiting decision');
     break;
   case RequestStatus.Approved:
-    console.log('Already approved');
+    console.log('Already approved (via refundInEscrow)');
     break;
   case RequestStatus.Denied:
     console.log('Already denied');
@@ -111,58 +94,41 @@ switch (status) {
 }
 ```
 
-## Get Pending Refund Requests (Paginated)
+## Get refund requests by operator (paginated)
 
-Retrieve a paginated list of refund request keys for a receiver. You can optionally filter by receiver address:
+Retrieve a paginated list of refund request keys for an operator:
 
 ```typescript
-// Get the first 10 pending requests for a specific receiver
-const { keys, total } = await arbiter.getPendingRefundRequests(
+const { keys, total } = await arbiter.refund.getOperatorRequests(
+  operatorAddress,
   0n,    // offset
-  10n,   // count
-  '0xReceiverAddress...' // optional: defaults to the arbiter's wallet address
+  10n    // count
 );
 
 console.log(`${total} total cases, showing first ${keys.length}`);
 
-// Look up each request by its composite key
 for (const key of keys) {
-  const request = await arbiter.getRefundRequestByKey(key);
+  const request = await arbiter.refund.getByKey(key);
   console.log(`Amount: ${request.amount}, Status: ${RequestStatus[request.status]}`);
 }
 ```
 
-## Get Refund Request Count
+## Get refund request by key
 
-Get the total number of refund requests for a receiver:
-
-```typescript
-const count = await arbiter.getRefundRequestCount('0xReceiverAddress...');
-console.log(`Total refund requests: ${count}`);
-
-// Defaults to the arbiter's wallet address if not specified
-const myCount = await arbiter.getRefundRequestCount();
-console.log(`My refund requests: ${myCount}`);
-```
-
-## Get Refund Request by Composite Key
-
-Look up a specific refund request using its `keccak256(paymentInfoHash, nonce)` composite key:
+Look up a specific refund request using its `paymentInfoHash`:
 
 ```typescript
-const request = await arbiter.getRefundRequestByKey(compositeKey);
+const request = await arbiter.refund.getByKey(paymentInfoHash);
 
 console.log('Payment hash:', request.paymentInfoHash);
 console.log('Amount:', request.amount);
 console.log('Status:', RequestStatus[request.status]);
 ```
 
-## Check If a Payment Is Frozen
-
-Verify whether a payment is currently frozen by a Freeze condition contract:
+## Check if a payment is frozen
 
 ```typescript
-const frozen = await arbiter.isFrozen(paymentInfo, freezeAddress);
+const frozen = await arbiter.freeze.isFrozen(paymentInfo);
 
 if (frozen) {
   console.log('Payment is frozen - dispute in progress');
@@ -171,23 +137,28 @@ if (frozen) {
 }
 ```
 
-## Complete Decision Workflow
+## Complete decision workflow
 
 This example shows the full arbiter workflow: fetching pending cases, reviewing them, making a decision, and executing the refund.
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
+import { createArbiterClient } from '@x402r/sdk';
 import { RequestStatus } from '@x402r/core';
 import type { PaymentInfo } from '@x402r/core';
 
-async function processAllPendingCases(arbiter: X402rArbiter, receiverAddress: `0x${string}`) {
-  // Step 1: Get all pending refund requests
-  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 50n, receiverAddress);
-  console.log(`Found ${total} pending cases`);
+async function processAllPendingCases(
+  arbiter: ReturnType<typeof createArbiterClient>,
+  operatorAddress: `0x${string}`
+) {
+  // Step 1: Get all refund requests for this operator
+  const { keys, total } = await arbiter.refund.getOperatorRequests(
+    operatorAddress, 0n, 50n
+  );
+  console.log(`Found ${total} cases`);
 
   for (const key of keys) {
     // Step 2: Retrieve request details
-    const request = await arbiter.getRefundRequestByKey(key);
+    const request = await arbiter.refund.getByKey(key);
 
     // Step 3: Skip if already decided
     if (request.status !== RequestStatus.Pending) {
@@ -195,48 +166,41 @@ async function processAllPendingCases(arbiter: X402rArbiter, receiverAddress: `0
       continue;
     }
 
-    // Step 4: Apply your decision logic
-    const shouldApprove = await evaluateCase(request);
+    // Step 4: Retrieve the stored PaymentInfo
+    const paymentInfo = await arbiter.refund.getStoredPaymentInfo(request.paymentInfoHash);
 
-    if (shouldApprove) {
-      // Step 5a: Approve and execute the refund
-      // NOTE: You need the full PaymentInfo struct to call these methods.
-      // Retrieve it from your application's database or event logs.
-      const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
+    // Step 5: Apply your decision logic
+    const shouldRefund = await evaluateCase(request);
 
-      const { txHash: approveTx } = await arbiter.approveRefundRequest(paymentInfo, request.nonce);
-      console.log(`Approved: ${approveTx}`);
-
-      const { txHash: executeTx } = await arbiter.executeRefundInEscrow(paymentInfo);
-      console.log(`Refund executed: ${executeTx}`);
+    if (shouldRefund) {
+      // Execute refund (auto-approves the request)
+      const txHash = await arbiter.payment.refundInEscrow(paymentInfo, request.amount);
+      console.log(`Refund executed: ${txHash}`);
     } else {
-      // Step 5b: Deny the refund
-      const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
-
-      const { txHash } = await arbiter.denyRefundRequest(paymentInfo, request.nonce);
+      // Deny the refund
+      const txHash = await arbiter.refund.deny(paymentInfo);
       console.log(`Denied: ${txHash}`);
     }
   }
 }
 ```
 
-## Decision Flow Diagram
+## Decision flow diagram
 
 ```mermaid
 flowchart TD
-    A[Get Pending Requests] --> B[getRefundRequestByKey]
+    A[Get Operator Requests] --> B[refund.getByKey]
     B --> C{Status Pending?}
     C -->|No| D[Skip - Already Decided]
     C -->|Yes| E[Evaluate Case]
     E --> F{Decision}
-    F -->|Approve| G[approveRefundRequest]
-    F -->|Deny| H[denyRefundRequest]
-    G --> I[executeRefundInEscrow]
-    I --> J[Funds Returned to Payer]
+    F -->|Refund| G[payment.refundInEscrow]
+    F -->|Deny| H[refund.deny]
+    G --> I[Funds Returned + Request Auto-Approved]
     H --> K[Merchant Keeps Funds]
 ```
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Batch Operations" icon="layer-group" href="/sdk/arbiter/batch-operations">

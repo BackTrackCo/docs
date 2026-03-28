@@ -1,120 +1,74 @@
 ---
-title: "Arbiter Events"
+title: "Arbiter events"
 description: "Subscribe to dispute events and build real-time arbiter dashboards"
 icon: "bell"
 ---
 
-The Arbiter SDK provides three subscription methods for monitoring dispute activity in real-time. Each returns an object with an `unsubscribe` function you call to stop watching.
+The arbiter client provides watch methods for monitoring dispute activity in real-time. Each returns an unsubscribe function you call to stop watching.
 
-## Watch New Cases
+## Watch refund requests
 
-Subscribe to `RefundRequested` events -- these are new refund requests that need your attention:
+Subscribe to RefundRequest contract events — these include new requests, status updates, and cancellations:
 
 ```typescript
-import type { RefundRequestEventLog } from '@x402r/core';
-
-const { unsubscribe } = arbiter.watchNewCases((event: RefundRequestEventLog) => {
-  console.log('New refund request!');
-  console.log('Payment hash:', event.args.paymentInfoHash);
-  console.log('Payer:', event.args.payer);
-  console.log('Receiver:', event.args.receiver);
-  console.log('Amount:', event.args.amount);
-  console.log('Nonce:', event.args.nonce);
-  console.log('Block:', event.blockNumber);
+const unsubscribe = arbiter.watch.onRefundRequest((event) => {
+  console.log('Refund request event:', event);
 });
 
 // Later: stop watching
 unsubscribe();
 ```
 
-## Watch Decisions
+## Watch refund execution
 
-Subscribe to `RefundRequestStatusUpdated` events -- these fire when a refund request is approved or denied:
+Subscribe to `RefundInEscrowExecuted` and `RefundPostEscrowExecuted` events on the operator:
 
 ```typescript
-import type { RefundRequestEventLog } from '@x402r/core';
-
-const { unsubscribe } = arbiter.watchDecisions((event: RefundRequestEventLog) => {
-  console.log('Decision made!');
-  console.log('Payment hash:', event.args.paymentInfoHash);
-  console.log('New status:', event.args.status);
-  console.log('Transaction:', event.transactionHash);
+const unsubscribe = arbiter.watch.onRefundExecuted((event) => {
+  console.log('Refund executed:', event);
 });
+
+unsubscribe();
 ```
 
-## Watch Freeze Events
+## Watch payment events
 
-Subscribe to `PaymentFrozen` and `PaymentUnfrozen` events from a Freeze condition contract:
+Subscribe to `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` events:
 
 ```typescript
-import type { FreezeEventLog } from '@x402r/core';
+const unsubscribe = arbiter.watch.onPayment((event) => {
+  console.log('Payment event:', event);
+});
 
-const freezeAddress = '0xFreezeContractAddress...' as `0x${string}`;
-
-const { unsubscribe } = arbiter.watchFreezeEvents(
-  freezeAddress,
-  (event: FreezeEventLog) => {
-    if (event.eventName === 'PaymentFrozen') {
-      console.log('Payment frozen:', event.args.paymentInfoHash);
-      console.log('Frozen by:', event.args.caller);
-    } else if (event.eventName === 'PaymentUnfrozen') {
-      console.log('Payment unfrozen:', event.args.paymentInfoHash);
-    }
-  }
-);
+unsubscribe();
 ```
 
-## Event Type Reference
+## Watch fee distribution
 
-| Method | Contract Event | Fires When |
-|--------|---------------|------------|
-| `watchNewCases` | `RefundRequested` | A payer submits a new refund request |
-| `watchDecisions` | `RefundRequestStatusUpdated` | An arbiter or receiver approves/denies a request |
-| `watchFreezeEvents` | `PaymentFrozen` / `PaymentUnfrozen` | A payment is frozen or unfrozen |
-
-## Event Log Types
-
-Both `watchNewCases` and `watchDecisions` emit `RefundRequestEventLog` events:
+Subscribe to `FeesDistributed` events:
 
 ```typescript
-interface RefundRequestEventLog {
-  eventName: 'RefundRequested' | 'RefundRequestStatusUpdated' | 'RefundRequestCancelled';
-  args: {
-    paymentInfoHash?: `0x${string}`;
-    payer?: `0x${string}`;
-    receiver?: `0x${string}`;
-    amount?: bigint;
-    nonce?: bigint;
-    status?: number;
-  };
-  address: `0x${string}`;
-  blockNumber: bigint;
-  transactionHash: `0x${string}`;
-  logIndex: number;
-}
+const unsubscribe = arbiter.watch.onFeeDistribution((event) => {
+  console.log('Fees distributed:', event);
+});
+
+unsubscribe();
 ```
 
-The `watchFreezeEvents` method emits `FreezeEventLog` events:
+## Event type reference
 
-```typescript
-interface FreezeEventLog {
-  eventName: 'PaymentFrozen' | 'PaymentUnfrozen';
-  args: {
-    paymentInfoHash?: `0x${string}`;
-    caller?: `0x${string}`;
-  };
-  address: `0x${string}`;
-  blockNumber: bigint;
-  transactionHash: `0x${string}`;
-  logIndex: number;
-}
-```
+| Method | Events Watched | Contract | Fires When |
+|--------|---------------|----------|------------|
+| `watch.onRefundRequest` | All RefundRequest events | RefundRequest | Request created, status updated, or cancelled |
+| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator | A refund is executed |
+| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator | Payment lifecycle events |
+| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator | Fees are distributed |
 
 <Tip>
-All subscription methods use viem's `watchContractEvent` under the hood. For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
+For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
 </Tip>
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">

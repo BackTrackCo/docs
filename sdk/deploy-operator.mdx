@@ -16,12 +16,12 @@ A complete marketplace operator deployment includes:
 
 1. **EscrowPeriod** — Records authorization time, enforces waiting period before release
 2. **Freeze** — Allows payer to freeze payment during escrow, receiver to unfreeze
-3. **StaticAddressCondition** — Restricts refund approval to the designated arbiter
-4. **OrCondition** — Allows either the receiver OR the arbiter to approve in-escrow refunds
+3. **ReceiverCondition** — Gates in-escrow refunds to the merchant (receiver)
+4. **RefundRequest (IRecorder)** — Wired as `refundInEscrowRecorder`, auto-approves pending refund requests during `refundInEscrow()`
 5. **StaticFeeCalculator** — Optional operator fee (basis points)
 6. **PaymentOperator** — The main contract tying everything together
 
-All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
+All contracts are deployed via factories using CREATE3, so identical configurations produce identical addresses across all supported chains.
 
 ## Deploy Your Operator
 
@@ -143,8 +143,8 @@ interface MarketplaceOperatorDeployment {
   operatorAddress: Address;           // The PaymentOperator
   escrowPeriodAddress: Address;       // EscrowPeriod recorder/condition
   freezeAddress: Address;             // Freeze condition
-  arbiterConditionAddress: Address;   // StaticAddressCondition for arbiter
-  refundInEscrowCondition: Address;   // OR(Receiver, Arbiter)
+  refundInEscrowCondition: Address;   // ReceiverCondition (merchant-gated)
+  refundInEscrowRecorder: Address;    // RefundRequest (auto-approve on refund)
   feeCalculatorAddress: Address | null; // null if no fee
   txHashes: Hash[];                   // All deployment tx hashes
   summary: {
@@ -155,7 +155,7 @@ interface MarketplaceOperatorDeployment {
 ```
 
 <Tip>
-Because all contracts use CREATE2, redeploying with the same parameters is idempotent — it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE3, redeploying with the same parameters is idempotent — it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview Addresses (No Deploy)
@@ -189,7 +189,8 @@ The deployed operator has the following slot configuration:
 | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_CONDITION` | (none) | No restrictions on charge |
 | `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-| `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+| `REFUND_IN_ESCROW_CONDITION` | ReceiverCondition | Only the receiver (merchant) can call |
+| `REFUND_IN_ESCROW_RECORDER` | RefundRequest | Auto-approves pending requests during refund |
 | `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
 | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
 | `FEE_RECIPIENT` | Your address | Receives fees |
@@ -201,16 +202,18 @@ Deployment is supported on all configured networks:
 | Network | Chain ID | EIP-155 ID |
 |---------|----------|------------|
 | Base Sepolia | 84532 | `eip155:84532` |
-| Base Mainnet | 8453 | `eip155:8453` |
+| Base | 8453 | `eip155:8453` |
 | Ethereum | 1 | `eip155:1` |
 | Ethereum Sepolia | 11155111 | `eip155:11155111` |
-| Arbitrum Sepolia | 421614 | `eip155:421614` |
-| Polygon | 137 | `eip155:137` |
 | Arbitrum | 42161 | `eip155:42161` |
+| Arbitrum Sepolia | 421614 | `eip155:421614` |
 | Optimism | 10 | `eip155:10` |
-| Avalanche | 43114 | `eip155:43114` |
+| Polygon | 137 | `eip155:137` |
 | Celo | 42220 | `eip155:42220` |
+| Avalanche | 43114 | `eip155:43114` |
+| Linea | 59144 | `eip155:59144` |
 | Monad | 143 | `eip155:143` |
+| SKALE Base | 1187947933 | `eip155:1187947933` |
 
 <Warning>
 Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can get testnet ETH from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).

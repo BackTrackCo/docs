@@ -5,7 +5,7 @@ icon: "cube"
 ---
 
 <Warning>
-The X402r SDK is in active development (v0.0.2). APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
+The X402r SDK is in active development. APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
 </Warning>
 
 The X402r SDK provides a complete TypeScript implementation for integrating with the X402r refundable payments protocol. It enables clients, merchants, and arbiters to interact with smart contracts for payment authorization, escrow management, and dispute resolution.
@@ -32,18 +32,22 @@ The SDK is organized into packages designed for specific roles in the payment ec
   </Card>
 </CardGroup>
 
-## Network Support
+## Network support
+
+All v3 contracts are deployed to the same address on every chain via CREATE3.
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
 | Base Sepolia | 84532 | Tested |
-| Base Mainnet | 8453 | Deployed, not yet tested |
-| Ethereum | 1 | Deployed, not yet tested |
-| Ethereum Sepolia | 11155111 | Deployed, not yet tested |
-| Arbitrum Sepolia | 421614 | Deployed, not yet tested |
-| Polygon | 137 | Deployed, not yet tested |
-| Arbitrum | 42161 | Deployed, not yet tested |
-| Optimism | 10 | Deployed, not yet tested |
-| Avalanche | 43114 | Deployed, not yet tested |
-| Celo | 42220 | Deployed, not yet tested |
-| Monad | 143 | Deployed, not yet tested |
+| Base | 8453 | Deployed |
+| Ethereum | 1 | Deployed |
+| Ethereum Sepolia | 11155111 | Deployed |
+| Arbitrum | 42161 | Deployed |
+| Arbitrum Sepolia | 421614 | Deployed |
+| Optimism | 10 | Deployed |
+| Polygon | 137 | Deployed |
+| Celo | 42220 | Deployed |
+| Avalanche | 43114 | Deployed |
+| Linea | 59144 | Deployed |
+| Monad | 143 | Deployed |
+| SKALE Base | 1187947933 | Deployed (Shanghai EVM) |

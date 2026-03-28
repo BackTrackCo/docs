@@ -8,38 +8,43 @@ The SDK provides full coverage of core payment flows including authorization, re
 
 ## API Constraints
 
-### EIP-155 Network Identifiers
+### Chain ID lookups
 
-Network configuration requires EIP-155 format strings, not chain ID numbers:
+Network configuration uses numeric chain IDs:
 
 ```typescript
 // Correct
-const config = getNetworkConfig('eip155:84532');
+const config = getChainConfig(84532);
 
-// Incorrect - will return undefined
-const config = getNetworkConfig(84532);
+// Incorrect - EIP-155 strings are no longer used for chain config
+// const config = getNetworkConfig('eip155:84532');
 ```
 
-### PaymentInfo Must Be Complete
+Use `toNetworkId(chainId)` and `fromNetworkId(networkId)` to convert between numeric chain IDs and EIP-155 format strings when needed.
 
-All SDK methods require a complete `PaymentInfo` object. You cannot query by hash alone:
+### PaymentInfo must be complete
+
+Most SDK methods require a complete `PaymentInfo` object. You can use `refund.getStoredPaymentInfo(paymentInfoHash)` to retrieve stored PaymentInfo from the RefundRequest contract, or use the query plugin to look up payments by hash:
 
 ```typescript
-// Works - full PaymentInfo
-const status = await client.getRefundStatus(paymentInfo, 0n);
+// Retrieve stored PaymentInfo from RefundRequest contract
+const paymentInfo = await client.refund.getStoredPaymentInfo(paymentInfoHash);
 
-// Not supported - hash-only queries require the full struct
-// const state = await client.getPaymentStateByHash(hash);
+// Or use the query plugin
+const paymentInfo = await client.query.getPayment(paymentInfoHash);
 ```
 
 ### Event Log Scanning Limits
 
-`getPayerPayments()`, `getReceiverPayments()`, and `getPaymentDetails()` scan `AuthorizationCreated` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Pass a `fromBlock` parameter for large ranges:
+The event-based query provider scans `AuthorizationCreated` and `ChargeExecuted` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Configure `eventFromBlock` in your client config to set the scan start:
 
 ```typescript
-// Scan only recent blocks to avoid RPC limits
-const payments = await client.getPayerPayments(recentBlockNumber);
-const details = await client.getPaymentDetails(hash, recentBlockNumber);
+const client = createPayerClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...',
+  eventFromBlock: recentBlockNumber, // Required to enable event fallback provider
+});
 ```
 
 ### No Express/Hono Middleware

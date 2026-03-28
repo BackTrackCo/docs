@@ -9,19 +9,9 @@ icon: "download"
 Install only the packages you need for your use case:
 
 <Tabs>
-  <Tab title="Client (Payer)">
+  <Tab title="All-in-one">
     ```bash
-    npm install @x402r/client @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Merchant">
-    ```bash
-    npm install @x402r/merchant @x402r/helpers @x402r/core viem
-    ```
-  </Tab>
-  <Tab title="Arbiter">
-    ```bash
-    npm install @x402r/arbiter @x402r/core viem
+    npm install @x402r/sdk @x402r/core viem
     ```
   </Tab>
   <Tab title="Helpers Only">
@@ -31,27 +21,29 @@ Install only the packages you need for your use case:
   </Tab>
 </Tabs>
 
-## Setup viem Clients
+The `@x402r/sdk` package includes factory functions for all roles (payer, merchant, arbiter).
 
-Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clients/public). All SDK classes require these as constructor arguments.
+## Setup viem clients
 
-## Contract Addresses
+Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clients/public). All SDK factory functions require these as config arguments.
 
-Get the deployed contract addresses from the network config:
+## Contract addresses
+
+Get the deployed contract addresses from the chain config:
 
 ```typescript
-import { getNetworkConfig } from '@x402r/core';
+import { getChainConfig } from '@x402r/core';
 
-const config = getNetworkConfig('eip155:84532'); // Base Sepolia
+const config = getChainConfig(84532); // Base Sepolia
 
 console.log(config.authCaptureEscrow); // Escrow contract
-console.log(config.refundRequest);     // RefundRequest contract
 console.log(config.arbiterRegistry);   // ArbiterRegistry contract
-console.log(config.usdc);             // USDC token address
+console.log(config.usdc);              // USDC token address
+console.log(config.factories);         // Factory addresses
 ```
 
 <Note>
-Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.
+`getChainConfig()` accepts a numeric chain ID (e.g., `84532` for Base Sepolia). All v3 protocol addresses are identical across every supported chain thanks to CREATE3 deployment.
 </Note>
 
 <Warning>
