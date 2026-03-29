@@ -1,5 +1,5 @@
 ---
-title: "SDK Overview"
+title: "Overview"
 description: "TypeScript SDK for adding escrow, refunds, and dispute resolution to x402 payments"
 icon: "cube"
 ---
@@ -58,12 +58,15 @@ bun add @x402r/helpers @x402r/evm
 
 ### Quickstarts
 
-<CardGroup cols={2}>
-  <Card title="Quickstart for Merchants" icon="store" href="/sdk/merchant-quickstart">
+<CardGroup cols={3}>
+  <Card title="Merchants" icon="store" href="/sdk/merchant-quickstart">
     Deploy an operator, accept a payment, release funds from escrow.
   </Card>
-  <Card title="Quickstart for Payers" icon="user" href="/sdk/payer-quickstart">
+  <Card title="Payers" icon="user" href="/sdk/payer-quickstart">
     Check payment state, request a refund, submit evidence.
+  </Card>
+  <Card title="Arbiters" icon="gavel" href="/sdk/arbiter-quickstart">
+    Review disputes, approve or deny refunds, distribute fees.
   </Card>
 </CardGroup>
 

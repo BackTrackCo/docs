@@ -1,6 +1,7 @@
 ---
 title: "Quickstart for Merchants"
 description: "Deploy an operator, accept a payment into escrow, and release funds."
+icon: "store"
 ---
 
 ### Prerequisites
@@ -177,26 +178,16 @@ if (hasRefund) {
 }
 ```
 
-### Summary
+## Next Steps
 
-* Install `@x402r/sdk`, `@x402r/core`, and `viem`
-* Deploy a `PaymentOperator` with `deployMarketplaceOperator()`
-* Create a merchant client with the deployment addresses
-* Payer signs authorization, merchant submits with `payment.authorize()`
-* Check state with `payment.getAmounts()` and `escrow.isDuringEscrow()`
-* Release after escrow with `payment.release()`
-* Handle disputes with `refund.get()` and `payment.refundInEscrow()`
-
----
-
-**Next Steps:**
-
-* [Quickstart for Payers](/sdk/payer-quickstart): request refunds, freeze payments, submit evidence
-* [Smart Contracts](/contracts/overview): on-chain architecture, conditions, and recorders
-* [Protocol Overview](/x402-integration/overview): how x402r extends the x402 payment protocol
-
-**References:**
-
-* [@x402r/sdk on npm](https://www.npmjs.com/package/@x402r/sdk)
-* [@x402r/core on npm](https://www.npmjs.com/package/@x402r/core)
-* [x402r-sdk on GitHub](https://github.com/BackTrackCo/x402r-sdk)
+<CardGroup cols={3}>
+  <Card title="Payer Quickstart" icon="user" href="/sdk/payer-quickstart">
+    Request refunds, freeze payments, submit evidence.
+  </Card>
+  <Card title="Arbiter Quickstart" icon="gavel" href="/sdk/arbiter-quickstart">
+    Review disputes, approve or deny refunds.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Runnable examples for every SDK operation.
+  </Card>
+</CardGroup>

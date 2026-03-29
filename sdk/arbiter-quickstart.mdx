@@ -1,6 +1,7 @@
 ---
 title: "Quickstart for Arbiters"
 description: "Review disputes, approve or deny refunds, and distribute fees."
+icon: "gavel"
 ---
 
 ### Prerequisites
@@ -156,27 +157,16 @@ if (fees > 0n) {
 }
 ```
 
-### Summary
+## Next Steps
 
-* Install `@x402r/sdk` and `viem`
-* Create an arbiter client with the operator's deployment addresses
-* Check for pending refund requests with `refund.has()` and `refund.get()`
-* Review evidence with `evidence.getBatch()`
-* Approve with `payment.refundInEscrow()` (recorder auto-approves)
-* Deny with `refund.deny()` or decline with `refund.refuse()`
-* Unfreeze payments with `freeze.unfreeze()`
-* Distribute fees with `operator.distributeFees()`
-
----
-
-**Next Steps:**
-
-* [Quickstart for Merchants](/sdk/merchant-quickstart): deploy an operator, authorize payments, release funds
-* [Quickstart for Payers](/sdk/payer-quickstart): request refunds, freeze payments, submit evidence
-* [Smart Contracts](/contracts/overview): conditions, recorders, and the operator architecture
-
-**References:**
-
-* [Dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts)
-* [Arbiter examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter)
-* [@x402r/sdk on npm](https://www.npmjs.com/package/@x402r/sdk)
+<CardGroup cols={3}>
+  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant-quickstart">
+    Deploy an operator, authorize payments, release funds.
+  </Card>
+  <Card title="Payer Quickstart" icon="user" href="/sdk/payer-quickstart">
+    Request refunds, freeze payments, submit evidence.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Runnable examples for every SDK operation.
+  </Card>
+</CardGroup>
