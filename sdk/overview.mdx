@@ -1,82 +1,49 @@
 ---
 title: "SDK Overview"
-description: "TypeScript SDK for the x402r refundable payments protocol"
+description: "TypeScript SDK for adding escrow, refunds, and dispute resolution to x402 payments"
 icon: "cube"
 ---
 
-x402 handles instant payments. x402r adds what happens *after* payment: escrow holds, partial captures, refund requests, dispute resolution, and freeze mechanics. If you need refund windows or arbitrated disputes on top of x402, this is the SDK.
+x402 payments are instant and irreversible. x402r adds escrow holds, refund windows, and dispute resolution on top.
 
-```typescript
-import { createMerchantClient } from '@x402r/sdk'
+Three roles interact with the protocol:
 
-const merchant = createMerchantClient({
-  publicClient,
-  walletClient,
-  operatorAddress: '0x...', // from deployMarketplaceOperator() — see Deploy an Operator guide
-})
+- **Merchants** authorize payments into escrow and release funds after delivery
+- **Payers** can request refunds, freeze payments, and submit evidence during disputes
+- **Arbiters** review disputes and approve or deny refund requests
 
-await merchant.payment.release(paymentInfo, amount)
+### Packages
+
+```bash
+npm install @x402r/sdk viem
 ```
 
-Three lines to set up, one line to release escrowed funds. The client narrows TypeScript types to merchant-relevant methods — `refund.request()` won't appear in autocomplete because merchants don't request refunds. Payers do.
+`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), and an `.extend()` plugin system.
 
-## Packages
+For low-level access to contract ABIs and deploy utilities: `npm install @x402r/core viem`
 
-<CardGroup cols={3}>
-  <Card title="@x402r/sdk" icon="cube" href="/sdk/create-client">
-    Client factory, role presets, 8 action groups, event watchers, and `.extend()` plugins. The only package most developers need.
+For x402 server integration: `npm install @x402r/helpers @x402r/evm`
+
+### Quickstarts
+
+<CardGroup cols={2}>
+  <Card title="Quickstart for Merchants" icon="store" href="/sdk/merchant-quickstart">
+    Deploy an operator, accept a payment, release funds from escrow.
   </Card>
-  <Card title="@x402r/core" icon="microchip" href="/sdk/installation">
-    Types, ABIs, chain config, deploy utilities, and low-level viem actions. Installed automatically as a dependency of `@x402r/sdk`.
-  </Card>
-  <Card title="@x402r/helpers" icon="wrench">
-    `refundable()` helper for marking x402 payment options as refundable. One function that attaches escrow config to a standard x402 payment request.
+  <Card title="Quickstart for Payers" icon="user" href="/sdk/payer-quickstart">
+    Check payment state, request a refund, submit evidence.
   </Card>
 </CardGroup>
 
-## Action Groups
+### Supported Chains
 
-Every method on the client belongs to an action group. Three groups are always available; the rest activate when you pass the corresponding contract address to the config.
-
-| Group | Methods | Requirement |
-|-------|---------|-------------|
-| `payment` | 9 | Always available — authorize, charge, release, refund in/post escrow, query state |
-| `operator` | 8 | Always available — fee calculation, slot config, fee distribution |
-| `watch` | 4 | Always available — subscribe to payment, refund, and fee events |
-| `escrow` | 3 | `escrowPeriodAddress` — check escrow status, authorization time, duration |
-| `refund` | 15 | `refundRequestAddress` — request, cancel, deny, refuse, query refund state |
-| `evidence` | 4 | `refundRequestEvidenceAddress` — submit and query IPFS evidence CIDs |
-| `freeze` | 3 | `freezeAddress` — freeze, unfreeze, check frozen status |
-| `query` | 3 | `paymentIndexRecorderAddress` — look up payments by payer or receiver |
-
-Skip addresses you don't need. If your operator has no freeze contract, omit `freezeAddress` — the `freeze` group won't exist on your client type and TypeScript will enforce that.
-
-## Role Presets
-
-Three factory functions narrow the client type to a specific role:
-
-- **`createPayerClient()`** — query payment state, request refunds, freeze payments, submit evidence
-- **`createMerchantClient()`** — authorize, charge, release, handle post-escrow refunds, read operator config
-- **`createArbiterClient()`** — deny/refuse refund requests, unfreeze, review evidence, distribute fees
-
-Autocomplete only shows methods your role can call. This is a DX convenience, not a security boundary — on-chain [conditions](/contracts/conditions/overview) enforce access control regardless of which client you use.
-
-## Supported Chains
-
-All protocol contracts are deployed via CREATE3 to identical addresses on every chain. Only the USDC address differs.
-
-### Testnets
+All contracts are deployed to identical addresses on every chain via CREATE3. Only USDC differs.
 
 | Chain | Chain ID | USDC |
 |-------|----------|------|
 | Base Sepolia | `84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | Ethereum Sepolia | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
 | Arbitrum Sepolia | `421614` | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` |
-
-### Mainnets
-
-| Chain | Chain ID | USDC |
-|-------|----------|------|
 | Ethereum | `1` | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
 | Base | `8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 | Polygon | `137` | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
@@ -86,18 +53,3 @@ All protocol contracts are deployed via CREATE3 to identical addresses on every 
 | Avalanche C-Chain | `43114` | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
 | Monad | `143` | `0x754704Bc059F8C67012fEd69BC8a327a5aafb603` |
 | Linea | `59144` | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
-
-<Warning>
-Base Sepolia is the primary testnet and the most battle-tested deployment. Mainnet contracts are live but have seen less production traffic. Run integration tests on your target chain before handling real funds.
-</Warning>
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Installation" icon="download" href="/sdk/installation">
-    Install packages and set up viem clients.
-  </Card>
-  <Card title="Create a Client" icon="plug" href="/sdk/create-client">
-    Pick between the full client and role presets.
-  </Card>
-</CardGroup>

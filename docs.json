@@ -90,9 +90,8 @@
             "group": "Getting Started",
             "pages": [
               "sdk/overview",
-              "sdk/installation",
-              "sdk/create-client",
-              "sdk/typescript"
+              "sdk/merchant-quickstart",
+              "sdk/payer-quickstart"
             ]
           }
         ]

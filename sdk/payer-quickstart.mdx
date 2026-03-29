@@ -1,0 +1,146 @@
+---
+title: "Quickstart for Payers"
+description: "Check payment state, request a refund, freeze a payment, and submit evidence — step by step."
+---
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+* An authorized payment on an x402r operator (see [Quickstart for Merchants](/sdk/merchant-quickstart))
+
+**Note**\
+There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [payer examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts).
+
+### 1. Install Dependencies
+
+```bash
+npm install @x402r/sdk viem
+```
+
+### 2. Create a Payer Client
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createPayerClient } from '@x402r/sdk'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const payer = createPayerClient({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: '0x...',           // your operator address
+  refundRequestAddress: '0x...',      // from deploy result
+  refundRequestEvidenceAddress: '0x...',
+  escrowPeriodAddress: '0x...',
+  freezeAddress: '0x...',
+})
+```
+
+`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not — that is a merchant action.
+
+### 3. Check Payment State
+
+```typescript
+import type { PaymentInfo } from '@x402r/sdk'
+
+// paymentInfo is the same struct used during authorization
+const paymentInfo: PaymentInfo = { /* ... */ }
+
+const amounts = await payer.payment.getAmounts(paymentInfo)
+console.log('Collected:', amounts.hasCollectedPayment)
+console.log('Capturable:', amounts.capturableAmount)
+console.log('Refundable:', amounts.refundableAmount)
+
+const inEscrow = await payer.escrow?.isDuringEscrow(paymentInfo)
+console.log('In escrow:', inEscrow)
+```
+
+### 4. Request a Refund
+
+Request a refund while the payment is still in escrow:
+
+```typescript
+// Check if a refund request already exists
+const hasExisting = await payer.refund?.has(paymentInfo)
+if (hasExisting) {
+  console.log('Refund already requested')
+} else {
+  const tx = await payer.refund?.request(paymentInfo, 1_000_000n) // 1 USDC
+  console.log('Refund requested:', tx)
+}
+
+// Check refund status
+const status = await payer.refund?.getStatus(paymentInfo)
+console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Refused
+```
+
+### 5. Freeze a Payment (Optional)
+
+Freezing blocks the merchant from releasing funds while the dispute is active:
+
+```typescript
+const frozen = await payer.freeze?.isFrozen(paymentInfo)
+if (!frozen) {
+  const tx = await payer.freeze?.freeze(paymentInfo)
+  console.log('Payment frozen:', tx)
+}
+```
+
+### 6. Submit Evidence (Optional)
+
+Attach evidence to a refund request. Evidence is stored on-chain as IPFS CIDs:
+
+```typescript
+// Upload your evidence to IPFS first, then submit the CID
+const tx = await payer.evidence?.submit(paymentInfo, 'QmYourEvidenceCID...')
+console.log('Evidence submitted:', tx)
+
+// Read back evidence
+const count = await payer.evidence?.count(paymentInfo)
+console.log('Evidence entries:', count)
+
+for (let i = 0n; i < count!; i++) {
+  const entry = await payer.evidence?.get(paymentInfo, i)
+  console.log(`  [${i}] CID: ${entry?.cid} from ${entry?.submitter}`)
+}
+```
+
+### 7. Cancel a Refund Request (Optional)
+
+If the issue is resolved directly with the merchant:
+
+```typescript
+const cancelTx = await payer.refund?.cancel(paymentInfo)
+console.log('Refund cancelled:', cancelTx)
+```
+
+### Summary
+
+* Install `@x402r/sdk` and `viem`
+* Create a payer client with the operator's deployment addresses
+* Check payment state with `payment.getAmounts()` and `escrow.isDuringEscrow()`
+* Request a refund with `refund.request()`
+* Optionally freeze the payment with `freeze.freeze()` to block release
+* Submit IPFS evidence with `evidence.submit()`
+* Cancel with `refund.cancel()` if the issue is resolved
+
+---
+
+**Next Steps:**
+
+* [Quickstart for Merchants](/sdk/merchant-quickstart) — deploy an operator, authorize payments, release funds
+* [Smart Contracts](/contracts/overview) — conditions, recorders, and the operator architecture
+* [Protocol Overview](/x402-integration/overview) — escrow scheme and payment lifecycle
+
+**References:**
+
+* [Dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts)
+* [Payer examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer)
+* [@x402r/sdk on npm](https://www.npmjs.com/package/@x402r/sdk)

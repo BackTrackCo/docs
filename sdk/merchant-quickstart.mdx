@@ -1,0 +1,194 @@
+---
+title: "Quickstart for Merchants"
+description: "Deploy an operator, accept a payment into escrow, and release funds — step by step."
+---
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+* USDC on Base Sepolia for testing ([faucet](https://faucet.circle.com/))
+
+**Note**\
+There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [merchant examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant) and full [scenario scripts](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios).
+
+### 1. Install Dependencies
+
+```bash
+npm install @x402r/sdk @x402r/core viem
+```
+
+### 2. Create viem Clients
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
+```
+
+### 3. Deploy an Operator
+
+Every x402r payment flows through a `PaymentOperator` contract. Deploy one with the marketplace preset:
+
+```typescript
+import { deployMarketplaceOperator } from '@x402r/core'
+
+const deployment = await deployMarketplaceOperator(walletClient, publicClient, {
+  chainId: 84532,
+  feeRecipient: account.address,          // receives operator fees
+  arbiter: '0xYourArbiterAddress',         // resolves disputes
+  escrowPeriodSeconds: 604_800n,           // 7 days
+  freezeDurationSeconds: 604_800n,         // 7 days (set 0 to disable freeze)
+  operatorFeeBps: 50n,                     // 0.5%
+})
+
+console.log('Operator:', deployment.operatorAddress)
+console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
+console.log('RefundRequest:', deployment.refundRequestAddress)
+console.log('Freeze:', deployment.freezeAddress)
+```
+
+This deploys a `PaymentOperator` with escrow, freeze, and dispute resolution contracts. Save these addresses — you need them to create SDK clients.
+
+### 4. Create a Merchant Client
+
+```typescript
+import { createMerchantClient } from '@x402r/sdk'
+
+const merchant = createMerchantClient({
+  publicClient,
+  walletClient,
+  operatorAddress: deployment.operatorAddress,
+  escrowPeriodAddress: deployment.escrowPeriodAddress,
+  refundRequestAddress: deployment.refundRequestAddress,
+  freezeAddress: deployment.freezeAddress,
+  refundRequestEvidenceAddress: deployment.refundRequestEvidenceAddress,
+})
+```
+
+`createMerchantClient` restricts TypeScript types to merchant-relevant methods. `payment.release()` shows up in autocomplete; `refund.request()` does not — that is a payer action.
+
+### 5. Authorize a Payment
+
+In the x402 flow, the **payer signs** an ERC-3009 authorization and the **merchant submits** it to the operator:
+
+```typescript
+import { signReceiveAuthorization, type PaymentInfo } from '@x402r/core'
+
+// The payer builds and signs
+const paymentInfo: PaymentInfo = {
+  operator: deployment.operatorAddress,
+  payer: '0xPayerAddress',
+  receiver: account.address,               // merchant receives funds
+  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia
+  maxAmount: 1_000_000n,                   // 1 USDC (6 decimals)
+  preApprovalExpiry: 281_474_976_710_655,   // far future
+  authorizationExpiry: 281_474_976_710_655,
+  refundExpiry: 281_474_976_710_655,
+  minFeeBps: 0,
+  maxFeeBps: 500,
+  feeReceiver: deployment.operatorAddress,
+  salt: 1n,
+}
+
+const { tokenCollector, collectorData } = await signReceiveAuthorization({
+  account: payerAccount,  // payer's viem account
+  chainId: 84532,
+  paymentInfo,
+})
+
+// The merchant submits the authorization
+const authTx = await merchant.payment.authorize(
+  paymentInfo,
+  1_000_000n,        // 1 USDC
+  tokenCollector,
+  collectorData,
+)
+console.log('Authorized:', authTx)
+```
+
+Funds are now locked in escrow.
+
+### 6. Check Payment State
+
+```typescript
+const amounts = await merchant.payment.getAmounts(paymentInfo)
+console.log('Collected:', amounts.hasCollectedPayment)     // true
+console.log('Capturable:', amounts.capturableAmount)       // 1000000n
+console.log('Refundable:', amounts.refundableAmount)       // 1000000n
+
+const inEscrow = await merchant.escrow?.isDuringEscrow(paymentInfo)
+console.log('In escrow:', inEscrow)                        // true
+```
+
+### 7. Release Funds After Escrow
+
+Once the escrow period expires, release funds to the receiver (merchant):
+
+```typescript
+const releaseTx = await merchant.payment.release(paymentInfo, 1_000_000n)
+console.log('Released:', releaseTx)
+
+// Verify
+const after = await merchant.payment.getAmounts(paymentInfo)
+console.log('Capturable after release:', after.capturableAmount) // 0n
+```
+
+### 8. Handle Refund Requests (Optional)
+
+If a payer disputes, check for pending refund requests:
+
+```typescript
+// Check if a refund request exists
+const hasRefund = await merchant.refund?.has(paymentInfo)
+
+if (hasRefund) {
+  const request = await merchant.refund?.get(paymentInfo)
+  console.log('Refund amount:', request?.amount)
+  console.log('Status:', request?.status)  // 0 = Pending
+
+  // Approve by executing refundInEscrow (recorder auto-approves)
+  const refundTx = await merchant.payment.refundInEscrow(
+    paymentInfo,
+    request!.amount,
+  )
+  console.log('Refunded:', refundTx)
+}
+```
+
+### Summary
+
+* Install `@x402r/sdk`, `@x402r/core`, and `viem`
+* Deploy a `PaymentOperator` with `deployMarketplaceOperator()`
+* Create a merchant client with the deployment addresses
+* Payer signs authorization, merchant submits with `payment.authorize()`
+* Check state with `payment.getAmounts()` and `escrow.isDuringEscrow()`
+* Release after escrow with `payment.release()`
+* Handle disputes with `refund.get()` and `payment.refundInEscrow()`
+
+---
+
+**Next Steps:**
+
+* [Quickstart for Payers](/sdk/payer-quickstart) — request refunds, freeze payments, submit evidence
+* [Smart Contracts](/contracts/overview) — on-chain architecture, conditions, and recorders
+* [Protocol Overview](/x402-integration/overview) — how x402r extends the x402 payment protocol
+
+**References:**
+
+* [@x402r/sdk on npm](https://www.npmjs.com/package/@x402r/sdk)
+* [@x402r/core on npm](https://www.npmjs.com/package/@x402r/core)
+* [x402r-sdk on GitHub](https://github.com/BackTrackCo/x402r-sdk)
