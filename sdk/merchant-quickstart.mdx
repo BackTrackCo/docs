@@ -1,6 +1,6 @@
 ---
 title: "Quickstart for Merchants"
-description: "Deploy an operator, accept a payment into escrow, and release funds — step by step."
+description: "Deploy an operator, accept a payment into escrow, and release funds."
 ---
 
 ### Prerequisites
@@ -14,9 +14,17 @@ There are pre-configured [examples in the x402r-sdk repo](https://github.com/Bac
 
 ### 1. Install Dependencies
 
-```bash
+<CodeGroup>
+```bash npm
 npm install @x402r/sdk @x402r/core viem
 ```
+```bash pnpm
+pnpm add @x402r/sdk @x402r/core viem
+```
+```bash bun
+bun add @x402r/sdk @x402r/core viem
+```
+</CodeGroup>
 
 ### 2. Create viem Clients
 
@@ -61,7 +69,7 @@ console.log('RefundRequest:', deployment.refundRequestAddress)
 console.log('Freeze:', deployment.freezeAddress)
 ```
 
-This deploys a `PaymentOperator` with escrow, freeze, and dispute resolution contracts. Save these addresses — you need them to create SDK clients.
+This deploys a `PaymentOperator` with escrow, freeze, and dispute resolution contracts. Save these addresses. You need them to create SDK clients.
 
 ### 4. Create a Merchant Client
 
@@ -79,7 +87,7 @@ const merchant = createMerchantClient({
 })
 ```
 
-`createMerchantClient` restricts TypeScript types to merchant-relevant methods. `payment.release()` shows up in autocomplete; `refund.request()` does not — that is a payer action.
+`createMerchantClient` restricts TypeScript types to merchant-relevant methods. `payment.release()` shows up in autocomplete; `refund.request()` does not because that is a payer action.
 
 ### 5. Authorize a Payment
 
@@ -183,9 +191,9 @@ if (hasRefund) {
 
 **Next Steps:**
 
-* [Quickstart for Payers](/sdk/payer-quickstart) — request refunds, freeze payments, submit evidence
-* [Smart Contracts](/contracts/overview) — on-chain architecture, conditions, and recorders
-* [Protocol Overview](/x402-integration/overview) — how x402r extends the x402 payment protocol
+* [Quickstart for Payers](/sdk/payer-quickstart): request refunds, freeze payments, submit evidence
+* [Smart Contracts](/contracts/overview): on-chain architecture, conditions, and recorders
+* [Protocol Overview](/x402-integration/overview): how x402r extends the x402 payment protocol
 
 **References:**
 

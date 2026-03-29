@@ -14,15 +14,47 @@ Three roles interact with the protocol:
 
 ### Packages
 
-```bash
+<CodeGroup>
+```bash npm
 npm install @x402r/sdk viem
 ```
+```bash pnpm
+pnpm add @x402r/sdk viem
+```
+```bash bun
+bun add @x402r/sdk viem
+```
+</CodeGroup>
 
 `@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), and an `.extend()` plugin system.
 
-For low-level access to contract ABIs and deploy utilities: `npm install @x402r/core viem`
+For low-level access to contract ABIs and deploy utilities:
 
-For x402 server integration: `npm install @x402r/helpers @x402r/evm`
+<CodeGroup>
+```bash npm
+npm install @x402r/core viem
+```
+```bash pnpm
+pnpm add @x402r/core viem
+```
+```bash bun
+bun add @x402r/core viem
+```
+</CodeGroup>
+
+For x402 server integration:
+
+<CodeGroup>
+```bash npm
+npm install @x402r/helpers @x402r/evm
+```
+```bash pnpm
+pnpm add @x402r/helpers @x402r/evm
+```
+```bash bun
+bun add @x402r/helpers @x402r/evm
+```
+</CodeGroup>
 
 ### Quickstarts
 

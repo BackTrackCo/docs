@@ -1,6 +1,6 @@
 ---
 title: "Quickstart for Payers"
-description: "Check payment state, request a refund, freeze a payment, and submit evidence — step by step."
+description: "Check payment state, request a refund, freeze a payment, and submit evidence."
 ---
 
 ### Prerequisites
@@ -14,9 +14,17 @@ There are pre-configured [examples in the x402r-sdk repo](https://github.com/Bac
 
 ### 1. Install Dependencies
 
-```bash
+<CodeGroup>
+```bash npm
 npm install @x402r/sdk viem
 ```
+```bash pnpm
+pnpm add @x402r/sdk viem
+```
+```bash bun
+bun add @x402r/sdk viem
+```
+</CodeGroup>
 
 ### 2. Create a Payer Client
 
@@ -43,7 +51,7 @@ const payer = createPayerClient({
 })
 ```
 
-`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not — that is a merchant action.
+`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not because that is a merchant action.
 
 ### 3. Check Payment State
 
@@ -135,9 +143,9 @@ console.log('Refund cancelled:', cancelTx)
 
 **Next Steps:**
 
-* [Quickstart for Merchants](/sdk/merchant-quickstart) — deploy an operator, authorize payments, release funds
-* [Smart Contracts](/contracts/overview) — conditions, recorders, and the operator architecture
-* [Protocol Overview](/x402-integration/overview) — escrow scheme and payment lifecycle
+* [Quickstart for Merchants](/sdk/merchant-quickstart): deploy an operator, authorize payments, release funds
+* [Smart Contracts](/contracts/overview): conditions, recorders, and the operator architecture
+* [Protocol Overview](/x402-integration/overview): escrow scheme and payment lifecycle
 
 **References:**
 
