@@ -65,7 +65,6 @@ import type { PaymentInfo } from '@x402r/sdk'
 // paymentInfo comes from the facilitator callback or your payment records
 const paymentInfo: PaymentInfo = { /* ... */ }
 
-```typescript
 const amounts = await merchant.payment.getAmounts(paymentInfo)
 console.log('Collected:', amounts.hasCollectedPayment)     // true
 console.log('Capturable:', amounts.capturableAmount)       // 1000000n
