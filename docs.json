@@ -91,7 +91,15 @@
             "pages": [
               "sdk/overview",
               "sdk/merchant-quickstart",
-              "sdk/payer-quickstart"
+              "sdk/payer-quickstart",
+              "sdk/arbiter-quickstart"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "sdk/deploy-operator",
+              "sdk/examples"
             ]
           }
         ]
