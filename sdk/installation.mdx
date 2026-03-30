@@ -37,18 +37,43 @@ Create `publicClient` and `walletClient` using [viem](https://viem.sh/docs/clien
 
 ## Contract Addresses
 
-Get the deployed contract addresses from the network config:
+All protocol contracts use CREATE3 addresses that are the same on every supported chain. You can import them directly as named constants or look them up from a chain config:
 
-```typescript
-import { getNetworkConfig } from '@x402r/core';
+<Tabs>
+  <Tab title="Named constants">
+    ```typescript
+    import {
+      authCaptureEscrow,
+      tokenCollector,
+      protocolFeeConfig,
+      arbiterRegistry,
+      receiverRefundCollector,
+      usdcTvlLimit,
+      factories,
+      conditions,
+    } from '@x402r/core';
 
-const config = getNetworkConfig('eip155:84532'); // Base Sepolia
+    console.log(authCaptureEscrow);       // 0xBC15…
+    console.log(factories.paymentOperator); // 0x3Cd5…
+    console.log(conditions.payer);          // 0x808b…
+    ```
+  </Tab>
+  <Tab title="Chain config">
+    ```typescript
+    import { getChainConfig } from '@x402r/core';
 
-console.log(config.authCaptureEscrow); // Escrow contract
-console.log(config.refundRequest);     // RefundRequest contract
-console.log(config.arbiterRegistry);   // ArbiterRegistry contract
-console.log(config.usdc);             // USDC token address
-```
+    const config = getChainConfig(84532); // Base Sepolia
+
+    console.log(config.authCaptureEscrow); // Escrow contract
+    console.log(config.arbiterRegistry);   // ArbiterRegistry contract
+    console.log(config.usdc);              // USDC token address (chain-specific)
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+The named constants and `getChainConfig()` return identical addresses. Use named constants when you don't need the chain-specific USDC address.
+</Tip>
 
 <Note>
 Network identifiers use the [EIP-155](https://eips.ethereum.org/EIPS/eip-155) format: `eip155:<chainId>`. For Base Sepolia, use `'eip155:84532'`. For Base Mainnet, use `'eip155:8453'`.

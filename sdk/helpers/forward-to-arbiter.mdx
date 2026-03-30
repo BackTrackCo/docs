@@ -1,0 +1,140 @@
+---
+title: "forwardToArbiter()"
+description: "Forward settlement data to an arbiter service for quality evaluation"
+icon: "arrow-right"
+---
+
+The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and payment payload to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
+
+- Only fires for successful **commerce** scheme settlements
+- POSTs `{ responseBody, transaction, paymentPayload }` to `{arbiterUrl}/verify`
+- Errors are silently caught so an unavailable arbiter cannot break the payment flow
+
+## Usage
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers';
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new EscrowServerScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001')
+  );
+```
+
+## Function signature
+
+```typescript
+function forwardToArbiter(
+  arbiterUrl: string,
+  options?: ForwardToArbiterOptions
+): (context: SettleResultContext) => Promise<void>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `arbiterUrl` | `string` | Base URL of your arbiter service (e.g. `http://arbiter:3001`) |
+| `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
+
+### Options
+
+```typescript
+interface ForwardToArbiterOptions {
+  /** Custom error handler. Defaults to `console.warn`. */
+  onError?: (error: unknown) => void;
+}
+```
+
+## Payload shape
+
+When a commerce settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
+
+```typescript
+{
+  responseBody: string;       // UTF-8 encoded response body
+  transaction: string;        // Settlement transaction hash
+  paymentPayload: {
+    x402Version: number;
+    accepted: {
+      scheme: string;         // e.g. "commerce"
+      network: string;        // e.g. "eip155:84532"
+      // ...other accepted fields
+    };
+    payload: {
+      paymentInfo: {
+        operator: string;
+        payer: string;
+        receiver: string;
+        // ...full PaymentInfo
+      };
+    };
+  };
+}
+```
+
+<Tip>
+Arbiters that need `paymentInfo` for `release()` can read it directly from `paymentPayload.payload.paymentInfo` — no extra RPC call needed.
+</Tip>
+
+## Error handling
+
+By default, fetch errors are logged with `console.warn`. You can override this with a custom handler:
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers';
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new EscrowServerScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001', {
+      onError: (err) => sentry.captureException(err),
+    })
+  );
+```
+
+Errors are wrapped in an `X402rError` with the arbiter URL and request details for easier debugging.
+
+## Skipped scenarios
+
+The hook silently returns without making a request when:
+
+- The settlement was not successful (`context.result.success === false`)
+- The scheme is not `commerce` (e.g. direct or other custom schemes)
+- No response body is available in the transport context
+
+## Address re-exports
+
+The `@x402r/helpers` package re-exports chain-invariant address constants from `@x402r/core` for convenience:
+
+```typescript
+import {
+  authCaptureEscrow,
+  tokenCollector,
+  protocolFeeConfig,
+  arbiterRegistry,
+  receiverRefundCollector,
+  usdcTvlLimit,
+  factories,
+  conditions,
+  getChainConfig,
+  supportedChainIds,
+} from '@x402r/helpers';
+```
+
+These are the same CREATE3 addresses available from `@x402r/core`. You can import from either package depending on which you already have installed.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
+    Configure escrow options and fee bounds.
+  </Card>
+  <Card title="Arbiter SDK" icon="gavel" href="/sdk/arbiter/quickstart">
+    Build an arbiter that processes forwarded settlements.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    See working merchant server examples.
+  </Card>
+</CardGroup>
