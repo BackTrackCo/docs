@@ -1,5 +1,5 @@
 ---
-title: "Quickstart for Payers"
+title: "Payer Guide"
 description: "Check payment state, request a refund, freeze a payment, and submit evidence."
 icon: "user"
 ---
@@ -8,7 +8,7 @@ icon: "user"
 
 * A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
 * Node.js 18+ and npm
-* An authorized payment on an x402r operator (see [Quickstart for Merchants](/sdk/merchant-quickstart))
+* An authorized payment on an x402r operator (see [Merchant Guide](/sdk/merchant))
 
 <Note>
 There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [payer examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts).
@@ -53,7 +53,7 @@ const payer = createPayerClient({
 })
 ```
 
-`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not because that is a merchant action.
+`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not because it is not part of the payer role.
 
 ### 3. Check Payment State
 
@@ -134,7 +134,7 @@ console.log('Refund cancelled:', cancelTx)
 ## Next Steps
 
 <CardGroup cols={3}>
-  <Card title="Arbiter Quickstart" icon="gavel" href="/sdk/arbiter-quickstart">
+  <Card title="Arbiter Guide" icon="gavel" href="/sdk/arbiter">
     What happens after you submit a refund request.
   </Card>
   <Card title="Protocol Overview" icon="globe" href="/x402-integration/overview">

@@ -14,12 +14,12 @@ The `@x402r/core` package includes deployment utilities that handle the full lif
 
 A complete marketplace operator deployment includes:
 
-1. **EscrowPeriod**  Records authorization time, enforces waiting period before release
-2. **Freeze**  Allows payer to freeze payment during escrow, receiver to unfreeze
-3. **StaticAddressCondition**  Restricts refund approval to the designated arbiter
-4. **OrCondition**  Allows either the receiver OR the arbiter to approve in-escrow refunds
-5. **StaticFeeCalculator**  Optional operator fee (basis points)
-6. **PaymentOperator**  The main contract tying everything together
+1. **EscrowPeriod** - Records authorization time, enforces waiting period before release
+2. **Freeze** - Allows payer to freeze payment during escrow, receiver to unfreeze
+3. **StaticAddressCondition** - Restricts refund approval to the designated arbiter
+4. **OrCondition** - Allows either the receiver OR the arbiter to approve in-escrow refunds
+5. **StaticFeeCalculator** - Optional operator fee (basis points)
+6. **PaymentOperator** - The main contract tying everything together
 
 All contracts are deployed via factories using CREATE3, so identical configurations produce identical addresses across deployments.
 
@@ -155,7 +155,7 @@ interface MarketplaceOperatorDeployment {
 ```
 
 <Tip>
-Because all contracts use CREATE3, redeploying with the same parameters is idempotent  it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE3, redeploying with the same parameters is idempotent. It will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview Addresses (No Deploy)
@@ -200,10 +200,10 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant-quickstart">
+  <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
     Accept payments, release funds from escrow.
   </Card>
-  <Card title="Payer Quickstart" icon="user" href="/sdk/payer-quickstart">
+  <Card title="Payer Guide" icon="user" href="/sdk/payer">
     Request refunds, freeze payments, submit evidence.
   </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">

@@ -14,17 +14,17 @@ icon: "store"
 
 <CodeGroup>
 ```bash npm
-npm install @x402r/sdk @x402r/core @x402r/helpers
+npm install @x402r/core @x402r/helpers
 ```
 ```bash pnpm
-pnpm add @x402r/sdk @x402r/core @x402r/helpers
+pnpm add @x402r/core @x402r/helpers
 ```
 ```bash bun
-bun add @x402r/sdk @x402r/core @x402r/helpers
+bun add @x402r/core @x402r/helpers
 ```
 </CodeGroup>
 
-`@x402r/core` is needed for `deployDeliveryProtectionOperator()`. `@x402r/helpers` is needed for `forwardToArbiter()`.
+`@x402r/core` is needed for `deployDeliveryProtectionOperator()`. `@x402r/helpers` provides the `forwardToArbiter()` hook.
 
 ### 2. Deploy a Delivery Protection Operator
 
@@ -91,9 +91,16 @@ The hook POSTs to `{arbiterUrl}/verify` with:
 {
   "responseBody": "the HTTP response body as a string",
   "transaction": "0xsettlement_tx_hash",
-  "paymentPayload": { "x402Version": 1, "scheme": "commerce", "payload": "..." }
+  "paymentPayload": {
+    "x402Version": 1,
+    "scheme": "commerce",
+    "accepted": { "network": "eip155:84532", ... },
+    "payload": { "paymentInfo": { ... }, ... }
+  }
 }
 ```
+
+The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `paymentInfo` and `network` from the nested structure.
 
 Fire-and-forget. Does not block the response to the client. Only fires for `commerce` scheme settlements.
 

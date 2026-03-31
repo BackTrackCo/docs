@@ -87,12 +87,17 @@
         "tab": "SDK",
         "groups": [
           {
+            "group": "",
+            "pages": [
+              "sdk/overview"
+            ]
+          },
+          {
             "group": "Marketplace",
             "pages": [
-              "sdk/overview",
-              "sdk/merchant-quickstart",
-              "sdk/payer-quickstart",
-              "sdk/arbiter-quickstart"
+              "sdk/merchant",
+              "sdk/payer",
+              "sdk/arbiter"
             ]
           },
           {

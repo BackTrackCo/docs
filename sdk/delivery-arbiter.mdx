@@ -18,13 +18,13 @@ There is a full [AI garbage detector example](https://github.com/BackTrackCo/arb
 
 <CodeGroup>
 ```bash npm
-npm install @x402r/sdk @x402r/helpers express
+npm install @x402r/sdk @x402r/helpers
 ```
 ```bash pnpm
-pnpm add @x402r/sdk @x402r/helpers express
+pnpm add @x402r/sdk @x402r/helpers
 ```
 ```bash bun
-bun add @x402r/sdk @x402r/helpers express
+bun add @x402r/sdk @x402r/helpers
 ```
 </CodeGroup>
 
@@ -34,7 +34,8 @@ bun add @x402r/sdk @x402r/helpers express
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { baseSepolia } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
-import { createArbiterClient, fromNetworkId } from '@x402r/sdk'
+import { createArbiterClient } from '@x402r/sdk'
+import { fromNetworkId } from '@x402r/core'
 
 const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`)
 
@@ -115,7 +116,7 @@ If the arbiter does not call `release()`, funds auto-refund to the payer after t
   <Card title="Merchant Setup" icon="store" href="/sdk/delivery-merchant">
     Deploy the operator and configure forwardToArbiter().
   </Card>
-  <Card title="Dispute Resolution" icon="scale-balanced" href="/sdk/arbiter-quickstart">
+  <Card title="Dispute Resolution" icon="scale-balanced" href="/sdk/arbiter">
     For human-reviewed disputes instead of automated evaluation.
   </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">
