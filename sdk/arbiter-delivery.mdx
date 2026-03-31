@@ -1,0 +1,157 @@
+---
+title: "Delivery Protection Arbiter"
+description: "Automatically evaluate every transaction and release or let funds expire."
+icon: "shield-check"
+---
+
+In this model, the arbiter is the only address that can release funds. The merchant sets up a `forwardToArbiter()` hook that sends the HTTP response body to your arbiter service after every payment. Your service evaluates the response (AI, schema validation, heuristics) and calls `release()` if it passes. If you do not release, funds auto-refund to the payer after escrow expires.
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+
+<Note>
+There is a full [AI garbage detector example](https://github.com/BackTrackCo/arbiter-examples) that implements this pattern with heuristic + LLM evaluation.
+</Note>
+
+### 1. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk @x402r/core
+```
+```bash pnpm
+pnpm add @x402r/sdk @x402r/core
+```
+```bash bun
+bun add @x402r/sdk @x402r/core
+```
+</CodeGroup>
+
+`@x402r/core` is needed for `deployDeliveryProtectionOperator()`.
+
+### 2. Deploy a Delivery Protection Operator
+
+```typescript
+import { deployDeliveryProtectionOperator } from '@x402r/core'
+
+const deployment = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: account.address,        // your arbiter service wallet
+    feeRecipient: account.address,   // receives protocol fees
+    escrowPeriodSeconds: 300n,       // 5 minutes (short for automated flows)
+  },
+)
+
+console.log('Operator:', deployment.operatorAddress)
+console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
+console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
+```
+
+This is simpler than the marketplace preset. No RefundRequest, Evidence, or Freeze contracts. The operator's `releaseCondition` is set to `StaticAddressCondition(arbiter)`, so only your arbiter address can call `release()`.
+
+### 3. Merchant Setup: Forward to Arbiter
+
+The merchant configures their x402 resource server to forward response data to your arbiter after every payment settlement:
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers'
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new CommerceEvmScheme(serverConfig))
+  .onAfterSettle(
+    forwardToArbiter('http://your-arbiter:3001', {
+      onError: (err) => console.error('Arbiter unreachable:', err),
+    })
+  )
+```
+
+`forwardToArbiter()` POSTs to `{arbiterUrl}/verify` with:
+
+```json
+{
+  "responseBody": "the HTTP response body as a string",
+  "transaction": "0xsettlement_tx_hash",
+  "paymentPayload": { "x402Version": 1, "scheme": "commerce", "payload": "..." }
+}
+```
+
+Fire-and-forget. Does not block the response to the client. Only fires for `commerce` scheme settlements.
+
+### 4. Build the Arbiter Service
+
+Your arbiter service receives the POST, evaluates the response, and calls `release()` if it passes:
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createX402r } from '@x402r/sdk'
+
+const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`)
+
+const arbiter = createX402r({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: deployment.operatorAddress,
+  escrowPeriodAddress: deployment.escrowPeriodAddress,
+})
+
+// Express route handling the POST from forwardToArbiter()
+app.post('/verify', async (req, res) => {
+  const { responseBody, transaction, paymentPayload } = req.body
+
+  // Your evaluation logic here
+  const passed = await evaluate(responseBody)
+
+  if (passed) {
+    // Extract paymentInfo from paymentPayload
+    const paymentInfo = extractPaymentInfo(paymentPayload)
+    const amounts = await arbiter.payment.getAmounts(paymentInfo)
+
+    await arbiter.payment.release(paymentInfo, amounts.capturableAmount)
+    res.json({ verdict: 'PASS' })
+  } else {
+    // Do nothing. Funds auto-refund after escrow expires.
+    res.json({ verdict: 'FAIL' })
+  }
+})
+```
+
+The `evaluate()` function is where your logic lives. It could be:
+- **Heuristic checks:** HTTP status code, response size, content-type validation
+- **AI evaluation:** send response body to an LLM and ask "is this a valid response?"
+- **Schema validation:** check if the response matches an expected JSON schema
+
+### 5. What Happens on Failure
+
+If the arbiter does not call `release()`, the payer can reclaim funds after the escrow period expires by calling `refundInEscrow()`. The escrow period acts as the verification window.
+
+```typescript
+// Anyone can call this after escrow expires (gated by EscrowPeriod condition)
+await payer.payment.refundInEscrow(paymentInfo, amount)
+```
+
+No dispute process needed. The timeout is the safety net.
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Dispute Resolution" icon="scale-balanced" href="/sdk/arbiter-dispute">
+    For human-reviewed disputes instead of automated evaluation.
+  </Card>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Full deployment config and condition slot details.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Runnable examples for every SDK operation.
+  </Card>
+</CardGroup>

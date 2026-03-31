@@ -10,7 +10,13 @@ Three roles interact with the protocol:
 
 - **Merchants** receive payments into escrow and release funds after delivery
 - **Payers** can request refunds, freeze payments, and submit evidence during disputes
-- **Arbiters** review disputes and approve or deny refund requests
+- **Arbiters** verify transactions or resolve disputes (two models below)
+
+### Two Operator Models
+
+**Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Best for general commerce where most transactions are uncontested.
+
+**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically and is the only address that can release funds. If the arbiter does not release, funds auto-refund after escrow. Best for AI content verification, schema validation, or any flow needing automated quality checks.
 
 ### Packages
 

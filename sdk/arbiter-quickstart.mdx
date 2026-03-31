@@ -1,173 +1,41 @@
 ---
 title: "Quickstart for Arbiters"
-description: "Review disputes, approve or deny refunds, and distribute fees."
+description: "Two arbiter models: dispute resolution and delivery protection."
 icon: "gavel"
 ---
 
-### Prerequisites
+x402r supports two arbiter models depending on your use case.
 
-* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
-* Node.js 18+ and npm
-* An operator where your address is configured as the arbiter (see [Deploy an Operator](/sdk/deploy-operator))
+### Marketplace (Dispute Resolution)
 
-<Note>
-There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [arbiter examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts).
-</Note>
+The merchant releases funds after escrow. If the payer contests, they file a refund request. The arbiter reviews evidence and approves or denies the refund.
 
-### 1. Install Dependencies
+Uses `deployMarketplaceOperator()`. Includes RefundRequest, Evidence, and Freeze contracts.
 
-<CodeGroup>
-```bash npm
-npm install @x402r/sdk
-```
-```bash pnpm
-pnpm add @x402r/sdk
-```
-```bash bun
-bun add @x402r/sdk
-```
-</CodeGroup>
+**When to use:** general-purpose commerce, human arbitration (e.g. Kleros), cases where most transactions are uncontested.
 
-### 2. Create an Arbiter Client
+### Delivery Protection
 
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem'
-import { baseSepolia } from 'viem/chains'
-import { privateKeyToAccount } from 'viem/accounts'
-import { createArbiterClient } from '@x402r/sdk'
+The arbiter evaluates every transaction automatically. Only the arbiter can release funds. If the arbiter does not release, funds auto-refund to the payer after escrow expires.
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+Uses `deployDeliveryProtectionOperator()`. No RefundRequest or Freeze needed.
 
-const arbiter = createArbiterClient({
-  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
-  walletClient: createWalletClient({
-    account,
-    chain: baseSepolia,
-    transport: http(),
-  }),
-  operatorAddress: '0x...',              // your operator address
-  refundRequestAddress: '0x...',         // from deploy result
-  refundRequestEvidenceAddress: '0x...', // from deploy result
-  escrowPeriodAddress: '0x...',
-  freezeAddress: '0x...',
-})
-```
+**When to use:** AI content verification (garbage detection), schema validation, any flow where every response needs automated quality checks.
 
-`createArbiterClient` restricts TypeScript types to arbiter-relevant methods. `refund.deny()` and `freeze.unfreeze()` show up in autocomplete; `payment.authorize()` does not because that is a merchant action.
+| | Marketplace | Delivery Protection |
+|---|---|---|
+| Who releases funds | Merchant (after escrow) | Arbiter only |
+| Dispute process | Payer files refund request | No disputes needed |
+| Arbiter involvement | Only on disputes | Every transaction |
+| Contracts needed | Operator + EscrowPeriod + RefundRequest + Evidence + Freeze | Operator + EscrowPeriod + StaticAddressCondition |
+| Speed | Arbiter acts on demand | Arbiter acts automatically |
+| Deploy preset | `deployMarketplaceOperator()` | `deployDeliveryProtectionOperator()` |
 
-### 3. Check for Pending Refund Requests
-
-```typescript
-import type { PaymentInfo } from '@x402r/sdk'
-
-const paymentInfo: PaymentInfo = { /* ... */ }
-
-const hasRefund = await arbiter.refund?.has(paymentInfo)
-if (hasRefund) {
-  const request = await arbiter.refund?.get(paymentInfo)
-  console.log('Amount:', request?.amount)
-  console.log('Status:', request?.status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Refused
-}
-```
-
-To list all refund requests for your operator:
-
-```typescript
-const requests = await arbiter.refund?.getOperatorRequests(
-  arbiter.config.operatorAddress,
-  0n,   // offset
-  10n,  // count
-)
-console.log('Pending requests:', requests)
-```
-
-### 4. Review Evidence
-
-Both payers and merchants can submit evidence as IPFS CIDs. Read all entries before making a decision:
-
-```typescript
-const count = await arbiter.evidence?.count(paymentInfo)
-console.log('Evidence entries:', count)
-
-const batch = await arbiter.evidence?.getBatch(paymentInfo, 0n, count!)
-
-for (const entry of batch!.entries) {
-  console.log('CID:', entry.cid)
-  console.log('Submitter:', entry.submitter)
-  console.log('Timestamp:', entry.timestamp)
-}
-```
-
-### 5. Approve a Refund
-
-Call `payment.refundInEscrow()` to approve. The RefundRequest recorder auto-approves the pending request, so there is no separate `approve()` call:
-
-```typescript
-const tx = await arbiter.payment.refundInEscrow(paymentInfo, request!.amount)
-console.log('Refund approved:', tx)
-
-// Verify
-const approved = await arbiter.refund?.get(paymentInfo)
-console.log('Approved amount:', approved?.approvedAmount)
-console.log('Status:', approved?.status) // 1 = Approved
-```
-
-### 6. Deny a Refund Request
-
-If the evidence does not support a refund:
-
-```typescript
-const denyTx = await arbiter.refund?.deny(paymentInfo)
-console.log('Refund denied:', denyTx)
-```
-
-Or decline to rule entirely:
-
-```typescript
-const refuseTx = await arbiter.refund?.refuse(paymentInfo)
-console.log('Declined to rule:', refuseTx)
-```
-
-### 7. Unfreeze a Payment
-
-If the payer froze the payment during the dispute, unfreeze it after resolution:
-
-```typescript
-const frozen = await arbiter.freeze?.isFrozen(paymentInfo)
-if (frozen) {
-  const tx = await arbiter.freeze?.unfreeze(paymentInfo)
-  console.log('Unfrozen:', tx)
-}
-```
-
-### 8. Distribute Accumulated Fees
-
-Protocol fees accumulate on the operator when payments are released. Any role can distribute them:
-
-```typescript
-import { getChainConfig } from '@x402r/sdk'
-
-const config = getChainConfig(84532)
-
-const fees = await arbiter.operator.getAccumulatedProtocolFees(config.usdc)
-console.log('Accumulated fees:', fees)
-
-if (fees > 0n) {
-  const tx = await arbiter.operator.distributeFees(config.usdc)
-  console.log('Fees distributed:', tx)
-}
-```
-
-## Next Steps
-
-<CardGroup cols={3}>
-  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
-    How your address gets configured as arbiter on an operator.
+<CardGroup cols={2}>
+  <Card title="Dispute Resolution" icon="scale-balanced" href="/sdk/arbiter-dispute">
+    Review refund requests, evidence, approve or deny.
   </Card>
-  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
-    Conditions and recorders that control on-chain access.
-  </Card>
-  <Card title="Examples" icon="code" href="/sdk/examples">
-    Full dispute resolution scenario end-to-end.
+  <Card title="Delivery Protection" icon="shield-check" href="/sdk/arbiter-delivery">
+    Evaluate every transaction, release or let expire.
   </Card>
 </CardGroup>

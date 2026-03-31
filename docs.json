@@ -92,7 +92,9 @@
               "sdk/overview",
               "sdk/merchant-quickstart",
               "sdk/payer-quickstart",
-              "sdk/arbiter-quickstart"
+              "sdk/arbiter-quickstart",
+              "sdk/arbiter-dispute",
+              "sdk/arbiter-delivery"
             ]
           },
           {
