@@ -52,6 +52,7 @@ console.log('Existing (reused):', result.summary.existingCount)
 | `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
 | `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
 | `operatorFeeBps` | `bigint` | Fee in basis points. Default: `0n` (no fee). `100n` = 1% |
+| `authorizedCodehash` | `Hex` | Optional. Restricts which contract codehashes can record. Defaults to `bytes32(0)` (no restriction) |
 
 <AccordionGroup>
   <Accordion title="Deployment Result Type">
@@ -120,7 +121,22 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 For automated quality verification (AI garbage detection, schema validation), use the simpler delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter is the only address that can release funds.
 
 ```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 import { deployDeliveryProtectionOperator } from '@x402r/core'
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
 
 const deployment = await deployDeliveryProtectionOperator(
   walletClient,
@@ -144,15 +160,56 @@ console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
 | `arbiter` | `Address` | Only address that can call `release()` |
 | `feeRecipient` | `Address` | Receives protocol fees |
 | `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
+| `authorizedCodehash` | `Hex` | Optional. Restricts which contract codehashes can record. Defaults to `bytes32(0)` (no restriction) |
 
-<Accordion title="Delivery Protection Slot Configuration">
-  | Slot | Contract | Purpose |
-  |------|----------|---------|
-  | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
-  | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
-  | `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
-  | `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
-</Accordion>
+<AccordionGroup>
+  <Accordion title="Deployment Result Type">
+    ```typescript
+    interface DeliveryProtectionOperatorDeployment {
+      operatorAddress: Address
+      escrowPeriodAddress: Address
+      arbiterConditionAddress: Address
+      operatorConfig: OperatorConfig
+      deployments: DeployResult[]
+      summary: {
+        newCount: number
+        existingCount: number
+        txHashes: `0x${string}`[]
+      }
+    }
+    ```
+
+    Redeploying with the same parameters is idempotent (CREATE3). It detects existing contracts and skips them. Check `summary` for what was new vs reused.
+  </Accordion>
+
+  <Accordion title="Preview Addresses (No Deploy)">
+    Compute addresses without deploying:
+
+    ```typescript
+    import { previewDeliveryProtectionOperator } from '@x402r/core'
+
+    const preview = await previewDeliveryProtectionOperator(publicClient, {
+      chainId: 84532,
+      arbiter: '0xArbiterServiceAddress',
+      feeRecipient: '0xYourAddress...',
+      escrowPeriodSeconds: 300n,
+    })
+
+    console.log('Operator will be at:', preview.operatorAddress)
+    console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
+    console.log('ArbiterCondition will be at:', preview.arbiterConditionAddress)
+    ```
+  </Accordion>
+
+  <Accordion title="Delivery Protection Slot Configuration">
+    | Slot | Contract | Purpose |
+    |------|----------|---------|
+    | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
+    | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
+    | `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
+    | `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
+  </Accordion>
+</AccordionGroup>
 
 ## Next Steps
 
