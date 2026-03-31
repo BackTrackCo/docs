@@ -1,0 +1,124 @@
+---
+title: "Arbiter Setup"
+description: "Build a service that evaluates responses and releases funds."
+icon: "shield-check"
+---
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+* Operator and escrow addresses from the [Merchant Setup](/sdk/delivery-merchant)
+
+<Note>
+There is a full [AI garbage detector example](https://github.com/BackTrackCo/arbiter-examples) that implements this pattern with heuristic + LLM evaluation.
+</Note>
+
+### 1. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk @x402r/helpers express
+```
+```bash pnpm
+pnpm add @x402r/sdk @x402r/helpers express
+```
+```bash bun
+bun add @x402r/sdk @x402r/helpers express
+```
+</CodeGroup>
+
+### 2. Create the Arbiter Client
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createArbiterClient, fromNetworkId } from '@x402r/sdk'
+
+const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`)
+
+const arbiter = createArbiterClient({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: process.env.OPERATOR_ADDRESS as `0x${string}`,
+  escrowPeriodAddress: process.env.ESCROW_PERIOD_ADDRESS as `0x${string}`,
+})
+```
+
+### 3. Handle the Verify Endpoint
+
+The merchant's `forwardToArbiter()` hook POSTs to `/verify`. Use `parseForwardedPayload()` to extract typed `PaymentInfo` with BigInt fields restored:
+
+```typescript
+import { parseForwardedPayload } from '@x402r/helpers'
+import express from 'express'
+
+const app = express()
+app.use(express.json())
+
+app.post('/verify', async (req, res) => {
+  const { responseBody, paymentInfo, network, transaction } =
+    parseForwardedPayload(req.body)
+
+  const chainId = fromNetworkId(network) // "eip155:84532" -> 84532
+
+  // Your evaluation logic
+  const passed = await evaluate(responseBody)
+
+  if (passed) {
+    const amounts = await arbiter.payment.getAmounts(paymentInfo)
+    await arbiter.payment.release(paymentInfo, amounts.capturableAmount)
+    res.json({ verdict: 'PASS' })
+  } else {
+    // Do nothing. Funds auto-refund after escrow expires.
+    res.json({ verdict: 'FAIL' })
+  }
+})
+
+app.listen(3001)
+```
+
+### 4. Implement Your Evaluation Logic
+
+The `evaluate()` function is where your logic lives. It could be:
+
+- **Heuristic checks:** HTTP status code, response size, content-type validation
+- **AI evaluation:** send response body to an LLM and ask "is this a valid response?"
+- **Schema validation:** check if the response matches an expected JSON schema
+
+```typescript
+async function evaluate(responseBody: string): Promise<boolean> {
+  // Example: reject empty or error responses
+  if (!responseBody || responseBody.length < 10) return false
+  if (responseBody.includes('"error"')) return false
+
+  // Example: LLM evaluation
+  // const result = await llm.evaluate(responseBody)
+  // return result.verdict === 'PASS'
+
+  return true
+}
+```
+
+### 5. What Happens on Failure
+
+If the arbiter does not call `release()`, funds auto-refund to the payer after the escrow period expires. The escrow period acts as the verification window. No dispute process needed.
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Merchant Setup" icon="store" href="/sdk/delivery-merchant">
+    Deploy the operator and configure forwardToArbiter().
+  </Card>
+  <Card title="Dispute Resolution" icon="scale-balanced" href="/sdk/arbiter-quickstart">
+    For human-reviewed disputes instead of automated evaluation.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Runnable examples for every SDK operation.
+  </Card>
+</CardGroup>

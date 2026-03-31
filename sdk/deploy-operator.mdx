@@ -21,7 +21,7 @@ A complete marketplace operator deployment includes:
 5. **StaticFeeCalculator**  Optional operator fee (basis points)
 6. **PaymentOperator**  The main contract tying everything together
 
-All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
+All contracts are deployed via factories using CREATE3, so identical configurations produce identical addresses across deployments.
 
 ## Deploy Your Operator
 
@@ -155,7 +155,7 @@ interface MarketplaceOperatorDeployment {
 ```
 
 <Tip>
-Because all contracts use CREATE2, redeploying with the same parameters is idempotent  it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE3, redeploying with the same parameters is idempotent  it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview Addresses (No Deploy)
@@ -201,7 +201,7 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 
 <CardGroup cols={2}>
   <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant-quickstart">
-    Authorize payments, release funds from escrow.
+    Accept payments, release funds from escrow.
   </Card>
   <Card title="Payer Quickstart" icon="user" href="/sdk/payer-quickstart">
     Request refunds, freeze payments, submit evidence.

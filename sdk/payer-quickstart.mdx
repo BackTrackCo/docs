@@ -88,7 +88,7 @@ if (hasExisting) {
 
 // Check refund status
 const status = await payer.refund?.getStatus(paymentInfo)
-console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Refused
+console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Cancelled, 4 = Refused
 ```
 
 ### 5. Freeze a Payment (Optional)

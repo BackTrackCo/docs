@@ -1,0 +1,111 @@
+---
+title: "Create a Client"
+description: "Client factory, role presets, and configuration reference."
+icon: "plug"
+---
+
+### Full Client
+
+`createX402r()` returns a client with all action groups. No type restrictions.
+
+```typescript
+import { createX402r } from '@x402r/sdk'
+
+const client = createX402r({
+  publicClient,
+  walletClient,                              // optional for read-only
+  operatorAddress: '0x...',                  // from deploy result
+  escrowPeriodAddress: '0x...',              // from deploy result
+  refundRequestAddress: '0x...',             // from deploy result
+  refundRequestEvidenceAddress: '0x...',     // from deploy result
+  freezeAddress: '0x...',                    // from deploy result
+})
+
+await client.payment.getAmounts(paymentInfo)
+await client.refund?.request(paymentInfo, amount)
+await client.escrow?.isDuringEscrow(paymentInfo)
+```
+
+### Role Presets
+
+Role presets call `createX402r()` internally and narrow the TypeScript types so autocomplete only shows relevant methods. All three require `walletClient`.
+
+```typescript
+import {
+  createPayerClient,
+  createMerchantClient,
+  createArbiterClient,
+} from '@x402r/sdk'
+
+const payer = createPayerClient({ publicClient, walletClient, operatorAddress: '0x...' })
+const merchant = createMerchantClient({ publicClient, walletClient, operatorAddress: '0x...' })
+const arbiter = createArbiterClient({ publicClient, walletClient, operatorAddress: '0x...' })
+```
+
+Type narrowing is a DX convenience, not a security boundary. On-chain [conditions](/contracts/conditions/overview) enforce access control.
+
+### Config Reference
+
+| Field | Type | Required | Notes |
+|-------|------|:--------:|-------|
+| `publicClient` | `PublicClient` | Yes | viem public client for reads |
+| `walletClient` | `WalletClient` | No | Required for writes. Role presets throw without it. |
+| `operatorAddress` | `Address` | Yes | Your deployed PaymentOperator |
+| `chainId` | `number` | No | Auto-detected from `publicClient.chain` |
+| `escrowPeriodAddress` | `Address` | No | Activates `escrow` group |
+| `refundRequestAddress` | `Address` | No | Activates `refund` group |
+| `refundRequestEvidenceAddress` | `Address` | No | Activates `evidence` group (requires `refundRequestAddress`) |
+| `freezeAddress` | `Address` | No | Activates `freeze` group |
+| `paymentIndexRecorderAddress` | `Address` | No | Activates `query` group |
+| `paymentStore` | `PaymentStore` | No | Pluggable storage for payment lookups |
+| `eventFromBlock` | `bigint` | No | Starting block for event-based payment lookups |
+
+### Action Groups
+
+| Group | Methods | Requirement |
+|-------|---------|-------------|
+| `payment` | 9 | Always available |
+| `operator` | 8 | Always available |
+| `watch` | 4 | Always available |
+| `escrow` | 3 | `escrowPeriodAddress` |
+| `refund` | 15 | `refundRequestAddress` |
+| `evidence` | 4 | `refundRequestEvidenceAddress` |
+| `freeze` | 3 | `freezeAddress` |
+| `query` | 3 | `paymentIndexRecorderAddress` |
+
+Groups without their required address are `undefined` on the client. Use optional chaining:
+
+```typescript
+await client.escrow?.isDuringEscrow(paymentInfo) // undefined if no escrowPeriodAddress
+```
+
+### Extend
+
+Add custom action groups with `.extend()`:
+
+```typescript
+import { createX402r, queryActions } from '@x402r/sdk'
+
+const client = createX402r({ publicClient, operatorAddress: '0x...' })
+
+const extended = client.extend(
+  queryActions('0xRecorderAddress', { eventFromBlock: 100000n })
+)
+
+// extended.query is now defined
+const payments = await extended.query.getPayerPayments(payerAddress)
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Merchant Quickstart" icon="store" href="/sdk/merchant-quickstart">
+    Accept payments and release funds.
+  </Card>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Get the addresses for your client config.
+  </Card>
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    Conditions and recorders that control on-chain access.
+  </Card>
+</CardGroup>

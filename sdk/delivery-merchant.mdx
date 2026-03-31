@@ -1,0 +1,113 @@
+---
+title: "Merchant Setup"
+description: "Deploy a delivery protection operator and forward responses to the arbiter."
+icon: "store"
+---
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+* An arbiter service URL (see [Arbiter Setup](/sdk/delivery-arbiter))
+
+### 1. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk @x402r/core @x402r/helpers
+```
+```bash pnpm
+pnpm add @x402r/sdk @x402r/core @x402r/helpers
+```
+```bash bun
+bun add @x402r/sdk @x402r/core @x402r/helpers
+```
+</CodeGroup>
+
+`@x402r/core` is needed for `deployDeliveryProtectionOperator()`. `@x402r/helpers` is needed for `forwardToArbiter()`.
+
+### 2. Deploy a Delivery Protection Operator
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { deployDeliveryProtectionOperator } from '@x402r/core'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const deployment = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: '0xArbiterServiceAddress', // the arbiter service wallet
+    feeRecipient: account.address,
+    escrowPeriodSeconds: 300n,          // 5 minutes (short for automated flows)
+  },
+)
+
+console.log('Operator:', deployment.operatorAddress)
+console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
+```
+
+This is simpler than the marketplace preset. No RefundRequest, Evidence, or Freeze contracts. The operator's `releaseCondition` is `StaticAddressCondition(arbiter)`, so only the arbiter address can call `release()`.
+
+<Note>
+`deployDeliveryProtectionOperator` export is tracked in [x402r-sdk#102](https://github.com/BackTrackCo/x402r-sdk/issues/102). Until resolved, import from `@x402r/core/deploy`.
+</Note>
+
+### 3. Configure forwardToArbiter()
+
+Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers'
+
+const resourceServer = new x402ResourceServer(facilitatorConfig)
+registerCommerceEvmScheme(resourceServer)
+
+resourceServer.onAfterSettle(
+  forwardToArbiter('http://your-arbiter:3001', {
+    onError: (err) => console.error('Arbiter unreachable:', err),
+  })
+)
+```
+
+The hook POSTs to `{arbiterUrl}/verify` with:
+
+```json
+{
+  "responseBody": "the HTTP response body as a string",
+  "transaction": "0xsettlement_tx_hash",
+  "paymentPayload": { "x402Version": 1, "scheme": "commerce", "payload": "..." }
+}
+```
+
+Fire-and-forget. Does not block the response to the client. Only fires for `commerce` scheme settlements.
+
+### 4. Share Addresses with the Arbiter
+
+The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from step 2 to create its SDK client. Share these via config, environment variables, or a shared registry.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Arbiter Setup" icon="shield-check" href="/sdk/delivery-arbiter">
+    Build the service that evaluates responses and releases funds.
+  </Card>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Full deployment config and condition slot details.
+  </Card>
+</CardGroup>
