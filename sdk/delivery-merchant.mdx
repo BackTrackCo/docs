@@ -1,70 +1,16 @@
 ---
 title: "Merchant Setup"
-description: "Deploy a delivery protection operator and forward responses to the arbiter."
+description: "Configure forwardToArbiter() to send responses to the arbiter for evaluation."
 icon: "store"
 ---
 
 ### Prerequisites
 
-* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
-* Node.js 18+ and npm
+* A deployed delivery protection operator (see [Deploy an Operator](/sdk/deploy-operator#delivery-protection-operator))
 * An arbiter service URL (see [Arbiter Setup](/sdk/delivery-arbiter))
+* `@x402r/helpers` installed (`npm install @x402r/helpers`)
 
-### 1. Install Dependencies
-
-<CodeGroup>
-```bash npm
-npm install @x402r/core @x402r/helpers
-```
-```bash pnpm
-pnpm add @x402r/core @x402r/helpers
-```
-```bash bun
-bun add @x402r/core @x402r/helpers
-```
-</CodeGroup>
-
-`@x402r/core` is needed for `deployDeliveryProtectionOperator()`. `@x402r/helpers` provides the `forwardToArbiter()` hook.
-
-### 2. Deploy a Delivery Protection Operator
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem'
-import { baseSepolia } from 'viem/chains'
-import { privateKeyToAccount } from 'viem/accounts'
-import { deployDeliveryProtectionOperator } from '@x402r/core'
-
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
-
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-})
-
-const walletClient = createWalletClient({
-  account,
-  chain: baseSepolia,
-  transport: http(),
-})
-
-const deployment = await deployDeliveryProtectionOperator(
-  walletClient,
-  publicClient,
-  {
-    chainId: 84532,
-    arbiter: '0xArbiterServiceAddress', // the arbiter service wallet
-    feeRecipient: account.address,
-    escrowPeriodSeconds: 300n,          // 5 minutes (short for automated flows)
-  },
-)
-
-console.log('Operator:', deployment.operatorAddress)
-console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
-```
-
-This is simpler than the marketplace preset. No RefundRequest, Evidence, or Freeze contracts. The operator's `releaseCondition` is `StaticAddressCondition(arbiter)`, so only the arbiter address can call `release()`.
-
-### 3. Configure forwardToArbiter()
+### 1. Configure forwardToArbiter()
 
 Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
 
@@ -102,9 +48,9 @@ The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `pay
 `forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
 </Warning>
 
-### 4. Share Addresses with the Arbiter
+### 2. Share Addresses with the Arbiter
 
-The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from step 2 to create its SDK client. Share these via config, environment variables, or a shared registry.
+The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from your [deployment](/sdk/deploy-operator#delivery-protection-operator) to create its SDK client. Share these via config, environment variables, or a shared registry.
 
 ## Next Steps
 
