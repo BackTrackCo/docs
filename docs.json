@@ -87,7 +87,7 @@
         "tab": "SDK",
         "groups": [
           {
-            "group": "",
+            "group": "Getting Started",
             "pages": [
               "sdk/overview",
               "sdk/deploy-operator"
