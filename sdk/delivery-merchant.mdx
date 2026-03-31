@@ -8,9 +8,14 @@ icon: "store"
 
 * A deployed delivery protection operator (see [Deploy an Operator](/sdk/deploy-operator#delivery-protection-operator))
 * An arbiter service URL (see [Arbiter Setup](/sdk/delivery-arbiter))
-* `@x402r/helpers` installed (`npm install @x402r/helpers`)
 
-### 1. Configure forwardToArbiter()
+### 1. Install Dependencies
+
+```bash
+npm install @x402r/helpers
+```
+
+### 2. Configure forwardToArbiter()
 
 Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
 
@@ -48,7 +53,7 @@ The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `pay
 `forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
 </Warning>
 
-### 2. Share Addresses with the Arbiter
+### 3. Share Addresses with the Arbiter
 
 The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from your [deployment](/sdk/deploy-operator#delivery-protection-operator) to create its SDK client. Share these via config, environment variables, or a shared registry.
 
