@@ -131,65 +131,61 @@ console.log('Existing (reused):', result.summary.existingCount)
 | `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
 | `operatorFeeBps` | `bigint` | Fee in basis points. Default: `0n` (no fee). `100n` = 1% |
 
-## Deployment Result
+<AccordionGroup>
+  <Accordion title="Deployment Result Type">
+    ```typescript
+    interface MarketplaceOperatorDeployment {
+      operatorAddress: Address
+      escrowPeriodAddress: Address
+      freezeAddress: Address | null
+      refundRequestAddress: Address
+      refundRequestEvidenceAddress: Address
+      refundInEscrowConditionAddress: Address   // OR(Receiver, Arbiter)
+      feeCalculatorAddress: Address | null      // null if no fee
+      operatorConfig: OperatorConfig
+      deployments: DeployResult[]
+      summary: {
+        newCount: number
+        existingCount: number
+        txHashes: `0x${string}`[]
+      }
+    }
+    ```
 
-The `deployMarketplaceOperator` function returns:
+    Redeploying with the same parameters is idempotent (CREATE3). It detects existing contracts and skips them. Check `summary` for what was new vs reused.
+  </Accordion>
 
-```typescript
-interface MarketplaceOperatorDeployment {
-  operatorAddress: Address
-  escrowPeriodAddress: Address
-  freezeAddress: Address | null
-  refundRequestAddress: Address
-  refundRequestEvidenceAddress: Address
-  refundInEscrowConditionAddress: Address   // OR(Receiver, Arbiter)
-  feeCalculatorAddress: Address | null      // null if no fee
-  operatorConfig: OperatorConfig
-  deployments: DeployResult[]
-  summary: {
-    newCount: number
-    existingCount: number
-    txHashes: `0x${string}`[]
-  }
-}
-```
+  <Accordion title="Preview Addresses (No Deploy)">
+    Compute addresses without deploying:
 
-<Tip>
-Because all contracts use CREATE3, redeploying with the same parameters is idempotent. It will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
-</Tip>
+    ```typescript
+    import { previewMarketplaceOperator } from '@x402r/core'
 
-## Preview Addresses (No Deploy)
+    const preview = await previewMarketplaceOperator(publicClient, {
+      chainId: 84532,
+      feeRecipient: '0xYourAddress...',
+      arbiter: '0xArbiterAddress...',
+      escrowPeriodSeconds: 604_800n,
+    })
 
-You can preview what addresses will be created without actually deploying:
+    console.log('Operator will be at:', preview.operatorAddress)
+    console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
+    ```
+  </Accordion>
 
-```typescript
-import { previewMarketplaceOperator } from '@x402r/core'
-
-const preview = await previewMarketplaceOperator(publicClient, {
-  chainId: 84532,
-  feeRecipient: '0xYourAddress...',
-  arbiter: '0xArbiterAddress...',
-  escrowPeriodSeconds: 604_800n,
-})
-
-console.log('Operator will be at:', preview.operatorAddress);
-console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress);
-```
-
-## Operator Slot Configuration
-
-The deployed operator has the following slot configuration:
-
-| Slot | Contract | Purpose |
-|------|----------|---------|
-| `AUTHORIZE_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
-| `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
-| `CHARGE_CONDITION` | (none) | No restrictions on charge |
-| `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-| `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
-| `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
-| `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
-| `FEE_RECIPIENT` | Your address | Receives fees |
+  <Accordion title="Marketplace Slot Configuration">
+    | Slot | Contract | Purpose |
+    |------|----------|---------|
+    | `AUTHORIZE_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
+    | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
+    | `CHARGE_CONDITION` | (none) | No restrictions on charge |
+    | `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
+    | `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+    | `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
+    | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
+    | `FEE_RECIPIENT` | Your address | Receives fees |
+  </Accordion>
+</AccordionGroup>
 
 Deployment is supported on all [supported chains](/sdk/overview#supported-chains). Pass the numeric `chainId` in the options.
 
@@ -227,14 +223,14 @@ console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
 | `feeRecipient` | `Address` | Receives protocol fees |
 | `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
 
-### Delivery Protection Slot Configuration
-
-| Slot | Contract | Purpose |
-|------|----------|---------|
-| `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
-| `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
-| `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
-| `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
+<Accordion title="Delivery Protection Slot Configuration">
+  | Slot | Contract | Purpose |
+  |------|----------|---------|
+  | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
+  | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
+  | `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
+  | `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
+</Accordion>
 
 ## Next Steps
 
