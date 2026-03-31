@@ -84,17 +84,20 @@ Fire-and-forget. Does not block the response to the client. Only fires for `comm
 
 ### 4. Build the Arbiter Service
 
-Your arbiter service receives the POST, evaluates the response, and calls `release()` if it passes:
+Your arbiter service receives the POST, evaluates the response, and calls `release()` if it passes.
+
+Use `parseForwardedPayload()` from `@x402r/helpers` to extract typed `PaymentInfo` (with BigInt fields restored) and `fromNetworkId()` to parse the CAIP-2 network identifier into a chain ID:
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { baseSepolia } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
-import { createX402r } from '@x402r/sdk'
+import { createArbiterClient, fromNetworkId } from '@x402r/sdk'
+import { parseForwardedPayload } from '@x402r/helpers'
 
 const account = privateKeyToAccount(process.env.ARBITER_PRIVATE_KEY as `0x${string}`)
 
-const arbiter = createX402r({
+const arbiter = createArbiterClient({
   publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
   walletClient: createWalletClient({
     account,
@@ -107,16 +110,16 @@ const arbiter = createX402r({
 
 // Express route handling the POST from forwardToArbiter()
 app.post('/verify', async (req, res) => {
-  const { responseBody, transaction, paymentPayload } = req.body
+  const { responseBody, paymentInfo, network, transaction } =
+    parseForwardedPayload(req.body)
+
+  const chainId = fromNetworkId(network) // "eip155:84532" -> 84532
 
   // Your evaluation logic here
   const passed = await evaluate(responseBody)
 
   if (passed) {
-    // Extract paymentInfo from paymentPayload
-    const paymentInfo = extractPaymentInfo(paymentPayload)
     const amounts = await arbiter.payment.getAmounts(paymentInfo)
-
     await arbiter.payment.release(paymentInfo, amounts.capturableAmount)
     res.json({ verdict: 'PASS' })
   } else {
