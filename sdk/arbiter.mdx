@@ -14,19 +14,11 @@ icon: "scale-balanced"
 There are pre-configured [arbiter examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts) in the SDK repo.
 </Note>
 
-### 1. Install Dependencies
+### 1. Install `@x402r/sdk`
 
-<CodeGroup>
-```bash npm
+```bash
 npm install @x402r/sdk
 ```
-```bash pnpm
-pnpm add @x402r/sdk
-```
-```bash bun
-bun add @x402r/sdk
-```
-</CodeGroup>
 
 ### 2. Create an Arbiter Client
 
@@ -98,7 +90,9 @@ for (const entry of batch!.entries) {
 
 ### 5. Approve a Refund
 
-Call `payment.refundInEscrow()` to approve. The RefundRequest recorder auto-approves the pending request, so there is no separate `approve()` call:
+<Warning>
+`refundInEscrow()` auto-approves the pending RefundRequest. There is no undo.
+</Warning>
 
 ```typescript
 const tx = await arbiter.payment.refundInEscrow(paymentInfo, request!.amount)
@@ -112,7 +106,9 @@ console.log('Status:', approved?.status) // 1 = Approved
 
 ### 6. Deny a Refund Request
 
-If the evidence does not support a refund:
+<Note>
+`deny()` = you reviewed and rejected the claim. `refuse()` = you decline to rule (e.g. conflict of interest).
+</Note>
 
 ```typescript
 const denyTx = await arbiter.refund?.deny(paymentInfo)

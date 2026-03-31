@@ -64,10 +64,6 @@ console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
 
 This is simpler than the marketplace preset. No RefundRequest, Evidence, or Freeze contracts. The operator's `releaseCondition` is `StaticAddressCondition(arbiter)`, so only the arbiter address can call `release()`.
 
-<Note>
-`deployDeliveryProtectionOperator` export is tracked in [x402r-sdk#102](https://github.com/BackTrackCo/x402r-sdk/issues/102). Until resolved, import from `@x402r/core/deploy`.
-</Note>
-
 ### 3. Configure forwardToArbiter()
 
 Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
@@ -102,7 +98,9 @@ The hook POSTs to `{arbiterUrl}/verify` with:
 
 The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `paymentInfo` and `network` from the nested structure.
 
-Fire-and-forget. Does not block the response to the client. Only fires for `commerce` scheme settlements.
+<Warning>
+`forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
+</Warning>
 
 ### 4. Share Addresses with the Arbiter
 

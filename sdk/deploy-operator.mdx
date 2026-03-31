@@ -197,6 +197,45 @@ Deployment is supported on all [supported chains](/sdk/overview#supported-chains
 Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can get testnet ETH from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).
 </Warning>
 
+## Delivery Protection Operator
+
+For automated quality verification (AI garbage detection, schema validation), use the simpler delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter is the only address that can release funds.
+
+```typescript
+import { deployDeliveryProtectionOperator } from '@x402r/core'
+
+const deployment = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: '0xArbiterServiceAddress',
+    feeRecipient: account.address,
+    escrowPeriodSeconds: 300n,           // 5 minutes
+  },
+)
+
+console.log('Operator:', deployment.operatorAddress)
+console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
+console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `chainId` | `number` | Target chain |
+| `arbiter` | `Address` | Only address that can call `release()` |
+| `feeRecipient` | `Address` | Receives protocol fees |
+| `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
+
+### Delivery Protection Slot Configuration
+
+| Slot | Contract | Purpose |
+|------|----------|---------|
+| `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
+| `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
+| `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
+| `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
+
 ## Next Steps
 
 <CardGroup cols={2}>

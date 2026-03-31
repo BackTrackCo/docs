@@ -89,7 +89,8 @@
           {
             "group": "",
             "pages": [
-              "sdk/overview"
+              "sdk/overview",
+              "sdk/deploy-operator"
             ]
           },
           {
@@ -109,10 +110,9 @@
             ]
           },
           {
-            "group": "Resources",
+            "group": "Reference",
             "pages": [
               "sdk/create-client",
-              "sdk/deploy-operator",
               "sdk/examples"
             ]
           }

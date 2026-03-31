@@ -14,19 +14,11 @@ icon: "user"
 There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [payer examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts).
 </Note>
 
-### 1. Install Dependencies
+### 1. Install `@x402r/sdk`
 
-<CodeGroup>
-```bash npm
+```bash
 npm install @x402r/sdk
 ```
-```bash pnpm
-pnpm add @x402r/sdk
-```
-```bash bun
-bun add @x402r/sdk
-```
-</CodeGroup>
 
 ### 2. Create a Payer Client
 
@@ -53,7 +45,9 @@ const payer = createPayerClient({
 })
 ```
 
-`createPayerClient` restricts TypeScript types to payer-relevant methods. `refund.request()` shows up in autocomplete; `payment.authorize()` does not because it is not part of the payer role.
+<Note>
+All payer actions (refund, freeze, evidence) must happen during the escrow period. Once escrow expires, the merchant can release.
+</Note>
 
 ### 3. Check Payment State
 
@@ -93,7 +87,9 @@ console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Can
 
 ### 5. Freeze a Payment (Optional)
 
-Freezing blocks the merchant from releasing funds while the dispute is active:
+<Warning>
+`freeze()` blocks the merchant from releasing until the arbiter unfreezes. Only use when you need to prevent a release during investigation.
+</Warning>
 
 ```typescript
 const frozen = await payer.freeze?.isFrozen(paymentInfo)

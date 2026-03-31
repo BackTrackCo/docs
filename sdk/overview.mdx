@@ -14,9 +14,9 @@ Three roles interact with the protocol:
 
 ### Two Operator Models
 
-**Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Best for general commerce where most transactions are uncontested.
+**Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Use this for general commerce where most transactions are uncontested.
 
-**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically and is the only address that can release funds. If the arbiter does not release, funds auto-refund after escrow. Best for AI content verification, schema validation, or any flow needing automated quality checks.
+**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically and is the only address that can release funds. If the arbiter does not release, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
 
 ### Packages
 
@@ -94,3 +94,4 @@ All contracts are deployed to identical addresses on every chain via CREATE3. On
 | Avalanche C-Chain | `43114` | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
 | Monad | `143` | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
 | Linea | `59144` | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
+| SKALE Base | `1187947933` | `0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20` |

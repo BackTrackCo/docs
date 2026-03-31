@@ -14,19 +14,11 @@ icon: "store"
 There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [merchant examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant) and full [scenario scripts](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios).
 </Note>
 
-### 1. Install Dependencies
+### 1. Install `@x402r/sdk`
 
-<CodeGroup>
-```bash npm
+```bash
 npm install @x402r/sdk
 ```
-```bash pnpm
-pnpm add @x402r/sdk
-```
-```bash bun
-bun add @x402r/sdk
-```
-</CodeGroup>
 
 ### 2. Create a Merchant Client
 
@@ -53,11 +45,7 @@ const merchant = createMerchantClient({
 })
 ```
 
-`createMerchantClient` restricts TypeScript types to merchant-relevant methods. `payment.release()` shows up in autocomplete; `refund.request()` does not because that is a payer action.
-
 ### 3. Check Payment State
-
-In the x402 flow, the payer signs an ERC-3009 authorization, the facilitator settles it on-chain, and funds land in escrow on your operator. Your first interaction as a merchant is checking what arrived:
 
 ```typescript
 import type { PaymentInfo } from '@x402r/sdk'
@@ -76,7 +64,9 @@ console.log('In escrow:', inEscrow)                        // true
 
 ### 4. Release Funds After Escrow
 
-Once the escrow period expires, release funds to the receiver (merchant):
+<Warning>
+`release()` reverts if called during escrow. Check `escrow.isDuringEscrow()` first. Pass a smaller amount to release partially.
+</Warning>
 
 ```typescript
 const releaseTx = await merchant.payment.release(paymentInfo, 1_000_000n)

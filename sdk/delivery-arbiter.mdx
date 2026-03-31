@@ -108,7 +108,9 @@ async function evaluate(responseBody: string): Promise<boolean> {
 
 ### 5. What Happens on Failure
 
-If the arbiter does not call `release()`, funds auto-refund to the payer after the escrow period expires. The escrow period acts as the verification window. No dispute process needed.
+<Warning>
+If your service goes down, no payments get evaluated and funds stay in escrow until timeout. The escrow period protects payers, but add uptime monitoring and alerting.
+</Warning>
 
 ## Next Steps
 
