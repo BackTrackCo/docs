@@ -1,0 +1,150 @@
+---
+title: "Payer Guide"
+description: "Check payment state, request a refund, freeze a payment, and submit evidence."
+icon: "user"
+---
+
+### Prerequisites
+
+* A wallet with ETH on Base Sepolia for gas ([faucet](https://www.alchemy.com/faucets/base-sepolia))
+* Node.js 18+ and npm
+* An authorized payment on an x402r operator (see [Merchant Guide](/sdk/merchant))
+
+<Note>
+There are pre-configured [examples in the x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples), including [payer examples](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer) and a full [dispute resolution scenario](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts).
+</Note>
+
+### 1. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @x402r/sdk
+```
+```bash pnpm
+pnpm add @x402r/sdk
+```
+```bash bun
+bun add @x402r/sdk
+```
+</CodeGroup>
+
+### 2. Create a Payer Client
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { createPayerClient } from '@x402r/sdk'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const payer = createPayerClient({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: '0x...',           // your operator address
+  refundRequestAddress: '0x...',      // from deploy result
+  refundRequestEvidenceAddress: '0x...',
+  escrowPeriodAddress: '0x...',
+  freezeAddress: '0x...',
+})
+```
+
+<Note>
+All payer actions (refund, freeze, evidence) must happen during the escrow period. Once escrow expires, the merchant can release.
+</Note>
+
+### 3. Check Payment State
+
+```typescript
+import type { PaymentInfo } from '@x402r/sdk'
+
+// paymentInfo is the same struct used during authorization
+const paymentInfo: PaymentInfo = { /* ... */ }
+
+const amounts = await payer.payment.getAmounts(paymentInfo)
+console.log('Collected:', amounts.hasCollectedPayment)
+console.log('Capturable:', amounts.capturableAmount)
+console.log('Refundable:', amounts.refundableAmount)
+
+const inEscrow = await payer.escrow?.isDuringEscrow(paymentInfo)
+console.log('In escrow:', inEscrow)
+```
+
+### 4. Request a Refund
+
+Request a refund while the payment is still in escrow:
+
+```typescript
+// Check if a refund request already exists
+const hasExisting = await payer.refund?.has(paymentInfo)
+if (hasExisting) {
+  console.log('Refund already requested')
+} else {
+  const tx = await payer.refund?.request(paymentInfo, 1_000_000n) // 1 USDC
+  console.log('Refund requested:', tx)
+}
+
+// Check refund status
+const status = await payer.refund?.getStatus(paymentInfo)
+console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Cancelled, 4 = Refused
+```
+
+### 5. Freeze a Payment (Optional)
+
+<Warning>
+`freeze()` blocks the merchant from releasing until the arbiter unfreezes. Only use when you need to prevent a release during investigation.
+</Warning>
+
+```typescript
+const frozen = await payer.freeze?.isFrozen(paymentInfo)
+if (!frozen) {
+  const tx = await payer.freeze?.freeze(paymentInfo)
+  console.log('Payment frozen:', tx)
+}
+```
+
+### 6. Submit Evidence (Optional)
+
+Attach evidence to a refund request. Evidence is stored on-chain as IPFS CIDs:
+
+```typescript
+// Upload your evidence to IPFS first, then submit the CID
+const tx = await payer.evidence?.submit(paymentInfo, 'QmYourEvidenceCID...')
+console.log('Evidence submitted:', tx)
+
+// Read back evidence
+const count = await payer.evidence?.count(paymentInfo)
+console.log('Evidence entries:', count)
+
+for (let i = 0n; i < count!; i++) {
+  const entry = await payer.evidence?.get(paymentInfo, i)
+  console.log(`  [${i}] CID: ${entry?.cid} from ${entry?.submitter}`)
+}
+```
+
+### 7. Cancel a Refund Request (Optional)
+
+If the issue is resolved directly with the merchant:
+
+```typescript
+const cancelTx = await payer.refund?.cancel(paymentInfo)
+console.log('Refund cancelled:', cancelTx)
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Arbiter Guide" icon="gavel" href="/sdk/arbiter">
+    What happens after you submit a refund request.
+  </Card>
+  <Card title="Protocol Overview" icon="globe" href="/x402-integration/overview">
+    Escrow timing, capture, and the payment lifecycle.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    Full dispute resolution scenario end-to-end.
+  </Card>
+</CardGroup>

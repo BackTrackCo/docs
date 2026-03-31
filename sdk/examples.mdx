@@ -1,117 +1,60 @@
 ---
 title: "Examples"
-description: "Working examples for deploying operators, building merchants, clients, and arbiters"
+description: "Runnable examples for every SDK operation."
 icon: "code"
 ---
 
-The SDK includes working examples in the `x402r-sdk/` repository. Each is a standalone project that demonstrates a specific integration pattern.
+The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) includes runnable examples for every role. Each example starts a local Anvil fork, deploys contracts, and runs. No wallet or testnet funds needed.
 
-## Examples
-
-<CardGroup cols={2}>
-  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator/basic">
-    Operator-agnostic HTTP service implementing x402's facilitator protocol for escrow payments. Handles signature verification and on-chain settlement.
-  </Card>
-  <Card title="deploy-operator" icon="rocket" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
-    Deploy a complete marketplace operator with escrow, freeze, and arbiter support.
-  </Card>
-  <Card title="server-express" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express">
-    Express merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
-  </Card>
-  <Card title="server-hono" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/hono">
-    Hono merchant server using `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` to accept escrow payments via x402 middleware.
-  </Card>
-  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/merchant-cli">
-    CLI tool for merchants to release payments, approve/deny refunds, and query escrow state.
-  </Card>
-  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/client-cli">
-    CLI tool for payers to `pay`, `preview-fee`, request refunds, freeze payments, and check status.
-  </Card>
-  <Card title="arbiter-cli" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/arbiter-cli">
-    CLI tool for arbiters to review cases, make decisions, and manage registry.
-  </Card>
-  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/shared">
-    Shared utilities used by the CLI examples: `parsePaymentInfo`, `shortAddress`, `formatUSDC`.
-  </Card>
-</CardGroup>
-
-## Running Examples
-
-<Warning>
-All examples require a private key with Base Sepolia ETH and USDC. See [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets) for testnet tokens.
-</Warning>
-
-The full payment flow requires the facilitator to be running before the merchant server:
+### Running
 
 ```bash
-# All commands run from the x402r-sdk/ root directory
-
-# 1. Set up environment files
-cp examples/facilitator/basic/.env-local examples/facilitator/basic/.env
-# Edit .env — set PRIVATE_KEY
-
-cp examples/servers/express/.env-local examples/servers/express/.env
-# Edit .env — set ADDRESS, OPERATOR_ADDRESS, FACILITATOR_URL
-
-# 2. Start the facilitator (port 4022)
-pnpm example:facilitator
-
-# 3. Start the merchant server (new terminal, port 4021)
-pnpm example:server:express
-# Or: pnpm example:server:hono
-
-# 4. Make a payment (new terminal)
-pnpm example:client-cli pay --url http://localhost:4021/weather
+git clone https://github.com/BackTrackCo/x402r-sdk.git
+cd x402r-sdk
+pnpm install && pnpm build
 ```
 
-<Note>
-The facilitator must be running before the merchant server (Express or Hono) starts, as the merchant delegates payment verification and settlement to it.
-</Note>
+Then run any example:
 
-## deploy-operator
+```bash
+# Per-action examples
+pnpm example:payer:request-refund
+pnpm example:merchant:charge
+pnpm example:arbiter:approve-refund
 
-Deploys a complete marketplace operator using `deployMarketplaceOperator()`:
-
-```typescript
-import { deployMarketplaceOperator } from '@x402r/core/deploy';
-
-const result = await deployMarketplaceOperator(
-  walletClient,
-  publicClient,
-  'eip155:84532',
-  {
-    feeRecipient: account.address,
-    arbiter: arbiterAddress,
-    escrowPeriodSeconds: 604800n, // 7 days
-    operatorFeeBps: 100n,         // 1%
-  }
-);
+# Multi-role scenarios
+pnpm scenario:release
+pnpm scenario:dispute
 ```
 
-See [Deploy an Operator](/sdk/deploy-operator) for the full guide.
+### Payer
 
-## Server Examples
+| Example | What it does |
+|---------|-------------|
+| [`payer/request-refund.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/request-refund.ts) | Request a refund for a payment in escrow |
+| [`payer/submit-evidence.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/submit-evidence.ts) | Submit an IPFS evidence CID for a dispute |
+| [`payer/freeze-payment.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/freeze-payment.ts) | Freeze a payment to block release during investigation |
 
-Demonstrates minimal merchant servers (Express and Hono variants) that use `EscrowServerScheme`, `HTTPFacilitatorClient`, and `refundable()` via x402's standard middleware:
+### Merchant
 
-1. Returns 402 with `refundable()` payment options
-2. Delegates payment verification to the facilitator via `HTTPFacilitatorClient`
-3. Delegates on-chain settlement to the facilitator after the handler runs
-4. Returns weather data after successful payment
+| Example | What it does |
+|---------|-------------|
+| [`merchant/charge-payment.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant/charge-payment.ts) | Charge an authorized payment (no escrow) |
+| [`merchant/release-escrow.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant/release-escrow.ts) | Release remaining funds after escrow expires |
 
-## Next Steps
+### Arbiter
 
-<CardGroup cols={2}>
-  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
-    Deploy a PaymentOperator with escrow and freeze support.
-  </Card>
-  <Card title="refundable() Helper" icon="wrench" href="/sdk/helpers/refundable">
-    Mark payment options as refundable with escrow configuration.
-  </Card>
-  <Card title="Core Concepts" icon="lightbulb" href="/sdk/concepts">
-    Understand the payment lifecycle and key concepts.
-  </Card>
-  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples">
-    Browse all examples on GitHub.
-  </Card>
-</CardGroup>
+| Example | What it does |
+|---------|-------------|
+| [`arbiter/approve-refund.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/approve-refund.ts) | Approve a payer's refund request |
+| [`arbiter/review-evidence.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/review-evidence.ts) | Review all submitted evidence for a dispute |
+| [`arbiter/distribute-fees.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/distribute-fees.ts) | Distribute accumulated protocol fees |
+
+### Scenarios
+
+Full multi-role integration tests running against a local Anvil fork.
+
+| Scenario | What it does |
+|----------|-------------|
+| [`scenarios/happy-path-release.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/happy-path-release.ts) | Authorize, wait for escrow, release (2 roles: payer + merchant) |
+| [`scenarios/dispute-resolution.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts) | Full dispute lifecycle with evidence and arbitration (3 roles) |

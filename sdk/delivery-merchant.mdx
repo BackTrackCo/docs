@@ -1,0 +1,77 @@
+---
+title: "Merchant Setup"
+description: "Configure forwardToArbiter() to send responses to the arbiter for evaluation."
+icon: "store"
+---
+
+### Prerequisites
+
+* A deployed delivery protection operator (see [Deploy an Operator](/sdk/deploy-operator#delivery-protection-operator))
+* An arbiter service URL (see [Arbiter Setup](/sdk/delivery-arbiter))
+
+### 1. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @x402r/helpers
+```
+```bash pnpm
+pnpm add @x402r/helpers
+```
+```bash bun
+bun add @x402r/helpers
+```
+</CodeGroup>
+
+### 2. Configure forwardToArbiter()
+
+Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers'
+
+const resourceServer = new x402ResourceServer(facilitatorConfig)
+registerCommerceEvmScheme(resourceServer)
+
+resourceServer.onAfterSettle(
+  forwardToArbiter('http://your-arbiter:3001', {
+    onError: (err) => console.error('Arbiter unreachable:', err),
+  })
+)
+```
+
+The hook POSTs to `{arbiterUrl}/verify` with:
+
+```json
+{
+  "responseBody": "the HTTP response body as a string",
+  "transaction": "0xsettlement_tx_hash",
+  "paymentPayload": {
+    "x402Version": 1,
+    "scheme": "commerce",
+    "accepted": { "network": "eip155:84532", ... },
+    "payload": { "paymentInfo": { ... }, ... }
+  }
+}
+```
+
+The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `paymentInfo` and `network` from the nested structure.
+
+<Warning>
+`forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
+</Warning>
+
+### 3. Share Addresses with the Arbiter
+
+The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from your [deployment](/sdk/deploy-operator#delivery-protection-operator) to create its SDK client. Share these via config, environment variables, or a shared registry.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Arbiter Setup" icon="shield-check" href="/sdk/delivery-arbiter">
+    Build the service that evaluates responses and releases funds.
+  </Card>
+  <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
+    Full deployment config and condition slot details.
+  </Card>
+</CardGroup>

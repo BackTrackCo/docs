@@ -1,0 +1,28 @@
+---
+title: "Delivery Protection"
+description: "Automated quality verification for every transaction."
+icon: "shield-check"
+---
+
+In the delivery protection model, the arbiter evaluates every transaction automatically. Only the arbiter can release funds. If the arbiter does not release, funds auto-refund to the payer after escrow expires.
+
+This is different from the [marketplace model](/sdk/overview) where the merchant releases funds and the arbiter only gets involved when a payer files a dispute.
+
+| | Marketplace | Delivery Protection |
+|---|---|---|
+| Who releases funds | Merchant (after escrow) | Arbiter only |
+| Dispute process | Payer files refund request | No disputes needed |
+| Arbiter involvement | Only on disputes | Every transaction |
+| Contracts needed | Operator + EscrowPeriod + RefundRequest + Evidence + Freeze | Operator + EscrowPeriod + StaticAddressCondition |
+| Deploy preset | `deployMarketplaceOperator()` | `deployDeliveryProtectionOperator()` |
+
+Use this when every response needs automated quality checks: AI content verification, garbage detection, schema validation.
+
+<CardGroup cols={2}>
+  <Card title="Merchant Setup" icon="store" href="/sdk/delivery-merchant">
+    Deploy the operator and configure forwardToArbiter().
+  </Card>
+  <Card title="Arbiter Setup" icon="shield-check" href="/sdk/delivery-arbiter">
+    Build the service that evaluates responses and releases funds.
+  </Card>
+</CardGroup>
