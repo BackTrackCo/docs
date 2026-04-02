@@ -117,7 +117,7 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 
 ## Delivery Protection Operator
 
-For automated quality verification (AI garbage detection, schema validation), use the simpler delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter is the only address that can release funds.
+For automated quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can release funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
 
 ```typescript
 import { deployDeliveryProtectionOperator } from '@x402r/core'
@@ -136,23 +136,74 @@ const deployment = await deployDeliveryProtectionOperator(
 console.log('Operator:', deployment.operatorAddress)
 console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
 console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
+console.log('ReleaseCondition:', deployment.releaseConditionAddress)
+console.log('AuthorizeRecorder:', deployment.authorizeRecorderAddress)
 ```
 
 | Option | Type | Description |
 |--------|------|-------------|
 | `chainId` | `number` | Target chain |
-| `arbiter` | `Address` | Only address that can call `release()` |
+| `arbiter` | `Address` | Arbiter address for release and refund decisions |
 | `feeRecipient` | `Address` | Receives protocol fees |
 | `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
+| `authorizedCodehash` | `Hex` | Override the default `recorderCombinatorCodehash`. Optional |
+| `paymentIndexRecorderAddress` | `Address` | Override the default PaymentIndexRecorder. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
+| `allowArbiterRefund` | `boolean` | Allow arbiter to refund immediately during escrow. Default: `true` |
 
-<Accordion title="Delivery Protection Slot Configuration">
-  | Slot | Contract | Purpose |
-  |------|----------|---------|
-  | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
-  | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
-  | `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
-  | `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
-</Accordion>
+<AccordionGroup>
+  <Accordion title="Deployment Result Type">
+    ```typescript
+    interface DeliveryProtectionOperatorDeployment {
+      operatorAddress: Address
+      escrowPeriodAddress: Address
+      arbiterConditionAddress: Address
+      releaseConditionAddress: Address           // OrCondition([arbiter, payer])
+      refundInEscrowConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
+      authorizeRecorderAddress: Address          // RecorderCombinator([escrowPeriod, paymentIndexRecorder])
+      paymentIndexRecorderAddress: Address
+      operatorConfig: OperatorConfig
+      deployments: DeployResult[]
+      summary: {
+        newCount: number
+        existingCount: number
+        txHashes: `0x${string}`[]
+      }
+    }
+    ```
+
+    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), RecorderCombinator, and the Operator. If you pass `paymentIndexRecorderAddress: zeroAddress`, the RecorderCombinator is skipped (5 contracts).
+
+    Redeploying with the same parameters is idempotent (CREATE3). It detects existing contracts and skips them.
+  </Accordion>
+
+  <Accordion title="Preview Addresses (No Deploy)">
+    Compute addresses without deploying:
+
+    ```typescript
+    import { previewDeliveryProtectionOperator } from '@x402r/core'
+
+    const preview = await previewDeliveryProtectionOperator(publicClient, {
+      chainId: 84532,
+      arbiter: '0xArbiterServiceAddress',
+      feeRecipient: account.address,
+      escrowPeriodSeconds: 300n,
+    })
+
+    console.log('Operator will be at:', preview.operatorAddress)
+    console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
+    console.log('AuthorizeRecorder will be at:', preview.authorizeRecorderAddress)
+    ```
+  </Accordion>
+
+  <Accordion title="Delivery Protection Slot Configuration">
+    | Slot | Contract | Purpose |
+    |------|----------|---------|
+    | `RELEASE_CONDITION` | OrCondition([SAC(arbiter), PayerCondition]) | Arbiter or satisfied payer can release |
+    | `AUTHORIZE_RECORDER` | RecorderCombinator([EscrowPeriod, PaymentIndexRecorder]) | Records authorization time and indexes payments on-chain |
+    | `REFUND_IN_ESCROW_CONDITION` | OrCondition([EscrowPeriod, ReceiverCondition, SAC(arbiter)]) | Escrow expiry, receiver voluntary refund, or arbiter immediate refund |
+    | `REFUND_POST_ESCROW_CONDITION` | ReceiverCondition | Only receiver after escrow |
+  </Accordion>
+</AccordionGroup>
 
 ## Next Steps
 
