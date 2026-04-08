@@ -23,7 +23,6 @@ const arbiter = new X402rArbiter({
   walletClient,
   operatorAddress: '0x...',
   refundRequestAddress: config.refundRequest,
-  arbiterRegistryAddress: config.arbiterRegistry,
 });
 ```
 
@@ -36,7 +35,6 @@ The Arbiter SDK currently supports:
 - **`executeRefundInEscrow()`** — Execute an approved refund to transfer funds back
 - **`getPendingRefundRequests()`** — List refund requests awaiting decision
 - **`getRefundRequestByKey()`** — Get details of a specific refund request
-- **`registerArbiter()`** — Register in the on-chain ArbiterRegistry
 - **`isArbiterRegistered()`** — Check registration status
 - **`submitEvidence()`** — Attach evidence (IPFS CID) to a refund request
 - **`getEvidence()`** — Retrieve a single evidence entry by index
