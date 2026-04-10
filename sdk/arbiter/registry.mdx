@@ -1,159 +1,146 @@
 ---
-title: "Arbiter Registry"
-description: "Register, update, and discover arbiters using the on-chain ArbiterRegistry"
+title: "Identity and discovery"
+description: "Register, discover, and rate arbiters using the ERC-8004 plugin"
 icon: "clipboard-list"
 ---
 
-The ArbiterRegistry is an on-chain contract that allows arbiters to register themselves, publish metadata URIs, and be discovered by merchants and clients.
+The `@x402r/sdk` includes an ERC-8004 plugin that provides on-chain identity registration, reputation scoring, and service endpoint discovery. Arbiters can register themselves and be discovered by merchants and payers.
 
 ## Setup
 
-To use registry methods, provide the `arbiterRegistryAddress` when creating the arbiter instance:
+Add the `erc8004Actions` plugin to your client using `.extend()`:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig } from '@x402r/core';
+import { createArbiterClient, erc8004Actions } from '@x402r/sdk'
 
-const config = getNetworkConfig('eip155:84532')!;
-
-const arbiter = new X402rArbiter({
+const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
-  refundRequestAddress: config.refundRequest,
-  arbiterRegistryAddress: config.arbiterRegistry,
-});
+  refundRequestAddress: '0x...',
+})
+
+const extended = arbiter.extend(erc8004Actions())
 ```
 
-## Register as an Arbiter
+This adds three action groups: `identity`, `reputation`, and `discovery`.
 
-Register your address in the on-chain registry with a URI pointing to your metadata or API endpoint:
+## Identity actions
+
+### identity.register
+
+Register your address in the on-chain identity registry:
 
 ```typescript
-const { txHash } = await arbiter.registerArbiter(
-  'https://arbiter.example.com/api/disputes'
-);
-console.log('Registered:', txHash);
+const tx = await extended.identity.register('my-arbiter-id')
+console.log('Registered:', tx)
 ```
 
-The URI can point to:
-- An API endpoint for receiving dispute notifications
-- A JSON metadata file describing your arbitration services
-- An IPFS hash with your arbiter profile
+### identity.isRegistered
 
-## Update Your URI
-
-Change your registered URI:
+Check if an address is registered:
 
 ```typescript
-const { txHash } = await arbiter.updateArbiterUri(
-  'https://new-arbiter.example.com/api'
-);
-console.log('URI updated:', txHash);
+const registered = await extended.identity.isRegistered('0xArbiterAddress...')
+console.log('Is registered:', registered)
 ```
 
-## Deregister
+### identity.resolveAgent
 
-Remove yourself from the registry:
+Look up an agent's registration data:
 
 ```typescript
-const { txHash } = await arbiter.deregisterArbiter();
-console.log('Deregistered:', txHash);
+const agent = await extended.identity.resolveAgent('0xArbiterAddress...')
+console.log('Agent:', agent)
 ```
 
-## Query the Registry
+### identity.verifyAgentId
 
-### Check if an Address is Registered
+Verify that an agent ID matches an address:
 
 ```typescript
-const isRegistered = await arbiter.isArbiterRegistered('0xArbiterAddress...');
-console.log('Is registered:', isRegistered);
+const valid = await extended.identity.verifyAgentId('0xArbiterAddress...', 'my-arbiter-id')
+console.log('Valid:', valid)
 ```
 
-### Get an Arbiter's URI
+## Reputation actions
+
+### reputation.rate
+
+Submit a rating (0-100) for another address:
 
 ```typescript
-const uri = await arbiter.getArbiterUri('0xArbiterAddress...');
-console.log('URI:', uri); // empty string if not registered
+const tx = await extended.reputation.rate('0xTargetAddress...', 85)
+console.log('Rating submitted:', tx)
 ```
 
-### Get Total Arbiter Count
+### reputation.getSummary
+
+Get the reputation summary for an address:
 
 ```typescript
-const count = await arbiter.getArbiterCount();
-console.log('Total arbiters:', count);
+const summary = await extended.reputation.getSummary('0xArbiterAddress...')
+console.log('Reputation:', summary)
 ```
 
-### List Arbiters (Paginated)
+### reputation.giveFeedback
+
+Submit raw feedback with custom tags:
 
 ```typescript
-const { arbiters, uris, total } = await arbiter.listArbiters(0n, 10n);
-console.log(`Showing ${arbiters.length} of ${total} arbiters`);
-
-for (let i = 0; i < arbiters.length; i++) {
-  console.log(`${arbiters[i]}: ${uris[i]}`);
-}
+const tx = await extended.reputation.giveFeedback({
+  target: '0xTargetAddress...',
+  score: 90n,
+  tag1: 'starred',
+  tag2: 'x402',
+})
+console.log('Feedback submitted:', tx)
 ```
 
-## Method Reference
+## Discovery actions
 
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `registerArbiter` | `uri: string` | `{ txHash }` | Register with a URI |
-| `updateArbiterUri` | `newUri: string` | `{ txHash }` | Update registered URI |
-| `deregisterArbiter` | (none) | `{ txHash }` | Remove from registry |
-| `getArbiterUri` | `arbiter: Address` | `string` | Get arbiter's URI |
-| `isArbiterRegistered` | `arbiter: Address` | `boolean` | Check registration |
-| `getArbiterCount` | (none) | `bigint` | Total registered count |
-| `listArbiters` | `offset: bigint, count: bigint` | `ArbiterList` | Paginated list |
+### discovery.resolveServiceEndpoint
 
-## ArbiterList Type
+Look up a service endpoint for an address:
 
 ```typescript
-interface ArbiterList {
-  arbiters: readonly `0x${string}`[];  // Arbiter addresses
-  uris: readonly string[];             // Corresponding URIs
-  total: bigint;                       // Total registered count
-}
+const endpoint = await extended.discovery.resolveServiceEndpoint('0xArbiterAddress...')
+console.log('Service endpoint:', endpoint)
 ```
 
-## Complete Example
+## Complete example
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig } from '@x402r/core';
+import { createArbiterClient, erc8004Actions } from '@x402r/sdk'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
 
-async function main() {
-  const config = getNetworkConfig('eip155:84532')!;
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
 
-  const arbiter = new X402rArbiter({
-    publicClient,
-    walletClient,
-    operatorAddress: '0x...',
-    arbiterRegistryAddress: config.arbiterRegistry,
-  });
+const arbiter = createArbiterClient({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: '0x...',
+}).extend(erc8004Actions())
 
-  // Register
-  await arbiter.registerArbiter('https://my-arbiter.example.com/api');
+// Register
+await arbiter.identity.register('my-dispute-resolver')
 
-  // Verify
-  const isRegistered = await arbiter.isArbiterRegistered(
-    walletClient.account!.address
-  );
-  console.log('Registered:', isRegistered);
+// Verify
+const isRegistered = await arbiter.identity.isRegistered(account.address)
+console.log('Registered:', isRegistered)
 
-  // Browse all arbiters
-  const { arbiters, uris, total } = await arbiter.listArbiters(0n, 100n);
-  console.log(`${total} arbiters registered:`);
-  for (let i = 0; i < arbiters.length; i++) {
-    console.log(`  ${arbiters[i]} → ${uris[i]}`);
-  }
-}
-
-main().catch(console.error);
+// Check reputation
+const summary = await arbiter.reputation.getSummary(account.address)
+console.log('Reputation:', summary)
 ```
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">

@@ -52,6 +52,7 @@ Type narrowing is a DX convenience, not a security boundary. On-chain [condition
 | `walletClient` | `WalletClient` | No | Required for writes. Role presets throw without it. |
 | `operatorAddress` | `Address` | Yes | Your deployed PaymentOperator |
 | `chainId` | `number` | No | Auto-detected from `publicClient.chain` |
+| `network` | `string` | No | EIP-155 network ID (e.g., `'eip155:84532'`). Alternative to `chainId`. |
 | `escrowPeriodAddress` | `Address` | No | Activates `escrow` group |
 | `refundRequestAddress` | `Address` | No | Activates `refund` group |
 | `refundRequestEvidenceAddress` | `Address` | No | Activates `evidence` group (requires `refundRequestAddress`) |
@@ -68,7 +69,7 @@ Type narrowing is a DX convenience, not a security boundary. On-chain [condition
 | `operator` | 8 | Always available |
 | `watch` | 4 | Always available |
 | `escrow` | 3 | `escrowPeriodAddress` |
-| `refund` | 15 | `refundRequestAddress` |
+| `refund` | 14 | `refundRequestAddress` |
 | `evidence` | 4 | `refundRequestEvidenceAddress` |
 | `freeze` | 3 | `freezeAddress` |
 | `query` | 3 | `paymentIndexRecorderAddress` |

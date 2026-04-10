@@ -1,39 +1,34 @@
 ---
-title: "Refund Operations"
-description: "Request and manage refunds with the Client SDK - submit, cancel, and track refund requests"
+title: "Refund operations"
+description: "Request and manage refunds with the payer client"
 icon: "rotate-left"
 ---
 
-The Client SDK provides complete refund management capabilities for payers. All refund methods interact directly with the `RefundRequest` contract on-chain.
+The payer client provides complete refund management through the `refund` action group. All methods interact directly with the `RefundRequest` contract on-chain.
 
 <Note>
-**About the `nonce` parameter:** Every refund method requires a `nonce: bigint` parameter. This is the record index from the `PaymentIndexRecorder` and identifies which charge within a payment you are requesting a refund for. For the first (and most common) charge, use `0n`.
+The `refund` group requires `refundRequestAddress` in the client config. Without it, `client.refund` is `undefined`.
 </Note>
 
-## requestRefund
+## refund.request
 
 Submit a refund request for a payment that is in escrow. The request goes on-chain and is visible to the merchant and any assigned arbiter.
 
 ```typescript
-const { txHash } = await client.requestRefund(
-  paymentInfo,
-  BigInt('1000000'), // amount to refund (e.g., 1 USDC with 6 decimals)
-  0n                 // nonce: first charge
-);
-
-console.log(`Refund requested: ${txHash}`);
+const tx = await client.refund?.request(paymentInfo, 1_000_000n) // 1 USDC
+console.log('Refund requested:', tx)
 ```
 
-## cancelRefundRequest
+## refund.cancel
 
 Cancel a pending refund request that you submitted. Only the original requester (payer) can cancel, and only while the request status is `Pending`.
 
 ```typescript
-const { txHash } = await client.cancelRefundRequest(paymentInfo, 0n);
-console.log(`Refund request cancelled: ${txHash}`);
+const tx = await client.refund?.cancel(paymentInfo)
+console.log('Refund request cancelled:', tx)
 ```
 
-## Query Refund State
+## Query refund state
 
 These methods read on-chain state for refund requests. None require a wallet client.
 
@@ -41,66 +36,91 @@ These methods read on-chain state for refund requests. None require a wallet cli
 
 ```typescript
 // Check if a refund request exists
-const hasRequest = await client.hasRefundRequest(paymentInfo, 0n);
+const hasRequest = await client.refund?.has(paymentInfo)
 
 // Get just the status
-const status = await client.getRefundStatus(paymentInfo, 0n);
-// Returns: RequestStatus.Pending | Approved | Denied | Cancelled
+const status = await client.refund?.getStatus(paymentInfo)
+// Returns: 0 = Pending, 1 = Approved, 2 = Denied, 3 = Cancelled, 4 = Refused
 ```
 
 ### Get full refund request data
 
 ```typescript
-// By paymentInfo + nonce
-const request = await client.getRefundRequest(paymentInfo, 0n);
-console.log(request.amount, request.status);
+// By paymentInfo
+const request = await client.refund?.get(paymentInfo)
+console.log(request?.amount, request?.status)
 
-// By composite key (from getMyRefundRequests)
-const request2 = await client.getRefundRequestByKey(compositeKey);
+// By hash (from list methods)
+const request2 = await client.refund?.getByKey(paymentInfoHash)
 ```
 
-### List your refund requests
+### List refund requests
 
 ```typescript
-// Get total count
-const count = await client.getMyRefundRequestCount();
+// Get payer's refund requests (paginated)
+const payerRequests = await client.refund?.getPayerRequests(
+  payerAddress,
+  0n,   // offset
+  10n,  // count
+)
 
-// Get paginated keys, then fetch details
-const { keys, total } = await client.getMyRefundRequests(0n, 10n);
+// Get receiver's refund requests
+const receiverRequests = await client.refund?.getReceiverRequests(
+  receiverAddress,
+  0n,
+  10n,
+)
 
-for (const key of keys) {
-  const request = await client.getRefundRequestByKey(key);
-  console.log(`Amount: ${request.amount}, Status: ${request.status}`);
-}
+// Get all requests for an operator
+const operatorRequests = await client.refund?.getOperatorRequests(
+  operatorAddress,
+  0n,
+  10n,
+)
 ```
 
-## Refund Request Lifecycle
+### Track cancellations
+
+```typescript
+const cancelCount = await client.refund?.getCancelCount(paymentInfo)
+const cancelledAmount = await client.refund?.getCancelledAmount(paymentInfo, 0n)
+```
+
+## Refund request lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending: requestRefund()
+    [*] --> Pending: refund.request()
     Pending --> Approved: Merchant/Arbiter approves
     Pending --> Denied: Merchant/Arbiter denies
-    Pending --> Cancelled: cancelRefundRequest()
+    Pending --> Refused: Arbiter declines to rule
+    Pending --> Cancelled: refund.cancel()
     Approved --> [*]: Funds returned
     Denied --> [*]
+    Refused --> [*]
     Cancelled --> [*]
 ```
 
-## Method Reference
+## Method reference
 
 | Method | Parameters | Returns |
 |--------|-----------|---------|
-| `requestRefund` | `paymentInfo, amount, nonce` | `{ txHash }` |
-| `cancelRefundRequest` | `paymentInfo, nonce` | `{ txHash }` |
-| `hasRefundRequest` | `paymentInfo, nonce` | `boolean` |
-| `getRefundStatus` | `paymentInfo, nonce` | `RequestStatus` |
-| `getRefundRequest` | `paymentInfo, nonce` | `RefundRequestData` |
-| `getRefundRequestByKey` | `compositeKey` | `RefundRequestData` |
-| `getMyRefundRequests` | `offset, count` | `{ keys, total }` |
-| `getMyRefundRequestCount` | none | `bigint` |
+| `refund.request` | `paymentInfo, amount` | `Hash` |
+| `refund.cancel` | `paymentInfo` | `Hash` |
+| `refund.deny` | `paymentInfo` | `Hash` |
+| `refund.refuse` | `paymentInfo` | `Hash` |
+| `refund.has` | `paymentInfo` | `boolean` |
+| `refund.getStatus` | `paymentInfo` | `RefundRequestStatus` |
+| `refund.get` | `paymentInfo` | `RefundRequestData` |
+| `refund.getByKey` | `paymentInfoHash` | `RefundRequestData` |
+| `refund.getStoredPaymentInfo` | `paymentInfoHash` | `PaymentInfo` |
+| `refund.getPayerRequests` | `payer, offset, count` | `RefundRequestData[]` |
+| `refund.getReceiverRequests` | `receiver, offset, count` | `RefundRequestData[]` |
+| `refund.getOperatorRequests` | `operator, offset, count` | `RefundRequestData[]` |
+| `refund.getCancelCount` | `paymentInfo` | `bigint` |
+| `refund.getCancelledAmount` | `paymentInfo, cancelIndex` | `bigint` |
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
@@ -113,6 +133,6 @@ stateDiagram-v2
     Query payment state and details.
   </Card>
   <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
-    Full setup guide for the Client SDK.
+    Full setup guide for the payer client.
   </Card>
 </CardGroup>

@@ -1,180 +1,107 @@
 ---
-title: "Batch Operations"
-description: "Process multiple refund decisions efficiently with the Arbiter SDK"
+title: "Batch operations"
+description: "Process multiple refund decisions efficiently as an arbiter"
 icon: "layer-group"
 ---
 
-The Arbiter SDK provides batch operations for processing multiple refund requests in a single call. Both `batchApprove` and `batchDeny` accept an array of `{ paymentInfo, nonce }` objects.
+The arbiter client can process multiple refund requests by iterating over cases and calling refund/payment methods individually. There is no built-in batch method, but you can build batch workflows on top of the action groups.
 
 <Warning>
-Batch items are processed **sequentially**, not atomically. If one item fails mid-batch, all previously processed items will **not** be rolled back. Design your error handling accordingly.
+Each refund decision is a separate on-chain transaction. If one fails mid-batch, previously processed items are not rolled back. Design your error handling accordingly.
 </Warning>
 
-## Batch Approve
+## Batch approve and execute
 
-Approve multiple refund requests in one call:
-
-```typescript
-const items = [
-  { paymentInfo: paymentInfo1, nonce: 0n },
-  { paymentInfo: paymentInfo2, nonce: 0n },
-  { paymentInfo: paymentInfo3, nonce: 1n },
-];
-
-const results = await arbiter.batchApprove(items);
-
-for (const { txHash } of results) {
-  console.log('Approved:', txHash);
-}
-```
-
-## Batch Deny
-
-Deny multiple refund requests in one call:
+Fetch pending cases, evaluate each one, then approve or deny:
 
 ```typescript
-const items = [
-  { paymentInfo: paymentInfo4, nonce: 0n },
-  { paymentInfo: paymentInfo5, nonce: 0n },
-];
+import { createArbiterClient, RefundRequestStatus } from '@x402r/sdk'
+import type { PaymentInfo } from '@x402r/sdk'
 
-const results = await arbiter.batchDeny(items);
-
-for (const { txHash } of results) {
-  console.log('Denied:', txHash);
-}
-```
-
-## Empty Batch Handling
-
-Both batch methods safely handle empty arrays and return an empty results array:
-
-```typescript
-const results = await arbiter.batchApprove([]);
-console.log(results.length); // 0
-```
-
-## Item Format
-
-Each item in the batch array must include both the `paymentInfo` struct and the `nonce`:
-
-```typescript
-interface BatchItem {
-  /** The full PaymentInfo struct identifying the payment */
-  paymentInfo: PaymentInfo;
-  /** The record index (nonce) from PaymentIndexRecorder */
-  nonce: bigint;
-}
-```
-
-<Info>
-The `nonce` identifies which specific charge record the refund request targets. For most single-charge payments, this is `0n`.
-</Info>
-
-## Example: Triage and Batch Process Pending Cases
-
-Fetch all pending cases, evaluate each one, then batch approve and deny:
-
-```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { RequestStatus } from '@x402r/core';
-import type { PaymentInfo, RefundRequestData } from '@x402r/core';
-
-async function triageAndProcess(
-  arbiter: X402rArbiter,
-  receiverAddress: `0x${string}`,
-  lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>
+async function batchProcess(
+  arbiter: ReturnType<typeof createArbiterClient>,
+  paymentInfos: PaymentInfo[],
 ) {
-  // Step 1: Fetch pending cases
-  const { keys, total } = await arbiter.getPendingRefundRequests(0n, 100n, receiverAddress);
-  console.log(`Processing ${total} pending cases`);
+  const approved: string[] = []
+  const denied: string[] = []
 
-  const toApprove: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
-  const toDeny: Array<{ paymentInfo: PaymentInfo; nonce: bigint }> = [];
+  for (const paymentInfo of paymentInfos) {
+    const request = await arbiter.refund?.get(paymentInfo)
+    if (!request || request.status !== RefundRequestStatus.Pending) continue
 
-  // Step 2: Evaluate each case
-  for (const key of keys) {
-    const request = await arbiter.getRefundRequestByKey(key);
+    const shouldApprove = request.amount < 10_000_000n // Auto-approve < 10 USDC
 
-    if (request.status !== RequestStatus.Pending) {
-      continue;
-    }
-
-    const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash);
-    const item = { paymentInfo, nonce: request.nonce };
-
-    if (shouldApprove(request)) {
-      toApprove.push(item);
+    if (shouldApprove) {
+      const tx = await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+      approved.push(tx)
     } else {
-      toDeny.push(item);
+      const tx = await arbiter.refund?.deny(paymentInfo)
+      if (tx) denied.push(tx)
     }
   }
 
-  // Step 3: Batch process decisions
-  const approveResults = await arbiter.batchApprove(toApprove);
-  const denyResults = await arbiter.batchDeny(toDeny);
-
-  console.log(`Approved: ${approveResults.length}, Denied: ${denyResults.length}`);
-
-  return { approved: approveResults, denied: denyResults };
-}
-
-function shouldApprove(request: RefundRequestData): boolean {
-  // Your decision logic here
-  return request.amount < BigInt('10000000'); // Auto-approve < 10 USDC
+  console.log('Approved:', approved.length, 'Denied:', denied.length)
+  return { approved, denied }
 }
 ```
 
-## Example: Batch Approve with Refund Execution
+## Triage from operator requests
 
-After batch approving, execute refunds individually for each approved payment:
+Fetch all pending cases for your operator and triage them:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import type { PaymentInfo } from '@x402r/core';
-
-async function batchApproveAndExecute(
-  arbiter: X402rArbiter,
-  items: Array<{ paymentInfo: PaymentInfo; nonce: bigint }>
+async function triageOperatorCases(
+  arbiter: ReturnType<typeof createArbiterClient>,
+  lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>,
 ) {
-  // Step 1: Batch approve all items
-  const approveResults = await arbiter.batchApprove(items);
-  console.log(`Approved ${approveResults.length} refund requests`);
+  // Step 1: Fetch all refund requests for this operator
+  const requests = await arbiter.refund?.getOperatorRequests(
+    arbiter.config.operatorAddress,
+    0n,
+    100n,
+  )
 
-  // Step 2: Execute refunds individually
-  const executeResults: Array<{ txHash: `0x${string}` }> = [];
+  // Step 2: Filter to pending only
+  const pending = (requests ?? []).filter(
+    (r) => r.status === RefundRequestStatus.Pending,
+  )
+  console.log('Pending cases:', pending.length)
 
-  for (const { paymentInfo } of items) {
-    try {
-      const { txHash } = await arbiter.executeRefundInEscrow(paymentInfo);
-      executeResults.push({ txHash });
-      console.log('Refund executed:', txHash);
-    } catch (error) {
-      console.error(`Failed to execute refund for ${paymentInfo.payer}:`, error);
+  // Step 3: Process each
+  for (const request of pending) {
+    const paymentInfo = await lookupPaymentInfo(request.paymentInfoHash)
+
+    // Review evidence if available
+    const evidenceCount = await arbiter.evidence?.count(paymentInfo)
+    if (evidenceCount && evidenceCount > 0n) {
+      const batch = await arbiter.evidence?.getBatch(paymentInfo, 0n, evidenceCount)
+      console.log('Evidence entries:', batch?.entries.length)
+    }
+
+    // Make decision
+    if (request.amount < 10_000_000n) {
+      await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+    } else {
+      await arbiter.refund?.deny(paymentInfo)
     }
   }
-
-  return {
-    approved: approveResults,
-    executed: executeResults,
-  };
 }
 ```
 
-## Performance Considerations
+## Performance considerations
 
 <Note>
-Each item in a batch results in a separate on-chain transaction. Gas costs scale linearly with the number of items. Plan batch sizes around your RPC provider's rate limits.
+Each decision is a separate on-chain transaction. Gas costs scale linearly with the number of items. Plan batch sizes around your RPC provider's rate limits.
 </Note>
 
 | Factor | Detail |
 |--------|--------|
-| **Transaction ordering** | Items are processed sequentially to ensure correct nonce ordering. |
-| **Gas costs** | Each item is a separate transaction. Batch methods save on SDK overhead, not gas. |
+| **Transaction ordering** | Process items sequentially to ensure correct nonce ordering. |
+| **Gas costs** | Each item is a separate transaction. Batch processing saves SDK overhead, not gas. |
 | **Partial failures** | If one transaction fails, previous ones remain on-chain. Handle partial failures in your logic. |
 | **Rate limiting** | Large batches may hit RPC rate limits. Consider adding delays for 50+ item batches. |
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
@@ -184,7 +111,7 @@ Each item in a batch results in a separate on-chain transaction. Gas costs scale
     Watch for new cases in real-time.
   </Card>
   <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
-    Individual approve/deny methods and executeRefundInEscrow.
+    Individual approve/deny methods and refund execution.
   </Card>
   <Card title="Arbiter Quickstart" icon="rocket" href="/sdk/arbiter/quickstart">
     Review the complete arbiter setup guide.

@@ -8,16 +8,18 @@ The SDK provides full coverage of core payment flows including authorization, re
 
 ## API Constraints
 
-### EIP-155 Network Identifiers
+### Chain configuration
 
-Network configuration requires EIP-155 format strings, not chain ID numbers:
+Use `getChainConfig()` from `@x402r/sdk` with a numeric chain ID:
 
 ```typescript
-// Correct
-const config = getNetworkConfig('eip155:84532');
+import { getChainConfig } from '@x402r/sdk'
 
-// Incorrect - will return undefined
-const config = getNetworkConfig(84532);
+// Correct - numeric chain ID
+const config = getChainConfig(84532)
+
+// Incorrect - EIP-155 strings are not accepted
+// const config = getChainConfig('eip155:84532')
 ```
 
 ### PaymentInfo Must Be Complete
@@ -26,10 +28,10 @@ All SDK methods require a complete `PaymentInfo` object. You cannot query by has
 
 ```typescript
 // Works - full PaymentInfo
-const status = await client.getRefundStatus(paymentInfo, 0n);
+const status = await client.refund?.getStatus(paymentInfo)
 
-// Not supported - hash-only queries require the full struct
-// const state = await client.getPaymentStateByHash(hash);
+// Some methods accept a hash directly
+const request = await client.refund?.getByKey(paymentInfoHash)
 ```
 
 ### Event Log Scanning Limits
@@ -37,9 +39,16 @@ const status = await client.getRefundStatus(paymentInfo, 0n);
 `getPayerPayments()`, `getReceiverPayments()`, and `getPaymentDetails()` scan `AuthorizationCreated` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Pass a `fromBlock` parameter for large ranges:
 
 ```typescript
-// Scan only recent blocks to avoid RPC limits
-const payments = await client.getPayerPayments(recentBlockNumber);
-const details = await client.getPaymentDetails(hash, recentBlockNumber);
+// Pass eventFromBlock when creating the client to limit scan range
+const client = createPayerClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...',
+  paymentIndexRecorderAddress: '0x...',
+  eventFromBlock: recentBlockNumber,
+})
+
+const payments = await client.query?.getPayerPayments(payerAddress)
 ```
 
 ### No Express/Hono Middleware
