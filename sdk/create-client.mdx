@@ -96,7 +96,73 @@ const extended = client.extend(
 const payments = await extended.query.getPayerPayments(payerAddress)
 ```
 
-## Next Steps
+### ERC-8004 plugin
+
+The `erc8004Actions` plugin adds `identity`, `reputation`, and `discovery` action groups for on-chain agent identity and reputation:
+
+```typescript
+import { createX402r, erc8004Actions } from '@x402r/sdk'
+
+const client = createX402r({ publicClient, walletClient, operatorAddress: '0x...' })
+
+const extended = client.extend(erc8004Actions())
+
+// Identity
+await extended.identity.register('https://my-agent.example.com')
+await extended.identity.verifyAgentId(42n, '0xAgentAddress...')
+await extended.identity.resolveAgent(42n)
+await extended.identity.isRegistered('0xAgentAddress...')
+
+// Verify + reputation in one call
+const result = await extended.identity.check(42n, '0xAgentAddress...', [
+  '0xReviewer1...',
+  '0xReviewer2...',
+])
+console.log('Verified:', result.verified)
+console.log('Reputation:', result.reputation) // ReputationSummary | null
+
+// Reputation
+await extended.reputation.rate(42n, 85)
+await extended.reputation.getSummary(42n, ['0xReviewer...'])
+
+// Discovery
+await extended.discovery.resolveServiceEndpoint(42n, 'arbiter')
+```
+
+#### `identity.check()`
+
+Verifies an agent's on-chain identity and optionally fetches their reputation summary in a single call. Both the verification and reputation lookup run in parallel.
+
+```typescript
+const { verified, reputation } = await extended.identity.check(
+  agentId,
+  agentAddress,
+  reviewerAddresses, // optional
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agentId` | `bigint` | The agent's on-chain ID |
+| `address` | `Address` | The address claiming to own the agent ID |
+| `reviewers` | `readonly Address[]` | Optional list of reviewer addresses for reputation lookup |
+
+Returns `CheckAgentResult`:
+
+```typescript
+interface CheckAgentResult {
+  verified: boolean
+  reputation: ReputationSummary | null
+}
+```
+
+When `reviewers` is omitted or empty, `reputation` is `null` and only on-chain verification runs.
+
+<Tip>
+For standalone helpers that extract identity data from x402 extension responses without a client instance, see [ERC-8004 helpers](/sdk/helpers/erc8004).
+</Tip>
+
+## Next steps
 
 <CardGroup cols={3}>
   <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
@@ -105,7 +171,7 @@ const payments = await extended.query.getPayerPayments(payerAddress)
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Get the addresses for your client config.
   </Card>
-  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
-    Conditions and recorders that control on-chain access.
+  <Card title="ERC-8004 Helpers" icon="wrench" href="/sdk/helpers/erc8004">
+    Standalone extraction helpers for arbiter identity and reputation data.
   </Card>
 </CardGroup>
