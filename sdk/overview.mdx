@@ -62,9 +62,23 @@ bun add @x402r/helpers
 ```
 </CodeGroup>
 
+For one-shot payments from the command line (no project install required):
+
+<CodeGroup>
+```bash npm
+npx @x402r/cli pay <url> [options]
+```
+```bash pnpm
+pnpm dlx @x402r/cli pay <url> [options]
+```
+```bash bun
+bunx @x402r/cli pay <url> [options]
+```
+</CodeGroup>
+
 ### Guides
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Merchants" icon="store" href="/sdk/merchant">
     Deploy an operator, accept a payment, release funds from escrow.
   </Card>
@@ -73,6 +87,9 @@ bun add @x402r/helpers
   </Card>
   <Card title="Arbiters" icon="gavel" href="/sdk/arbiter">
     Review disputes, approve or deny refunds, distribute fees.
+  </Card>
+  <Card title="CLI" icon="terminal" href="/sdk/cli">
+    One-shot payments from the command line or scripts.
   </Card>
 </CardGroup>
 
