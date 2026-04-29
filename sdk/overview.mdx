@@ -94,4 +94,41 @@ All contracts are deployed to identical addresses on every chain via CREATE3. On
 | Avalanche C-Chain | `43114` | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
 | Monad | `143` | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
 | Linea | `59144` | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
-| SKALE Base | `1187947933` | `0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20` |
+
+<Note>
+SKALE Base (`1187947933`) was removed from the registry. Its Shanghai EVM is incompatible with the Cancun-locked canonical bytecode used by the commerce-payments v1 primitives.
+</Note>
+
+### commerce-payments v1 primitives
+
+The `base/commerce-payments@v1.0.0` primitives are redeployed at canonical CREATE2 addresses via CreateX permissionless salts. Each contract has the same address on every supported chain.
+
+| Contract | Address |
+|----------|---------|
+| `AuthCaptureEscrow` | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
+| `ERC3009PaymentCollector` | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
+| `Permit2PaymentCollector` | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
+
+Salt namespace: `commerce-payments::v1::<ContractName>`.
+
+Import the addresses from `@x402r/core`:
+
+```ts
+import {
+  commercePaymentsAddresses,
+  commercePaymentsAuthCaptureEscrow,
+  commercePaymentsErc3009PaymentCollector,
+  commercePaymentsPermit2PaymentCollector,
+} from '@x402r/core';
+
+// Convenience bundle
+commercePaymentsAddresses.authCaptureEscrow;
+commercePaymentsAddresses.erc3009PaymentCollector;
+commercePaymentsAddresses.permit2PaymentCollector;
+```
+
+The primitives are live on Base, Optimism, Arbitrum One, Polygon, Celo, Avalanche C-Chain, Linea, Base Sepolia, Ethereum Sepolia, and Arbitrum Sepolia. Ethereum mainnet and Monad are listed in the registry pending an imminent deploy.
+
+<Info>
+The legacy CREATE3 exports (`authCaptureEscrow`, `tokenCollector`, `factories`, `conditions`, `recorders`) remain unchanged. They will be retired in the SDK v2 migration that ships the x402r-authored contracts at CREATE2 addresses.
+</Info>
