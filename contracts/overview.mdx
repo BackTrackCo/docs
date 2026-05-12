@@ -22,7 +22,7 @@ Core escrow contract for holding ERC-20 tokens during payments.
 
 **Features:**
 - Authorization-based deposits (no direct transfers)
-- Payment state machine: `NonExistent` → `InEscrow` → `Released` → `Settled`
+- Payment state machine: `NonExistent` → `InEscrow` → `Captured` → `Settled`
 - Void/reclaim for failed authorizations
 - CaptureAuthorizer-based access control
 
@@ -30,7 +30,7 @@ Core escrow contract for holding ERC-20 tokens during payments.
 ```solidity
 authorize(paymentId, payer, receiver, amount, token, operator)
 charge(paymentId, amount)
-release(paymentId)
+capture(paymentInfo, amount)
 void(paymentId)
 reclaim(paymentId, receiver, amount)
 ```
@@ -69,18 +69,18 @@ x402r extends commerce-payments with flexible payment capabilities:
 - Configurable authorization via conditions (not hardcoded roles)
 - Refund request states: `Pending` → `Approved`/`Denied`/`Cancelled`
 - Voids (during escrow period)
-- Refunds (after capture) (after release)
+- Refunds (after capture)
 - Support for marketplace, subscription, streaming, and custom flows
 
 ### 2. Pluggable Condition System
 
 **Conditions (ICondition)** - Authorization checks before actions
 
-**Recorders (IRecorder)** - State updates after actions
+**Hooks (IHook)** - State updates after actions
 
 **10-slot configuration per operator:**
-- 5 condition slots (before action): authorize, charge, release, voidPayment, refund
-- 5 recorder slots (after action): state tracking for each action
+- 5 condition slots (before action): authorize, charge, capture, void, refund
+- 5 hook slots (after action): state tracking for each action
 
 **Benefits:**
 - Configure operator behavior without redeploying
@@ -90,9 +90,9 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 ### 3. Time-Based Escrow & Freeze Policies
 
-**EscrowPeriod** - Combined recorder and condition that tracks authorization time and enforces escrow period
+**EscrowPeriod** - Combined hook and condition that tracks authorization time and enforces escrow period
 
-**Freeze** - Standalone condition that blocks release when payment is frozen (with configurable freeze/unfreeze authorization)
+**Freeze** - Standalone condition that blocks capture when payment is frozen (with configurable freeze/unfreeze authorization)
 
 **Key features:**
 - Configurable escrow periods (e.g., 7 days, 14 days)
@@ -113,7 +113,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 **FreezeFactory** - Deploys Freeze condition contracts
 
-Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, RecorderCombinator.
+Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, HookCombinator.
 
 All factories use **universal CREATE2 addresses**: same address on every supported chain.
 
@@ -129,7 +129,7 @@ All factories use **universal CREATE2 addresses**: same address on every support
 | Feature | Commerce Payments | x402r |
 |---------|------------------|-------|
 | **Refunds** | Manual void/reclaim | Structured refund requests with configurable approval |
-| **Escrow Period** | Not enforced | Configurable time-lock before release |
+| **Escrow Period** | Not enforced | Configurable time-lock before capture |
 | **Dispute Resolution** | Not built-in | Arbiter workflow via conditions, signatures, and evidence |
 | **Authorization** | Operator-based only | Pluggable conditions (access, time, signature, combinators) |
 | **Freeze Mechanism** | Not available | Configurable freeze during escrow period |
@@ -168,7 +168,7 @@ Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelo
 - Condition singletons deployed once, reused everywhere
 - CREATE2 for deterministic addresses (no registry lookups)
 - Minimal storage in operators (conditions are stateless)
-- Recorder pattern separates state from logic
+- Hook pattern separates state from logic
 </Accordion>
 
 <Accordion title="Composability">

@@ -1,12 +1,12 @@
 ---
-title: "PaymentIndexRecorder"
+title: "PaymentIndexRecorderHook"
 description: "Index payments by sequential count for on-chain queries and multiple refund requests"
 icon: "list-ol"
 ---
 
 ## Overview
 
-PaymentIndexRecorder records a sequential index for each payment action, enabling multiple refund requests per payment. Each time `record()` is called, the index increments by 1.
+PaymentIndexRecorderHook records a sequential index for each payment action, enabling multiple refund requests per payment. Each time `record()` is called, the index increments by 1.
 
 ## When to Use
 
@@ -14,7 +14,7 @@ PaymentIndexRecorder records a sequential index for each payment action, enablin
 - You need to support **multiple refund requests** per payment (each keyed by nonce)
 - Other contracts need to read the payment index on-chain
 
-**Skip when:** You're using a subgraph for payment queries — the subgraph can derive indexes from events without the on-chain gas cost.
+**Skip when:** You're using a subgraph for payment queries, the subgraph can derive indexes from events without the on-chain gas cost.
 
 ## State
 
@@ -63,10 +63,10 @@ await refundRequest.requestRefund(paymentInfo, amount2, 1); // nonce 1
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="RecorderCombinator" icon="layer-group" href="/contracts/recorders/combinator">
-    Combine with other recorders in a single slot.
+  <Card title="HookCombinator" icon="layer-group" href="/contracts/hooks/combinator">
+    Combine with other hooks in a single slot.
   </Card>
-  <Card title="Recorders Overview" icon="database" href="/contracts/recorders/overview">
+  <Card title="Hooks Overview" icon="database" href="/contracts/hooks/overview">
     Compare recording strategies.
   </Card>
 </CardGroup>

@@ -11,7 +11,7 @@ The main payment operator contract with pluggable conditions for flexible author
 - **Type:** Operator instance (one per fee recipient + configuration)
 - **Deployment:** Via PaymentOperatorFactory
 - **Immutability:** Cannot be paused or upgraded
-- **Configuration:** 10 slots for conditions and recorders
+- **Configuration:** 10 slots for conditions and hooks
 - **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
 ## Immutable Fields
@@ -38,17 +38,17 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 <Accordion title="Condition Slots (Before Actions)">
 1. **AUTHORIZE_PRE_ACTION_CONDITION** - Who can authorize payments
 2. **CHARGE_PRE_ACTION_CONDITION** - Who can charge partial amounts
-3. **CAPTURE_PRE_ACTION_CONDITION** - Who can release from escrow
+3. **CAPTURE_PRE_ACTION_CONDITION** - Who can capture funds from escrow
 4. **VOID_PRE_ACTION_CONDITION** - Who can refund during escrow
-5. **REFUND_PRE_ACTION_CONDITION** - Who can refund after release
+5. **REFUND_PRE_ACTION_CONDITION** - Who can refund after capture
 
 **Default:** `address(0)` = always allow
 </Accordion>
 
-<Accordion title="Recorder Slots (After Actions)">
+<Accordion title="Hook Slots (After Actions)">
 1. **AUTHORIZE_POST_ACTION_HOOK** - Record authorization (e.g., timestamp)
 2. **CHARGE_POST_ACTION_HOOK** - Record charge event
-3. **CAPTURE_POST_ACTION_HOOK** - Record release
+3. **CAPTURE_POST_ACTION_HOOK** - Record capture
 4. **VOID_POST_ACTION_HOOK** - Record void
 5. **REFUND_POST_ACTION_HOOK** - Record refund
 
@@ -136,7 +136,7 @@ function capture(
 
 **Parameters:**
 - `paymentInfo` - Payment info struct
-- `amount` - Amount to release
+- `amount` - Amount to capture
 
 **Flow:**
 1. Check `CAPTURE_PRE_ACTION_CONDITION` (if set)

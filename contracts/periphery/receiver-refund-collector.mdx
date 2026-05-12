@@ -7,7 +7,7 @@ icon: "arrow-rotate-left"
 ## Overview
 
 - **Type:** Singleton (one per network)
-- **Purpose:** Collect tokens from the receiver to refund the payer after escrow release
+- **Purpose:** Collect tokens from the receiver to refund the payer after capture
 - **Address:** `0x88C9826dFA17Ad9d3a726015C667dD995394D341` (all chains)
 
 ## Features
@@ -18,7 +18,7 @@ icon: "arrow-rotate-left"
 
 ## How It Works
 
-After funds have been released to the receiver (state: `Released`), refunds require pulling tokens back from the receiver's wallet. The `ReceiverRefundCollector` handles this by:
+After funds have been released to the receiver (state: `Captured`), refunds require pulling tokens back from the receiver's wallet. The `ReceiverRefundCollector` handles this by:
 
 1. Operator calls `refund(paymentInfo, amount, receiverRefundCollector, collectorData)`
 2. The collector transfers tokens from the receiver to the escrow contract

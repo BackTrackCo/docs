@@ -30,7 +30,7 @@ icon: "scale-balanced"
 |---------|-------|--------|
 | **Settlement Timing** | Immediate | Deferred (conditional) |
 | **Payer Protection** | None (payment final) | Refund possible until capture |
-| **Receiver Risk** | No risk (paid upfront) | Must wait for release |
+| **Receiver Risk** | No risk (paid upfront) | Must wait for capture |
 | **Gas Cost** | Single transaction | Two transactions (auth + capture) |
 | **Complexity** | Minimal (direct transfer) | Higher (operator logic) |
 | **Variable Pricing** | Not supported | Supported (authorize max, capture actual) |
@@ -222,7 +222,7 @@ Why: Variable pricing, multiple requests, moderate trust. Authorize $20 max, cap
 **Duration:** 48 hours
 **Decision:** ✅ **Use escrow**
 
-Why: High value, long-running, need verification before payment. Release after job completes successfully.
+Why: High value, long-running, need verification before payment. Capture after job completes successfully.
 
 ### Scenario 4: Freelance Work
 

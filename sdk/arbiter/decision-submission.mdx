@@ -4,7 +4,7 @@ description: "Submit decisions on refund requests and execute refunds as an arbi
 icon: "gavel"
 ---
 
-The arbiter client provides methods for reviewing refund requests, making decisions, and executing refunds through the `refund`, `payment`, and `evidence` action groups.
+As an arbiter, you review pending refund requests, then either execute a refund via `payment.voidPayment` / `payment.refund` (which auto-approves the request), or terminally `refund.deny` / `refund.refuse` it. Evidence reads sit on `evidence.*`.
 
 ## Approve a refund (voidPayment)
 
@@ -204,7 +204,7 @@ flowchart TD
   <Card title="Arbiter Discovery" icon="clipboard-list" href="/sdk/arbiter/registry">
     How arbiters are discovered by merchants and clients.
   </Card>
-  <Card title="RefundRequest" icon="file-contract" href="/contracts/periphery/refund-request">
+  <Card title="RefundRequest" icon="file-contract" href="/contracts/hooks/refund-request">
     RefundRequest contract and state machine details.
   </Card>
 </CardGroup>

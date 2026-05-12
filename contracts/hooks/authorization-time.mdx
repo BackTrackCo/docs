@@ -1,15 +1,15 @@
 ---
-title: "AuthorizationTimeRecorder"
+title: "AuthorizationTimeRecorderHook"
 description: "Records authorization timestamp for time-based conditions"
 icon: "clock"
 ---
 
 ## Overview
 
-AuthorizationTimeRecorder stores the `block.timestamp` when a payment is authorized. This timestamp is used by time-based conditions like [EscrowPeriod](/contracts/conditions/escrow-period).
+AuthorizationTimeRecorderHook stores the `block.timestamp` when a payment is authorized. This timestamp is used by time-based conditions like [EscrowPeriod](/contracts/conditions/escrow-period).
 
 <Note>
-[EscrowPeriod](/contracts/conditions/escrow-period) **extends** AuthorizationTimeRecorder and adds `ICondition` implementation. For escrow enforcement, use EscrowPeriod directly instead of deploying AuthorizationTimeRecorder separately.
+[EscrowPeriod](/contracts/conditions/escrow-period) **extends** AuthorizationTimeRecorderHook and adds `ICondition` implementation. For escrow enforcement, use EscrowPeriod directly instead of deploying AuthorizationTimeRecorderHook separately.
 </Note>
 
 ## State
@@ -41,7 +41,7 @@ function getAuthorizationTime(
 
 ## When to Use
 
-Use AuthorizationTimeRecorder directly only if you need authorization timestamps **without** escrow period enforcement. For most use cases, [EscrowPeriod](/contracts/conditions/escrow-period) is the better choice since it includes this recorder plus time-lock condition logic.
+Use AuthorizationTimeRecorderHook directly only if you need authorization timestamps **without** escrow period enforcement. For most use cases, [EscrowPeriod](/contracts/conditions/escrow-period) is the better choice since it includes this hook plus time-lock condition logic.
 
 ## Gas
 
@@ -51,9 +51,9 @@ Use AuthorizationTimeRecorder directly only if you need authorization timestamps
 
 <CardGroup cols={2}>
   <Card title="EscrowPeriod" icon="clock" href="/contracts/conditions/escrow-period">
-    Combined recorder + condition for escrow enforcement.
+    Combined hook + condition for escrow enforcement.
   </Card>
-  <Card title="PaymentIndexRecorder" icon="list-ol" href="/contracts/recorders/payment-index">
+  <Card title="PaymentIndexRecorderHook" icon="list-ol" href="/contracts/hooks/payment-index">
     Index payments for on-chain queries.
   </Card>
 </CardGroup>

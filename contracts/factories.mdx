@@ -142,7 +142,7 @@ const factory = getContract({
 const arbiterConditionHash = await staticAddressConditionFactory.write.deploy([arbiterAddress]);
 const arbiterConditionAddress = /* get from receipt */;
 
-// Deploy release condition: arbiter AND escrow period passed
+// Deploy capture condition: arbiter AND escrow period passed
 const capturePreActionConditionHash = await andConditionFactory.write.deploy([
   [arbiterConditionAddress, escrowPeriodAddress]
 ]);
@@ -204,7 +204,7 @@ If you call `deployOperator()` with the same configuration twice, the factory re
 
 ## Escrow Period Factory
 
-Deploys `EscrowPeriod` contracts - combined recorder and condition for time-based release logic.
+Deploys `EscrowPeriod` contracts - combined hook and condition for time-based capture logic.
 
 ### Contract Address
 
@@ -228,18 +228,18 @@ function deploy(
 ### How It Works
 
 The factory deploys a single **EscrowPeriod** contract that:
-- Extends `AuthorizationTimeRecorder` (implements `IRecorder`)
+- Extends `AuthorizationTimeRecorderHook` (implements `IHook`)
 - Implements `ICondition`
-- Records authorization timestamp when used as recorder
+- Records authorization timestamp when used as hook
 - Checks if escrow period has passed when used as condition
 
 **Architecture:**
 
 ```mermaid
 flowchart LR
-    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorderHook]
     EP -->|implements| IC[ICondition]
-    ATR -->|implements| IR[IRecorder]
+    ATR -->|implements| IR[IHook]
 ```
 
 <Note>
@@ -268,7 +268,7 @@ const escrowPeriodAddress = receipt.logs[0].address;
 
 console.log("EscrowPeriod:", escrowPeriodAddress);
 
-// Use SAME address for both recorder and condition
+// Use SAME address for both hook and condition
 const config = {
   authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   authorizePostActionHook: escrowPeriodAddress,     // Record auth time
@@ -293,7 +293,7 @@ const config = {
 
 ## Freeze Factory
 
-Deploys `Freeze` condition contracts that block release when a payment is frozen.
+Deploys `Freeze` condition contracts that block capture when a payment is frozen.
 
 ### Contract Address
 
@@ -335,7 +335,7 @@ const freeze = await freezeFactory.write.deploy([
   escrowPeriod          // Link to EscrowPeriod (or zeroAddress for unconstrained)
 ]);
 
-// Step 3: Compose with EscrowPeriod for release condition
+// Step 3: Compose with EscrowPeriod for capture condition
 const capturePreActionCondition = await andConditionFactory.write.deploy([
   [escrowPeriod, freeze]
 ]);
@@ -470,7 +470,7 @@ Approximate gas costs for factory deployments (Base Sepolia):
 | Operation | Gas Cost | USD (at 0.1 gwei, $3000 ETH) |
 |-----------|----------|------------------------------|
 | Deploy PaymentOperator | ~2.5M gas | ~$0.75 |
-| Deploy EscrowPeriod (condition + recorder) | ~1.8M gas | ~$0.54 |
+| Deploy EscrowPeriod (condition + hook) | ~1.8M gas | ~$0.54 |
 | Deploy Freeze | ~1.0M gas | ~$0.30 |
 | Predict address (view call) | 0 gas | $0.00 |
 

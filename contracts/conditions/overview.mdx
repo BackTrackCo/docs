@@ -12,9 +12,9 @@ Conditions are pluggable contracts that control who can perform actions on a Pay
 |------|----------|
 | `AUTHORIZE_PRE_ACTION_CONDITION` | Who can authorize payments |
 | `CHARGE_PRE_ACTION_CONDITION` | Who can charge partial amounts |
-| `CAPTURE_PRE_ACTION_CONDITION` | Who can release from escrow |
+| `CAPTURE_PRE_ACTION_CONDITION` | Who can capture funds from escrow |
 | `VOID_PRE_ACTION_CONDITION` | Who can refund during escrow |
-| `REFUND_PRE_ACTION_CONDITION` | Who can refund after release |
+| `REFUND_PRE_ACTION_CONDITION` | Who can refund after capture |
 
 ## ICondition Interface
 
@@ -63,12 +63,12 @@ This means you only need to set conditions for slots you want to restrict. Leave
 
 Conditions compose to create flexible authorization policies. Here are common patterns:
 
-### Open Authorization, Restricted Release
+### Open Authorization, Restricted Capture
 
 ```solidity
 config = {
     authorizePreActionCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
-    authorizePostActionHook: escrowRecorder,          // Record time
+    authorizePostActionHook: escrowHook,          // Record time
     capturePreActionCondition: capturePreActionCondition,         // Restricted
     // ...
 };
@@ -134,7 +134,7 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Recorders" icon="database" href="/contracts/recorders/overview">
+  <Card title="Hooks" icon="database" href="/contracts/hooks/overview">
     Learn about the state recording system.
   </Card>
   <Card title="Combinators" icon="puzzle-piece" href="/contracts/conditions/combinators">

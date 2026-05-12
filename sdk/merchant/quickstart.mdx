@@ -1,6 +1,6 @@
 ---
 title: "Merchant SDK"
-description: "Release funds, charge payments, process refunds, and query escrow state"
+description: "Capture funds, charge payments, process refunds, and query escrow state"
 icon: "rocket"
 ---
 
@@ -49,22 +49,22 @@ const merchant = createMerchantClient({
 })
 ```
 
-## Release funds from escrow
+## Capture funds from escrow
 
 Use `payment.capture()` to transfer escrowed funds to the receiver (merchant). The `amount` parameter is required.
 
 ```typescript
-// Release 10 USDC (6 decimals) from escrow
+// Capture 10 USDC (6 decimals) from escrow
 const tx = await merchant.payment.capture(paymentInfo, 10_000_000n)
-console.log('Released:', tx)
+console.log('Captured:', tx)
 ```
 
-For partial releases, specify a smaller amount. The remaining funds stay in escrow.
+For partial captures, specify a smaller amount. The remaining funds stay in escrow.
 
 ```typescript
-// Release 3 USDC of a 10 USDC escrow
+// Capture 3 USDC of a 10 USDC escrow
 const tx = await merchant.payment.capture(paymentInfo, 3_000_000n)
-console.log('Partial release:', tx)
+console.log('Partial capture:', tx)
 
 // Check what remains
 const amounts = await merchant.payment.getAmounts(paymentInfo)
@@ -106,7 +106,7 @@ console.log('Charged:', tx)
 The `charge()` method is designed for recurring payments and session-based billing where funds are not pre-escrowed. The token collector contract handles the actual token transfer.
 </Tip>
 
-## Refund after release (after capture)
+## Refund after capture (after capture)
 
 Use `payment.refund()` to refund funds that have already been released. This requires a token collector to source the refund from the merchant's balance.
 
@@ -192,19 +192,19 @@ console.log('Total fee:',        fees.totalFeeAmount)
 console.log('Net amount:',       fees.netAmount)
 ```
 
-## Release vs refund decision flow
+## Capture vs refund decision flow
 
 ```mermaid
 flowchart TD
     A[Payment in Escrow] --> B{Check payment.getAmounts}
     B --> C{capturableAmount > 0?}
     C -->|Yes| D{Has refund request?}
-    C -->|No| E[Nothing to release]
-    D -->|No| F[Safe to release]
+    C -->|No| E[Nothing to capture]
+    D -->|No| F[Safe to capture]
     D -->|Yes| G{Approve refund?}
     F --> H["payment.capture(paymentInfo, amount)"]
     G -->|Yes| I["payment.voidPayment(paymentInfo)"]
-    G -->|No| J[Deny request, then release]
+    G -->|No| J[Deny request, then capture]
     J --> H
 ```
 

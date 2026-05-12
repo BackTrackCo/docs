@@ -23,26 +23,26 @@ flowchart TB
     subgraph Operator["PaymentOperator (per config)"]
         Auth[authorize]
         Charge[charge]
-        Release[release]
-        RefundIE[voidPayment]
-        RefundPE[refund]
+        Capture[capture]
+        Void[void]
+        Refund[refund]
     end
 
-    subgraph Plugins["Conditions & Recorders"]
+    subgraph Plugins["Conditions & Hooks"]
         Cond["ICondition<br/>(check before action)"]
-        Rec["IRecorder<br/>(record after action)"]
+        Hook["IHook<br/>(run after action)"]
         EP[EscrowPeriod]
         Freeze[Freeze]
         And[AndCondition]
         Or[OrCondition]
+        RR[RefundRequest]
     end
 
     Escrow[AuthCaptureEscrow]
-    RR[RefundRequest]
 
     Payer -->|authorize / freeze| Operator
-    Receiver -->|release / charge| Operator
-    DesAddr -->|refund / release| Operator
+    Receiver -->|capture / charge| Operator
+    DesAddr -->|void / refund / capture| Operator
     Payer -->|requestRefund| RR
 
     POF -->|deploys| Operator
@@ -50,12 +50,13 @@ flowchart TB
     FF -->|deploys| Freeze
 
     Operator -->|checks| Cond
-    Operator -->|calls| Rec
-    Operator -->|locks/releases funds| Escrow
+    Operator -->|calls| Hook
+    Operator -->|locks/captures funds| Escrow
 
     EP -.->|implements| Cond
-    EP -.->|implements| Rec
+    EP -.->|implements| Hook
     Freeze -.->|implements| Cond
+    RR -.->|implements| Hook
     And -.->|composes| Cond
     Or -.->|composes| Cond
 ```
@@ -82,11 +83,10 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 
 **Example: Marketplace with arbiter dispute resolution**
 
-1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount, nonce)`
+1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount)`
 2. **RefundRequest** creates request with status `Pending`
 3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
-4. **Designated address** calls `refundRequest.updateStatus(paymentInfo, nonce, Approved)`
-5. **Designated address** calls `operator.void(paymentInfo)`
+4. **Designated address** calls `operator.void(paymentInfo)`; the `VOID_POST_ACTION_HOOK` (RefundRequest) auto-flips status to `Approved`
 6. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
 7. **Operator** calls `escrow.void()` to return all escrowed funds to payer
 8. **Operator** calls `VOID_POST_ACTION_HOOK`
@@ -104,10 +104,10 @@ Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-
 - **Day 0:** Payment authorized, escrow period begins
 - **Day 0-7:** Payer can freeze if suspicious (per Freeze contract configuration)
 - **Day 3:** Payer freezes payment (freeze lasts 3 days per configuration)
-- **Day 3-6:** Payment frozen, release blocked
+- **Day 3-6:** Payment frozen, capture blocked
 - **Day 6:** Freeze expires automatically (or authorized address unfreezes early)
 - **Day 7:** Escrow period ends
-- **Day 7+:** Authorized address(es) can release (if not frozen)
+- **Day 7+:** Authorized address(es) can capture (if not frozen)
 
 <Note>
 Freeze policies are optional and configurable. Define who can freeze, who can unfreeze, and how long freeze lasts.
@@ -132,7 +132,7 @@ When an action is called (e.g., `capture()`):
    - `true` → Proceed to execute action
    - `false` → Revert with `ConditionNotMet` error
 4. **Execute Action** - Call escrow method
-5. **Call Recorder** - Update state after successful execution
+5. **Call Hook** - Run the matching `*_POST_ACTION_HOOK` after successful execution
 
 ### Combinator Example
 
@@ -189,7 +189,7 @@ mapping(address token => uint256) public accumulatedProtocolFees;
 ### EscrowPeriod Recording
 
 ```solidity
-// In EscrowPeriod (extends AuthorizationTimeRecorder)
+// In EscrowPeriod (extends AuthorizationTimeRecorderHook)
 mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTimes;
 ```
 

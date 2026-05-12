@@ -1,12 +1,12 @@
 ---
 title: "Freeze"
-description: "Block payment release when frozen, with configurable freeze/unfreeze authorization"
+description: "Block payment capture when frozen, with configurable freeze/unfreeze authorization"
 icon: "snowflake"
 ---
 
 ## Overview
 
-Freeze is a standalone condition that blocks release when a payment is frozen. It manages freeze/unfreeze state with configurable authorization and optional duration-based auto-expiry.
+Freeze is a standalone condition that blocks capture when a payment is frozen. It manages freeze/unfreeze state with configurable authorization and optional duration-based auto-expiry.
 
 **Type:** Per-deployment via [FreezeFactory](/contracts/factories)
 
@@ -19,7 +19,7 @@ Freeze is a standalone condition that blocks release when a payment is frozen. I
 ## Logic
 
 ```solidity
-// ICondition, returns false when frozen (blocks release)
+// ICondition, returns false when frozen (blocks capture)
 function check(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256,
@@ -51,7 +51,7 @@ const freeze = await freezeFactory.deploy(
 // Both:                capturePreActionCondition = AndCondition([escrowPeriod, freeze])
 ```
 
-Use [AndCondition](/contracts/conditions/combinators) to require both escrow period elapsed **and** not frozen before release.
+Use [AndCondition](/contracts/conditions/combinators) to require both escrow period elapsed **and** not frozen before capture.
 
 ## Freeze Duration
 
@@ -86,7 +86,7 @@ Freeze duration should balance payer protection with receiver UX. Too long and r
 
 <CardGroup cols={2}>
   <Card title="EscrowPeriod" icon="clock" href="/contracts/conditions/escrow-period">
-    Add time-based release restrictions.
+    Add time-based capture restrictions.
   </Card>
   <Card title="Factories" icon="industry" href="/contracts/factories">
     Deploy Freeze via FreezeFactory.

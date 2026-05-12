@@ -1,10 +1,10 @@
 ---
 title: "Payment operations"
-description: "Release funds, charge payments, process refunds, and query escrow state"
+description: "Capture funds, charge payments, process refunds, and query escrow state"
 icon: "coins"
 ---
 
-The merchant client provides methods for managing the full payment lifecycle through the `payment` and `operator` action groups: releasing escrowed funds, charging directly for subscriptions, processing refunds, and querying operator configuration.
+Use `createMerchantClient` to capture escrowed funds, charge directly, void or refund, and query operator state. The methods below sit on the `payment` and `operator` action groups.
 
 ## Payment operations
 
@@ -13,15 +13,15 @@ The merchant client provides methods for managing the full payment lifecycle thr
 Transfer escrowed funds to the receiver (merchant). The `amount` parameter is required.
 
 ```typescript
-// Release 10 USDC (6 decimals) from escrow
+// Capture 10 USDC (6 decimals) from escrow
 const tx = await merchant.payment.capture(paymentInfo, 10_000_000n)
-console.log('Released:', tx)
+console.log('Captured:', tx)
 ```
 
-For partial releases, specify a smaller amount. The remaining funds stay in escrow.
+For partial captures, specify a smaller amount. The remaining funds stay in escrow.
 
 ```typescript
-// Release 3 USDC of a 10 USDC escrow
+// Capture 3 USDC of a 10 USDC escrow
 const tx = await merchant.payment.capture(paymentInfo, 3_000_000n)
 
 // Check what remains
@@ -167,19 +167,19 @@ console.log('Total fee:',        fees.totalFeeAmount)
 console.log('Net amount:',       fees.netAmount)
 ```
 
-## Release vs refund decision flow
+## Capture vs refund decision flow
 
 ```mermaid
 flowchart TD
     A[Payment in Escrow] --> B{Check payment.getAmounts}
     B --> C{capturableAmount > 0?}
     C -->|Yes| D{Has refund request?}
-    C -->|No| E[Nothing to release]
-    D -->|No| F[Safe to release]
+    C -->|No| E[Nothing to capture]
+    D -->|No| F[Safe to capture]
     D -->|Yes| G{Approve refund?}
     F --> H["payment.capture(paymentInfo, amount)"]
     G -->|Yes| I["payment.voidPayment(paymentInfo)"]
-    G -->|No| J[Deny request, then release]
+    G -->|No| J[Deny request, then capture]
     J --> H
 ```
 

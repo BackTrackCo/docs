@@ -6,9 +6,9 @@ icon: "clock"
 
 ## Overview
 
-EscrowPeriod is a dual-purpose contract, it functions as both a **recorder** and a **condition**:
+EscrowPeriod is a dual-purpose contract, it functions as both a **hook** and a **condition**:
 
-- **As a recorder:** Records the `block.timestamp` when a payment is authorized
+- **As a hook:** Records the `block.timestamp` when a payment is authorized
 - **As a condition:** Returns `true` only after the escrow period has elapsed
 
 Use the **same address** for both `AUTHORIZE_POST_ACTION_HOOK` and `CAPTURE_PRE_ACTION_CONDITION` slots on the operator.
@@ -19,12 +19,12 @@ Use the **same address** for both `AUTHORIZE_POST_ACTION_HOOK` and `CAPTURE_PRE_
 
 ```mermaid
 flowchart LR
-    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorderHook]
     EP -->|implements| IC[ICondition]
-    ATR -->|implements| IR[IRecorder]
+    ATR -->|implements| IR[IHook]
 ```
 
-EscrowPeriod extends [AuthorizationTimeRecorder](/contracts/recorders/authorization-time) and adds `ICondition` implementation. You don't need to deploy AuthorizationTimeRecorder separately, use EscrowPeriod directly.
+EscrowPeriod extends [AuthorizationTimeRecorderHook](/contracts/hooks/authorization-time) and adds `ICondition` implementation. You don't need to deploy AuthorizationTimeRecorderHook separately, use EscrowPeriod directly.
 
 ## Logic
 

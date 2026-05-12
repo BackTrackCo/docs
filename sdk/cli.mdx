@@ -53,6 +53,10 @@ Environment variable names are unprefixed to match Foundry, Hardhat, and x402-re
 | `--max-amount <n>` | Refuse to pay more than `n` atomic token units. Exits with code 3 if the price exceeds this. |
 | `--json` | Emit a single JSON envelope to stdout instead of plain text. |
 
+### Supported chains
+
+The CLI auto-detects the chain from the 402 response's `accepts[].network` field. Any EVM chain known to `viem/chains` is supported (Base, Base Sepolia, Ethereum, Arbitrum, Optimism, and others). For unknown chain IDs, pass `--rpc <url>` to provide an RPC endpoint.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -184,10 +188,6 @@ The `@x402r/cli` package exports:
 | `SignatureRejectedError` | class | Exit code 4 |
 | `SettlementError` | class | Exit code 5 |
 | `SignerResolutionError` | class | Exit code 6 |
-
-### Supported chains
-
-The CLI auto-detects the chain from the 402 response's `accepts[].network` field. Any EVM chain known to `viem/chains` is supported (Base, Base Sepolia, Ethereum, Arbitrum, Optimism, and others). For unknown chain IDs, pass `--rpc <url>` to provide an RPC endpoint.
 
 ## Next steps
 

@@ -54,7 +54,7 @@ const payer = createPayerClient({
 ```
 
 <Note>
-All payer actions (refund, freeze, evidence) must happen during the escrow period. Once escrow expires, the merchant can release.
+All payer actions (refund, freeze, evidence) must happen during the escrow period. Once escrow expires, the merchant can capture.
 </Note>
 
 ### 3. Check Payment State
@@ -96,7 +96,7 @@ console.log('Status:', status) // 0 = Pending, 1 = Approved, 2 = Denied, 3 = Can
 ### 5. Freeze a Payment (Optional)
 
 <Warning>
-`freeze()` blocks the merchant from releasing until the arbiter unfreezes. Only use when you need to prevent a release during investigation.
+`freeze()` blocks the merchant from releasing until the arbiter unfreezes. Only use when you need to prevent a capture during investigation.
 </Warning>
 
 ```typescript

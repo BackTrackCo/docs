@@ -90,7 +90,7 @@ import { createX402r, queryActions } from '@x402r/sdk'
 const client = createX402r({ publicClient, operatorAddress: '0x...' })
 
 const extended = client.extend(
-  queryActions('0xRecorderAddress', { eventFromBlock: 100000n })
+  queryActions('0xHookAddress', { eventFromBlock: 100000n })
 )
 
 // extended.query is now defined
@@ -167,7 +167,7 @@ For standalone helpers that extract identity data from x402 extension responses 
 
 <CardGroup cols={3}>
   <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
-    Accept payments and release funds.
+    Accept payments and capture funds.
   </Card>
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Get the addresses for your client config.

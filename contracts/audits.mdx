@@ -21,21 +21,21 @@ These audits cover the core escrow lifecycle: authorize, capture, void, reclaim,
 
 | Component | Status | Risk |
 |-----------|--------|------|
-| PaymentOperator | **Unaudited** | Core operator with condition/recorder dispatch and fee system |
+| PaymentOperator | **Unaudited** | Core operator with condition/hook dispatch and fee system |
 | PaymentOperatorFactory | **Unaudited** | CREATE2 deterministic deployment |
 | ProtocolFeeConfig | **Unaudited** | Timelocked fee governance |
 | StaticFeeCalculator | **Unaudited** | Simple immutable fee calculator |
 | Condition plugins | **Unaudited** | PayerCondition, ReceiverCondition, StaticAddressCondition, AlwaysTrueCondition |
 | Combinator plugins | **Unaudited** | AndCondition, OrCondition, NotCondition |
-| EscrowPeriod | **Unaudited** | Combined recorder + time-lock condition |
+| EscrowPeriod | **Unaudited** | Combined hook + time-lock condition |
 | Freeze | **Unaudited** | Freeze/unfreeze state management |
-| Recorder plugins | **Unaudited** | AuthorizationTimeRecorder, PaymentIndexRecorder, RecorderCombinator |
+| Hook plugins | **Unaudited** | AuthorizationTimeRecorderHook, PaymentIndexRecorderHook, HookCombinator |
 | RefundRequest | **Unaudited** | Refund request lifecycle management |
 
 ### What This Means
 
 - The audited escrow layer covers fund custody, token transfers, and payment state transitions
-- The condition/recorder plugin system is stateless or minimal-state by design, reducing attack surface
+- The condition/hook plugin system is stateless or minimal-state by design, reducing attack surface
 
 <Warning>
 Use x402r contracts on mainnet at your own risk. While we've built with security best practices (CEI pattern, reentrancy guards, immutable configuration, timelocked governance), the x402r-specific code has not undergone a formal audit.
@@ -57,7 +57,7 @@ Even without a formal audit, the x402r contracts follow established security pat
 We plan to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
 
 1. **PaymentOperator**: condition dispatch, fee calculation, fee locking, distribution
-2. **Plugin system**: conditions, recorders, combinators, and their factories
+2. **Plugin system**: conditions, hooks, combinators, and their factories
 3. **EscrowPeriod + Freeze**: time-lock enforcement and freeze state management
 4. **RefundRequest**: request lifecycle and access control
 

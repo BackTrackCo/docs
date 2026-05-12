@@ -4,7 +4,7 @@ description: "Manage escrow periods and freeze payments with the payer client"
 icon: "lock"
 ---
 
-The payer client provides methods to interact with the escrow system through the `freeze` and `escrow` action groups. These let you freeze payments during disputes and query escrow period timing.
+Freeze payments during disputes and query escrow-period timing from the payer client. Methods sit on the `freeze` and `escrow` action groups.
 
 ## Freeze operations
 
@@ -89,7 +89,7 @@ console.log('Escrow period:', duration, 'seconds')
 
 ## Understanding escrow timing
 
-| Condition | Escrow Timer | Can Request Refund | Can Release |
+| Condition | Escrow Timer | Can Request Refund | Can Capture |
 |-----------|--------------|-------------------|-------------|
 | Normal (unfrozen, period active) | Running | Yes | Partial only |
 | Frozen | Paused | Yes | No |
@@ -101,7 +101,7 @@ The escrow period length is configured at the contract level when the `EscrowPer
 
 ## Example: freeze and request refund
 
-A common pattern is to freeze a payment before submitting a refund request, ensuring the merchant cannot release funds while the request is pending.
+A common pattern is to freeze a payment before submitting a refund request, ensuring the merchant cannot capture funds while the request is pending.
 
 ```typescript
 import { createPayerClient } from '@x402r/sdk'

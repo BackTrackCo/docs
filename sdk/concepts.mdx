@@ -97,12 +97,12 @@ RefundRequestStatus.Refused    // 4 - Arbiter declined to rule
 
 ### Refund flow
 
-In v3, RefundRequest is wired as an IRecorder plugin. Refund approval happens automatically when the merchant or arbiter calls `voidPayment()` on the operator, no separate approve step is needed.
+In v3, RefundRequest is wired as an IHook plugin. Refund approval happens automatically when the merchant or arbiter calls `voidPayment()` on the operator, no separate approve step is needed.
 
 ```mermaid
 sequenceDiagram
     participant P as Payer
-    participant R as RefundRequest (IRecorder)
+    participant R as RefundRequest (IHook)
     participant M as Merchant
     participant O as PaymentOperator
     participant A as Arbiter
@@ -173,7 +173,7 @@ flowchart TB
 
     subgraph Components[Supporting Contracts]
         direction LR
-        subgraph RR[RefundRequest IRecorder]
+        subgraph RR[RefundRequest IHook]
             rr1[Request/Cancel]
             rr2[Deny/Refuse]
             rr3[Auto-approve on refund]

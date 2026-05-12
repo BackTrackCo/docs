@@ -12,10 +12,13 @@ Periphery contracts support the [PaymentOperator](/contracts/payment-operator) b
 
 | Contract | Role | Type |
 |----------|------|------|
-| [Commerce Payments](/contracts/periphery/auth-capture-escrow) | AuthCaptureEscrow + ERC3009PaymentCollector (base layer) | Singleton |
-| [RefundRequest](/contracts/periphery/refund-request) | Tracks refund request lifecycle and approvals | Singleton |
-| [RefundRequestEvidence](/contracts/periphery/refund-request-evidence) | On-chain evidence submission for disputes | Singleton |
-| [ReceiverRefundCollector](/contracts/periphery/receiver-refund-collector) | Pulls funds from receiver for refunds | Singleton |
+| [Commerce Payments](/contracts/periphery/auth-capture-escrow) | AuthCaptureEscrow + ERC3009PaymentCollector + Permit2PaymentCollector (base layer) | Singleton |
+| [RefundRequestEvidence](/contracts/periphery/refund-request-evidence) | On-chain evidence submission tied to RefundRequest | Singleton |
+| [ReceiverRefundCollector](/contracts/periphery/receiver-refund-collector) | Pulls funds from receiver for refunds (after capture) | Singleton |
+
+<Note>
+**RefundRequest** is a hook plugin, see [Hooks: RefundRequest](/contracts/hooks/refund-request).
+</Note>
 
 ## Contract Addresses
 
@@ -41,7 +44,7 @@ All periphery contracts use **universal CREATE2 addresses**: the same address on
 | AndConditionFactory | `0x2B07d750C639b65a26e43F1FDCE404b21DCf16D9` |
 | OrConditionFactory | `0x0519a37c0A996DD5F1e81e07b4aD3B24C257BC90` |
 | NotConditionFactory | `0xb9c3223D059C3cAbD482bB54f3d7cD52DE70A9ae` |
-| RecorderCombinatorFactory | `0x30B5373FD791D2d7b28C3B8020EB68b032f3f960` |
+| HookCombinatorFactory | `0x30B5373FD791D2d7b28C3B8020EB68b032f3f960` |
 
 ### Condition Singletons
 
@@ -61,7 +64,7 @@ All addresses are available programmatically via `@x402r/core`'s `getChainConfig
   <Card title="Commerce Payments" icon="vault" href="/contracts/periphery/auth-capture-escrow">
     AuthCaptureEscrow and ERC3009PaymentCollector.
   </Card>
-  <Card title="RefundRequest" icon="rotate-left" href="/contracts/periphery/refund-request">
+  <Card title="RefundRequest (hook)" icon="rotate-left" href="/contracts/hooks/refund-request">
     Refund request lifecycle and approvals.
   </Card>
   <Card title="PaymentOperator" icon="file-contract" href="/contracts/payment-operator">

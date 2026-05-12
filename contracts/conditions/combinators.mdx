@@ -22,14 +22,14 @@ const comboAddress = await andConditionFactory.write.deploy([
 config.captureCondition = comboAddress;
 ```
 
-**Example:** Release requires receiver AND escrow period passed.
+**Example:** Capture requires receiver AND escrow period passed.
 
 ## OrCondition
 
 At least one condition must pass (`A || B`).
 
 ```typescript
-// Receiver OR Arbiter can release
+// Receiver OR Arbiter can capture
 const comboAddress = await orConditionFactory.write.deploy([
   [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
@@ -37,7 +37,7 @@ const comboAddress = await orConditionFactory.write.deploy([
 config.captureCondition = comboAddress;
 ```
 
-**Example:** Either receiver or arbiter can release.
+**Example:** Either receiver or arbiter can capture.
 
 ## NotCondition
 

@@ -4,7 +4,7 @@ description: "Query payment states, amounts, and history with the payer client"
 icon: "magnifying-glass"
 ---
 
-The payer client provides methods for querying payment state and history across the `payment`, `query`, and `operator` action groups.
+Query lifecycle state, history, and operator config from the payer client. Methods sit on the `payment`, `query`, and `operator` action groups.
 
 ## payment.getState
 
@@ -47,7 +47,7 @@ for (const payment of payments ?? []) {
 ```
 
 <Note>
-The `query` group uses a tiered resolver: it checks the in-memory store first, then the on-chain recorder, then falls back to event log scanning. Pass `eventFromBlock` in the client config to limit the scan range.
+The `query` group uses a tiered resolver: it checks the in-memory store first, then the on-chain hook, then falls back to event log scanning. Pass `eventFromBlock` in the client config to limit the scan range.
 </Note>
 
 ## query.getReceiverPayments
@@ -73,7 +73,7 @@ Retrieve all slot addresses from the PaymentOperator contract.
 ```typescript
 const config = await client.operator.getConfig()
 
-console.log('Release condition:', config.captureCondition)
+console.log('Capture condition:', config.captureCondition)
 console.log('Fee calculator:', config.feeCalculator)
 console.log('Fee recipient:', config.feeReceiver)
 ```

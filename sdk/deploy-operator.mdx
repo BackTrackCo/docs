@@ -25,10 +25,10 @@ All contracts are deployed via factories using CREATE2, so identical configurati
 
 A complete marketplace operator deployment includes:
 
-1. **EscrowPeriod**: Records authorization time, enforces waiting period before release
+1. **EscrowPeriod**: Records authorization time, enforces waiting period before capture
 2. **Freeze**: Allows payer to freeze payment during escrow, receiver to unfreeze
 3. **ReceiverCondition**: Gates voids to the merchant (receiver)
-4. **RefundRequest (IRecorder)**: Wired as `voidPostActionHook`, auto-approves pending refund requests during `voidPayment()`
+4. **RefundRequest (IHook)**: Wired as `voidPostActionHook`, auto-approves pending refund requests during `voidPayment()`
 5. **StaticFeeCalculator**: Optional operator fee (basis points)
 6. **PaymentOperator**: The main contract tying everything together
 
@@ -150,7 +150,7 @@ console.log('Existing (reused):', result.summary.existingCount);
 ```typescript
 interface MarketplaceOperatorDeployment {
   operatorAddress: Address                    // The PaymentOperator
-  escrowPeriodAddress: Address                // EscrowPeriod recorder/condition
+  escrowPeriodAddress: Address                // EscrowPeriod hook/condition
   freezeAddress: Address | null               // Freeze condition (null if disabled)
   refundRequestAddress: Address               // RefundRequest contract
   refundRequestEvidenceAddress: Address       // RefundRequestEvidence contract
@@ -195,7 +195,7 @@ The deployed marketplace operator has the following slot configuration:
 | `AUTHORIZE_PRE_ACTION_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
 | `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_PRE_ACTION_CONDITION` | (none) | No restrictions on charge |
-| `CAPTURE_PRE_ACTION_CONDITION` | EscrowPeriod (or AND(EscrowPeriod, Freeze) if freeze enabled) | Blocks release during escrow period |
+| `CAPTURE_PRE_ACTION_CONDITION` | EscrowPeriod (or AND(EscrowPeriod, Freeze) if freeze enabled) | Blocks capture during escrow period |
 | `VOID_PRE_ACTION_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
 | `VOID_POST_ACTION_HOOK` | RefundRequest | Tracks refund request state |
 | `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
@@ -221,7 +221,7 @@ Deployment requires gas fees. Ensure your wallet has ETH on the target network. 
 
 ## Delivery Protection Operator
 
-For automated quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can release funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
+For automated quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can capture funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -256,17 +256,17 @@ console.log('Operator:', deployment.operatorAddress)
 console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
 console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
 console.log('ReleaseCondition:', deployment.captureConditionAddress)
-console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
+console.log('AuthorizeHook:', deployment.authorizeHookAddress)
 ```
 
 | Option | Type | Description |
 |--------|------|-------------|
 | `chainId` | `number` | Target chain |
-| `arbiter` | `Address` | Arbiter address for release and refund decisions |
+| `arbiter` | `Address` | Arbiter address for capture and refund decisions |
 | `feeReceiver` | `Address` | Receives protocol fees |
 | `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
-| `authorizedCodehash` | `Hex` | Override the default `recorderCombinatorCodehash`. Optional |
-| `paymentIndexRecorderHookAddress` | `Address` | Override the default PaymentIndexRecorder. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
+| `authorizedCodehash` | `Hex` | Override the default `hookCombinatorCodehash`. Optional |
+| `paymentIndexRecorderHookAddress` | `Address` | Override the default PaymentIndexRecorderHook. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
 | `allowArbiterRefund` | `boolean` | Allow arbiter to refund immediately during escrow. Default: `false` |
 
 <AccordionGroup>
@@ -278,7 +278,7 @@ console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
       arbiterConditionAddress: Address
       captureConditionAddress: Address           // OrCondition([arbiter, payer])
       voidConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
-      authorizeHookAddress: Address          // RecorderCombinator([escrowPeriod, paymentIndexRecorder])
+      authorizeHookAddress: Address          // HookCombinator([escrowPeriod, paymentIndexRecorderHook])
       paymentIndexRecorderHookAddress: Address
       operatorConfig: OperatorConfig
       deployments: DeployResult[]
@@ -290,7 +290,7 @@ console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
     }
     ```
 
-    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), RecorderCombinator, and the Operator. If you pass `paymentIndexRecorderHookAddress: zeroAddress`, the RecorderCombinator is skipped (5 contracts).
+    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), HookCombinator, and the Operator. If you pass `paymentIndexRecorderHookAddress: zeroAddress`, the HookCombinator is skipped (5 contracts).
 
     Redeploying with the same parameters is idempotent (CREATE2). It detects existing contracts and skips them.
   </Accordion>
@@ -310,15 +310,15 @@ console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
 
     console.log('Operator will be at:', preview.operatorAddress)
     console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
-    console.log('AuthorizeRecorder will be at:', preview.authorizeHookAddress)
+    console.log('AuthorizeHook will be at:', preview.authorizeHookAddress)
     ```
   </Accordion>
 
   <Accordion title="Delivery Protection Slot Configuration">
     | Slot | Contract | Purpose |
     |------|----------|---------|
-    | `CAPTURE_PRE_ACTION_CONDITION` | OrCondition([SAC(arbiter), PayerCondition]) | Arbiter or satisfied payer can release |
-    | `AUTHORIZE_POST_ACTION_HOOK` | RecorderCombinator([EscrowPeriod, PaymentIndexRecorder]) | Records authorization time and indexes payments on-chain |
+    | `CAPTURE_PRE_ACTION_CONDITION` | OrCondition([SAC(arbiter), PayerCondition]) | Arbiter or satisfied payer can capture |
+    | `AUTHORIZE_POST_ACTION_HOOK` | HookCombinator([EscrowPeriod, PaymentIndexRecorderHook]) | Records authorization time and indexes payments on-chain |
     | `VOID_PRE_ACTION_CONDITION` | OrCondition([EscrowPeriod, ReceiverCondition, SAC(arbiter)]) | Escrow expiry, receiver voluntary refund, or arbiter immediate refund |
     | `REFUND_PRE_ACTION_CONDITION` | ReceiverCondition | Only receiver after escrow |
   </Accordion>
@@ -328,7 +328,7 @@ console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
 
 <CardGroup cols={2}>
   <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
-    Accept payments, release funds from escrow.
+    Accept payments, capture funds from escrow.
   </Card>
   <Card title="Payer Guide" icon="user" href="/sdk/payer">
     Request refunds, freeze payments, submit evidence.
@@ -340,6 +340,6 @@ console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
     Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
-    On-chain architecture, conditions, and recorders.
+    On-chain architecture, conditions, and hooks.
   </Card>
 </CardGroup>

@@ -27,7 +27,7 @@ sequenceDiagram
     Escrow-->>Merchant: Payment notification
 
     alt Happy path
-        Merchant->>Escrow: Release funds
+        Merchant->>Escrow: Capture funds
         Escrow->>Merchant: Transfer
     else Refund requested
         Client->>Escrow: Request refund
@@ -45,7 +45,7 @@ sequenceDiagram
     Request refunds, freeze suspicious payments, and track payment state.
   </Card>
   <Card title="Merchants (Receivers)" icon="store" href="/sdk/examples">
-    Release funds, process refunds, and manage escrow periods.
+    Capture funds, process refunds, and manage escrow periods.
   </Card>
   <Card title="Arbiters" icon="gavel" href="/sdk/arbiter/quickstart">
     Resolve disputes and approve/deny refund requests.
@@ -77,7 +77,7 @@ x402r consists of these core components:
 |-----------|---------|
 | **PaymentOperator** | Manages payment authorization, capture, charge, void, and refunds with pluggable conditions |
 | **AuthCaptureEscrow** | Holds ERC-20 tokens during the payment lifecycle (from commerce-payments) |
-| **Conditions & Recorders** | Pluggable authorization checks (before action) and state updates (after action) |
+| **Conditions & Hooks** | Pluggable authorization checks (before action) and state updates (after action) |
 | **EscrowPeriod & Freeze** | Time-based capture and freeze policies for buyer protection |
 | **RefundRequest** | Handles refund request lifecycle and approvals |
 

@@ -139,7 +139,7 @@ Check whether a payment has been frozen by the payer. Frozen payments cannot be 
 const frozen = await merchant.freeze?.isFrozen(paymentInfo)
 
 if (frozen) {
-  console.log('Payment is frozen, cannot release until unfrozen')
+  console.log('Payment is frozen, cannot capture until unfrozen')
 }
 ```
 
@@ -257,9 +257,9 @@ sequenceDiagram
     Watch for refund requests in real-time instead of polling.
   </Card>
   <Card title="Merchant SDK" icon="coins" href="/sdk/merchant/quickstart">
-    Release funds, charge, and query escrow state.
+    Capture funds, charge, and query escrow state.
   </Card>
-  <Card title="RefundRequest" icon="file-contract" href="/contracts/periphery/refund-request">
+  <Card title="RefundRequest" icon="file-contract" href="/contracts/hooks/refund-request">
     RefundRequest contract details and state machine.
   </Card>
   <Card title="Arbiter Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">

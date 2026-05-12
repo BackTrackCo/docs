@@ -1,17 +1,17 @@
 ---
-title: "Custom Recorders"
-description: "Build your own recorder contracts for specialized state tracking"
+title: "Custom Hooks"
+description: "Build your own hook contracts for specialized state tracking"
 icon: "wrench"
 ---
 
 ## Overview
 
-You can create custom recorders for specialized tracking beyond what the built-in recorders provide. Implement the `IRecorder` interface and extend `BaseRecorder` for operator access control.
+You can create custom hooks for specialized tracking beyond what the built-in hooks provide. Implement the `IHook` interface and extend `BaseHook` for operator access control.
 
-## IRecorder Interface
+## IHook Interface
 
 ```solidity
-interface IRecorder {
+interface IHook {
     function record(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
@@ -20,13 +20,13 @@ interface IRecorder {
 }
 ```
 
-## Extending BaseRecorder
+## Extending BaseHook
 
-Extend `BaseRecorder` to ensure only authorized operators can call `record()`:
+Extend `BaseHook` to ensure only authorized operators can call `record()`:
 
 ```solidity
-contract MyRecorder is BaseRecorder {
-    constructor(address _escrow) BaseRecorder(_escrow) {}
+contract MyHook is BaseHook {
+    constructor(address _escrow) BaseHook(_escrow) {}
 
     function record(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
@@ -38,16 +38,16 @@ contract MyRecorder is BaseRecorder {
 }
 ```
 
-## Example: ReleaseCountRecorder
+## Example: ReleaseCountHook
 
 Tracks the number and total amount of releases per payment:
 
 ```solidity
-contract ReleaseCountRecorder is BaseRecorder {
+contract ReleaseCountHook is BaseHook {
     mapping(bytes32 => uint256) public releaseCount;
     mapping(bytes32 => uint256) public totalReleased;
 
-    constructor(address _escrow) BaseRecorder(_escrow) {}
+    constructor(address _escrow) BaseHook(_escrow) {}
 
     function record(
         PaymentInfo calldata payment,
@@ -71,29 +71,29 @@ contract ReleaseCountRecorder is BaseRecorder {
 
 ## Testing
 
-Test custom recorders with Forge:
+Test custom hooks with Forge:
 
 ```solidity
-contract ReleaseCountRecorderTest is Test {
-    ReleaseCountRecorder recorder;
+contract ReleaseCountHookTest is Test {
+    ReleaseCountHook hook;
 
     function setUp() public {
-        recorder = new ReleaseCountRecorder(address(escrow));
+        hook = new ReleaseCountHook(address(escrow));
     }
 
     function test_incrementsOnRecord() public {
-        recorder.record(paymentInfo, 100e6, caller);
+        hook.record(paymentInfo, 100e6, caller);
         bytes32 hash = escrow.getHash(paymentInfo);
-        (uint256 count, uint256 total) = recorder.getStats(hash);
+        (uint256 count, uint256 total) = hook.getStats(hash);
         assertEq(count, 1);
         assertEq(total, 100e6);
     }
 
     function test_tracksMultipleReleases() public {
-        recorder.record(paymentInfo, 50e6, caller);
-        recorder.record(paymentInfo, 30e6, caller);
+        hook.record(paymentInfo, 50e6, caller);
+        hook.record(paymentInfo, 30e6, caller);
         bytes32 hash = escrow.getHash(paymentInfo);
-        (uint256 count, uint256 total) = recorder.getStats(hash);
+        (uint256 count, uint256 total) = hook.getStats(hash);
         assertEq(count, 2);
         assertEq(total, 80e6);
     }
@@ -102,19 +102,19 @@ contract ReleaseCountRecorderTest is Test {
 
 ## Security Checklist
 
-- [ ] Extends `BaseRecorder` for operator access control
+- [ ] Extends `BaseHook` for operator access control
 - [ ] Handles edge cases (zero amounts, duplicate records)
 - [ ] Gas-efficient storage layout
 - [ ] Comprehensive test coverage
 
 <Warning>
-Unlike conditions, recorders **do modify state**. Ensure proper access control via `BaseRecorder` to prevent unauthorized writes.
+Unlike conditions, hooks **do modify state**. Ensure proper access control via `BaseHook` to prevent unauthorized writes.
 </Warning>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Recorders Overview" icon="database" href="/contracts/recorders/overview">
+  <Card title="Hooks Overview" icon="database" href="/contracts/hooks/overview">
     Compare recording strategies.
   </Card>
   <Card title="Custom Conditions" icon="filter" href="/contracts/conditions/custom">

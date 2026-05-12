@@ -66,10 +66,10 @@ Client authorizes $10 → Uses $6.50 → Operator captures $6.50 → Refund $3.5
 Client pays for video rendering → 48 hours later → How to verify completion?
 ```
 
-**Escrow Solution:** Conditional release with verification
+**Escrow Solution:** Conditional capture with verification
 
 ```
-Client authorizes → Work progresses → Client verifies → Release on approval
+Client authorizes → Work progresses → Client verifies → Capture on approval
 ```
 
 ### Multi-Request Sessions
@@ -96,10 +96,10 @@ x402r provides the **authCapture scheme implementation** for x402:
    - On-chain safety guarantees
 
 2. **Operator Contracts**
-   - Conditional release logic
+   - Conditional capture logic
    - Dispute resolution
    - Fee distribution
-   - Time-based release
+   - Time-based capture
 
 3. **Payment Facilitator**
    - Validates ERC-3009 signatures
@@ -132,7 +132,7 @@ sequenceDiagram
     Server-->>Client: 200 OK + resource
 
     Note over Operator,Escrow: Later: capture or void
-    Operator->>Escrow: release(paymentInfo, amount)
+    Operator->>Escrow: capture(paymentInfo, amount)
     Note over Escrow: Funds released to receiver (minus fees)
 ```
 
@@ -187,7 +187,7 @@ sequenceDiagram
 Lock funds in escrow without immediate transfer. Client signs an ERC-3009 authorization allowing the escrow contract to pull tokens.
 
 ### Capture
-Release authorized funds to the receiver. The operator contract decides when and how much to release based on configured conditions.
+Capture authorized funds to the receiver. The operator contract decides when and how much to capture based on configured conditions.
 
 ### Void
 Return funds to payer before capture. Used for full refunds during the escrow period.
@@ -197,8 +197,8 @@ Safety valve for payer. If authorization expires without capture, payer can recl
 
 ### Operator
 Smart contract that controls capture/void logic. Different operators enable different payment patterns:
-- **Time-locked**: Release after period expires
-- **Arbiter-controlled**: Third party decides release
+- **Time-locked**: Capture after period expires
+- **Arbiter-controlled**: Third party decides capture
 - **Usage-based**: Capture proportional to consumption
 - **Immediate**: Behaves like `exact` scheme
 

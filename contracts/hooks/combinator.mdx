@@ -1,0 +1,50 @@
+---
+title: "HookCombinator"
+description: "Chain multiple hooks into a single operator slot for composite state tracking"
+icon: "layer-group"
+---
+
+## Overview
+
+HookCombinator chains multiple hooks into one, calling each in sequence. Since each operator slot accepts only one hook address, use HookCombinator when you need multiple hooks for the same action.
+
+## Deployment
+
+Deploy via HookCombinatorFactory:
+
+```typescript
+const comboAddress = await hookCombinatorFactory.write.deploy([
+  [escrowPeriodAddress, paymentIndexRecorderHookAddress]  // Records auth time + payment index
+]);
+
+config.authorizeHook = comboAddress;
+```
+
+## Behavior
+
+- Hooks are called in the order provided
+- **If any hook reverts, all revert**: the entire recording is atomic
+- Each hook receives the same `paymentInfo`, `amount`, and `caller` parameters
+
+## Limits
+
+<Warning>
+**Max 10 hooks per combinator.** Each additional hook adds ~1k gas overhead for the delegation call.
+</Warning>
+
+## Gas
+
+**Cost:** Sum of all individual hook costs + ~1k gas overhead per hook for delegation.
+
+Example: EscrowPeriod (~20k) + PaymentIndexRecorderHook (~20k) + ~2k overhead = ~42k gas total.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AuthorizationTimeRecorderHook" icon="clock" href="/contracts/hooks/authorization-time">
+    Record authorization timestamps.
+  </Card>
+  <Card title="PaymentIndexRecorderHook" icon="list-ol" href="/contracts/hooks/payment-index">
+    Index payments for on-chain queries.
+  </Card>
+</CardGroup>

@@ -10,7 +10,7 @@ The X402r SDK is in active development. APIs may change between releases. Always
 
 Three roles interact with the protocol:
 
-- **Merchants** receive payments into escrow and release funds after delivery
+- **Merchants** receive payments into escrow and capture funds after delivery
 - **Payers** can request refunds, freeze payments, and submit evidence during disputes
 - **Arbiters** verify transactions or resolve disputes (two models below)
 
@@ -18,7 +18,7 @@ Three roles interact with the protocol:
 
 **Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Use this for general commerce where most transactions are uncontested.
 
-**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically. The arbiter or a satisfied payer can release funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
+**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically. The arbiter or a satisfied payer can capture funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
 
 ### Packages
 
@@ -82,7 +82,7 @@ bunx @x402r/cli pay <url> [options]
 
 <CardGroup cols={2}>
   <Card title="Merchants" icon="store" href="/sdk/merchant">
-    Deploy an operator, accept a payment, release funds from escrow.
+    Deploy an operator, accept a payment, capture funds from escrow.
   </Card>
   <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
     High-level client with role-scoped factories (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r`.

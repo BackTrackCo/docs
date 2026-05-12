@@ -1,6 +1,6 @@
 ---
 title: "Merchant events"
-description: "Subscribe to real-time refund, release, and fee events"
+description: "Subscribe to real-time refund, capture, and fee events"
 icon: "bell"
 ---
 
@@ -24,14 +24,14 @@ unwatch()
 ### Example: revenue tracking
 
 ```typescript
-let totalReleased = 0n
+let totalCaptured = 0n
 
 const unwatch = merchant.watch.onPayment((logs) => {
   for (const log of logs) {
     if (log.eventName === 'CaptureExecuted') {
       const amount = log.args?.amount ?? 0n
-      totalReleased += amount
-      console.log('Release: +', amount, 'Total:', totalReleased)
+      totalCaptured += amount
+      console.log('Capture: +', amount, 'Total:', totalCaptured)
     }
   }
 })
@@ -119,7 +119,7 @@ For reliable real-time delivery, configure your `publicClient` with a [WebSocket
 
 <CardGroup cols={2}>
   <Card title="Merchant SDK" icon="rocket" href="/sdk/merchant/quickstart">
-    Release funds, charge, and query escrow state.
+    Capture funds, charge, and query escrow state.
   </Card>
   <Card title="Arbiter Guide" icon="scale-balanced" href="/sdk/arbiter/quickstart">
     Learn about dispute resolution from the arbiter perspective.

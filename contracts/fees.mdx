@@ -117,7 +117,7 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 
 **Flow:**
 1. `authorize()` calculates fees and stores them in `authorizedFees[hash]`
-2. `release()` uses the stored fees, not the current calculator rates
+2. `capture()` uses the stored fees, not the current calculator rates
 3. Protocol fee timelocks can't break already-authorized payments
 
 <Note>

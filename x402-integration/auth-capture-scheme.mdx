@@ -35,7 +35,7 @@ AUTHORIZE -> RESOURCE DELIVERED -> CAPTURE / VOID -> (REFUND)
   </Step>
 
   <Step title="Capture or Void">
-    The captureAuthorizer can capture (release funds to the receiver) or void (return escrowed funds to the client). Capture conditions are policy-defined per captureAuthorizer (time-locked, arbiter-approved, etc.).
+    The captureAuthorizer can capture (capture funds to the receiver) or void (return escrowed funds to the client). Capture conditions are policy-defined per captureAuthorizer (time-locked, arbiter-approved, etc.).
   </Step>
 
   <Step title="Reclaim">
@@ -140,7 +140,7 @@ The **captureAuthorizer** is the address authorized to authorize/capture/void/re
 |---|---|
 | Session billing | EOA that tracks usage off-chain, captures periodically |
 | Time-locked escrow | Contract that releases after a period expires |
-| Dispute resolution | Arbiter contract that decides release vs refund |
+| Dispute resolution | Arbiter contract that decides capture vs refund |
 | Immediate (exact-like) | Facilitator with `autoCapture: true` for instant settlement |
 | Streaming payments | Contract that performs time-proportional captures |
 
@@ -364,7 +364,7 @@ The escrow contract enforces invariants on-chain:
 </CardGroup>
 
 <Warning>
-**CaptureAuthorizer Trust Required:** The captureAuthorizer controls when and how much to release. Choose carefully and understand the release policy. See [Operators](/contracts/overview#payment-operator) for examples.
+**CaptureAuthorizer Trust Required:** The captureAuthorizer controls when and how much to capture. Choose carefully and understand the capture policy. See [Operators](/contracts/overview#payment-operator) for examples.
 </Warning>
 
 ## Error Codes

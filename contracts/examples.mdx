@@ -10,7 +10,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
 
 ## Example 1: Standard E-Commerce with 7-Day Escrow
 
-**Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can release after escrow.
+**Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can capture after escrow.
 
 ### Complete Configuration
 
@@ -35,7 +35,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
 
   <Step title="Deploy EscrowPeriod and Freeze">
     ```typescript
-    // 7-day escrow period (combined recorder + condition)
+    // 7-day escrow period (combined hook + condition)
     const escrowPeriod = await escrowPeriodFactory.deploy(
       7 * 24 * 60 * 60,    // 7 days
       zeroHash             // bytes32(0) = operator-only
@@ -49,7 +49,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
     ```
   </Step>
 
-  <Step title="Create Release Condition">
+  <Step title="Create capture condition">
     ```typescript
     // (Receiver OR Arbiter) AND (EscrowPassed AND NotFrozen)
     const receiverOrArbiter = await new OrCondition([
@@ -115,9 +115,9 @@ sequenceDiagram
     Note over Buyer,Seller: Day 8 - Freeze Expires
     Note over Operator: Freeze automatically expires
 
-    Note over Buyer,Seller: Day 9 - Release
-    Seller->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    Note over Buyer,Seller: Day 9 - Capture
+    Seller->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>Seller: 99.95 USDC
     Escrow->>Operator: 0.05 USDC
 ```
@@ -141,7 +141,7 @@ const config = {
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
   chargePreActionCondition: RECEIVER_CONDITION,        // Only receiver can charge
   chargePostActionHook: '0x0000000000000000000000000000000000000000',
-  capturePreActionCondition: RECEIVER_CONDITION,       // Fallback to release remaining
+  capturePreActionCondition: RECEIVER_CONDITION,       // Fallback to capture remaining
   capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: arbiterCondition.address,
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
@@ -194,7 +194,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
 // Deploy Freeze linked to escrow period
 const freeze = await freezeFactory.deploy(freezePolicy, escrowPeriod);
 
-// Receiver OR Arbiter can release (after escrow + not frozen)
+// Receiver OR Arbiter can capture (after escrow + not frozen)
 const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   await new AndCondition([escrowPeriod, freeze])
@@ -253,7 +253,7 @@ sequenceDiagram
 
 ---
 
-## Example 4: Service-Based Payments (Milestone Release)
+## Example 4: Service-Based Payments (Milestone Capture)
 
 **Use Case:** Freelance work with milestone-based releases. Receiver can trigger partial releases.
 
@@ -269,7 +269,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
   zeroHash              // bytes32(0) = operator-only
 );
 
-// Receiver can release after short escrow
+// Receiver can capture after short escrow
 const capturePreActionCondition = await new AndCondition([
   RECEIVER_CONDITION,    // Only receiver
   escrowPeriod           // Escrow period passed
@@ -319,8 +319,8 @@ sequenceDiagram
     Note over Escrow: 300 USDC remaining
 
     Note over Client,Escrow: Day 15 - Final Milestone
-    Freelancer->>Operator: release(paymentId)
-    Operator->>Escrow: release remaining
+    Freelancer->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture remaining
     Escrow->>Freelancer: 300 USDC
     Note over Escrow: Payment complete
 ```
@@ -382,7 +382,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
   zeroHash              // bytes32(0) = operator-only
 );
 
-// Receiver OR Arbiter can release
+// Receiver OR Arbiter can capture
 const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   escrowPeriod          // Escrow period passed
@@ -501,8 +501,8 @@ sequenceDiagram
     Escrow->>Provider: 100 USDC
 
     Note over User,Escrow: Month 12 - Subscription Ends
-    Provider->>Operator: release(paymentId)
-    Operator->>Escrow: release remaining
+    Provider->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture remaining
     Escrow->>Provider: Remaining funds
 
     Note over User,Escrow: Alt: If cancelled early
@@ -563,9 +563,9 @@ sequenceDiagram
     Note over DAO: Review and vote
     DAO->>DAO: Multisig approval
 
-    Note over Grantee,Escrow: Release
-    DAO->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    Note over Grantee,Escrow: Capture
+    DAO->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>Grantee: 50000 USDC
     Note over Grantee: Grant complete
 ```
@@ -661,7 +661,7 @@ sequenceDiagram
 ### Configuration
 
 ```typescript
-// No arbiter - receiver controls release, platform earns fees
+// No arbiter - receiver controls capture, platform earns fees
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
 const config = {
@@ -701,8 +701,8 @@ sequenceDiagram
     Note over CompanyA: Receives goods
 
     Note over CompanyA,Platform: Day 30 - Settlement
-    CompanyB->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    CompanyB->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>CompanyB: 99900 USDC
     Escrow->>Platform: 100 USDC
     Note over CompanyB: Invoice settled
@@ -739,7 +739,7 @@ Before deploying, verify:
 
 - [ ] Freeze policy suits your use case
 - [ ] Escrow period is appropriate for delivery time
-- [ ] Release condition prevents premature releases
+- [ ] Capture condition prevents premature captures
 - [ ] Refund conditions allow arbiter intervention
 - [ ] Fee rates are competitive and sustainable
 - [ ] Protocol fee percentage is reasonable
@@ -773,13 +773,13 @@ await walletClient.writeContract({
   args: [paymentInfo, parseUnits('100', 6), tokenCollectorAddress, collectorData],
 });
 
-// 2. Try to release immediately (should fail if escrow configured)
+// 2. Try to capture immediately (should fail if escrow configured)
 // Expect revert with ConditionNotMet
 try {
   await walletClient.writeContract({
     address: operatorAddress,
     abi: paymentOperatorAbi,
-    functionName: 'release',
+    functionName: 'capture',
     args: [paymentInfo, parseUnits('100', 6)],
   });
 } catch (e) {
@@ -790,11 +790,11 @@ try {
 await testClient.increaseTime({ seconds: 7 * 24 * 60 * 60 });
 await testClient.mine({ blocks: 1 });
 
-// 4. Release after escrow
+// 4. Capture after escrow
 await walletClient.writeContract({
   address: operatorAddress,
   abi: paymentOperatorAbi,
-  functionName: 'release',
+  functionName: 'capture',
   args: [paymentInfo, parseUnits('100', 6)],
 });
 
@@ -822,7 +822,7 @@ Research competitors' escrow periods and fees:
 
 <Accordion title="Test Edge Cases">
 Test your configuration handles:
-- Immediate release attempts
+- Immediate capture attempts
 - Freeze during escrow
 - Freeze expiry
 - Refunds in both states
