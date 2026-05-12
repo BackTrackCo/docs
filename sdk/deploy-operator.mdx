@@ -147,65 +147,43 @@ console.log('Existing (reused):', result.summary.existingCount);
 
 ## Deployment result
 
-    Redeploying with the same parameters is idempotent (CREATE2). It detects existing contracts and skips them. Check `summary` for what was new vs reused.
-  </Accordion>
-
 ```typescript
 interface MarketplaceOperatorDeployment {
-  operatorAddress: Address;                   // The PaymentOperator
-  escrowPeriodAddress: Address;               // EscrowPeriod recorder/condition
-  freezeAddress: Address | null;              // Freeze condition (null if disabled)
-  refundRequestAddress: Address;              // RefundRequest contract
-  refundRequestEvidenceAddress: Address;      // RefundRequestEvidence contract
-  voidPreActionConditionAddress: Address;    // OR(Receiver, Arbiter)
-  feeCalculatorAddress: Address | null;       // null if no fee
-  operatorConfig: OperatorConfig;             // Full operator slot configuration
-  deployments: DeployResult[];                // Per-contract deploy details
+  operatorAddress: Address                    // The PaymentOperator
+  escrowPeriodAddress: Address                // EscrowPeriod recorder/condition
+  freezeAddress: Address | null               // Freeze condition (null if disabled)
+  refundRequestAddress: Address               // RefundRequest contract
+  refundRequestEvidenceAddress: Address       // RefundRequestEvidence contract
+  voidPreActionConditionAddress: Address      // OR(Receiver, Arbiter)
+  feeCalculatorAddress: Address | null        // null if no fee
+  operatorConfig: OperatorConfig              // Full operator slot configuration
+  deployments: DeployResult[]                 // Per-contract deploy details
   summary: {
-    newCount: number;                         // Newly deployed contracts
-    existingCount: number;                    // Reused existing contracts
-    txHashes: `0x${string}`[];                // All deployment tx hashes
-  };
+    newCount: number                          // Newly deployed contracts
+    existingCount: number                     // Reused existing contracts
+    txHashes: `0x${string}`[]                 // All deployment tx hashes
+  }
 }
 ```
 
 <Tip>
-Because all contracts use CREATE2, redeploying with the same parameters is idempotent, it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE2, redeploying with the same parameters is idempotent: existing contracts are detected and skipped. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview addresses (no deploy)
 
-    console.log('Operator will be at:', preview.operatorAddress)
-    console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
-    ```
-  </Accordion>
+```typescript
+import { previewMarketplaceOperator } from '@x402r/core'
 
-  <Accordion title="Marketplace Slot Configuration">
-    | Slot | Contract | Purpose |
-    |------|----------|---------|
-    | `AUTHORIZE_PRE_ACTION_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
-    | `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
-    | `CHARGE_PRE_ACTION_CONDITION` | (none) | No restrictions on charge |
-    | `CAPTURE_PRE_ACTION_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-    | `VOID_PRE_ACTION_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
-    | `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
-    | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
-    | `FEE_RECIPIENT` | Your address | Receives fees |
-  </Accordion>
-</AccordionGroup>
+const preview = await previewMarketplaceOperator(publicClient, {
+  chainId: 84532,
+  feeRecipient: '0xYourAddress...',
+  arbiter: '0xArbiterAddress...',
+  escrowPeriodSeconds: 604800n,
+})
 
-const preview = await previewMarketplaceOperator(
-  publicClient,
-  {
-    chainId: 84532,
-    feeRecipient: '0xYourAddress...',
-    arbiter: '0xArbiterAddress...',
-    escrowPeriodSeconds: 604800n,
-  }
-);
-
-console.log('Operator will be at:', preview.operatorAddress);
-console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress);
+console.log('Operator will be at:', preview.operatorAddress)
+console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
 ```
 
 ## Marketplace operator slot configuration
@@ -213,7 +191,7 @@ console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress);
 The deployed marketplace operator has the following slot configuration:
 
 | Slot | Contract | Purpose |
-|------|----------|---------|
+|---|---|---|
 | `AUTHORIZE_PRE_ACTION_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
 | `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_PRE_ACTION_CONDITION` | (none) | No restrictions on charge |
@@ -225,107 +203,6 @@ The deployed marketplace operator has the following slot configuration:
 | `FEE_RECIPIENT` | Your address | Receives fees |
 
 ---
-
-## Delivery protection operator
-
-The delivery protection preset is a simpler operator designed for garbage detection and content verification use cases. An arbiter verifies that content was delivered correctly and releases funds. If the arbiter does nothing, the escrow window expires and anyone can trigger a refund.
-
-This preset has **no freeze, no fees, and no RefundRequest** contracts, making it cheaper to deploy.
-
-### Condition layout
-
-| Slot | Contract | Purpose |
-|------|----------|---------|
-| `CAPTURE_PRE_ACTION_CONDITION` | StaticAddressCondition(arbiter) | Only the arbiter can release |
-| `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
-| `VOID_PRE_ACTION_CONDITION` | EscrowPeriod | Anyone can refund after escrow window expires |
-| `REFUND_PRE_ACTION_CONDITION` | Receiver | Receiver can refund |
-
-### Deploy a delivery protection operator
-
-```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { deployDeliveryProtectionOperator } from '@x402r/core/deploy';
-
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-});
-
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-const walletClient = createWalletClient({
-  account,
-  chain: baseSepolia,
-  transport: http(),
-});
-
-const result = await deployDeliveryProtectionOperator(
-  walletClient,
-  publicClient,
-  {
-    chainId: 84532,                        // Base Sepolia
-    arbiter: '0xArbiterAddress...',         // Delivery verifier
-    feeRecipient: account.address,          // Required (non-zero), future-proofs for fees
-    escrowPeriodSeconds: 604800n,           // 7 days
-  }
-);
-
-console.log('Operator:', result.operatorAddress);
-console.log('EscrowPeriod:', result.escrowPeriodAddress);
-console.log('Arbiter condition:', result.arbiterConditionAddress);
-```
-
-<Note>
-The `feeRecipient` is required by the factory even though no fee calculator is set. This future-proofs the operator so you can add a fee calculator later without redeploying.
-</Note>
-
-### Configuration options
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `chainId` | `number` | Target chain ID (e.g., `84532` for Base Sepolia) |
-| `arbiter` | `Address` | Arbiter address that verifies delivery |
-| `feeRecipient` | `Address` | Fee recipient (required, non-zero) |
-| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
-| `authorizedCodehash` | `Hex` | Optional codehash restriction. Default: `bytes32(0)` (no restriction) |
-
-### Deployment result
-
-```typescript
-interface DeliveryProtectionOperatorDeployment {
-  operatorAddress: Address;                   // The PaymentOperator
-  escrowPeriodAddress: Address;               // EscrowPeriod recorder/condition
-  arbiterConditionAddress: Address;           // StaticAddressCondition for arbiter
-  operatorConfig: OperatorConfig;             // Full operator slot configuration
-  deployments: DeployResult[];                // Per-contract deploy details
-  summary: {
-    newCount: number;                         // Newly deployed contracts
-    existingCount: number;                    // Reused existing contracts
-    txHashes: `0x${string}`[];                // All deployment tx hashes
-  };
-}
-```
-
-### Preview addresses (no deploy)
-
-```typescript
-import { previewDeliveryProtectionOperator } from '@x402r/core/deploy';
-
-const preview = await previewDeliveryProtectionOperator(
-  publicClient,
-  {
-    chainId: 84532,
-    arbiter: '0xArbiterAddress...',
-    feeRecipient: '0xYourAddress...',
-    escrowPeriodSeconds: 604800n,
-  }
-);
-
-console.log('Operator will be at:', preview.operatorAddress);
-console.log('Arbiter condition:', preview.arbiterConditionAddress);
-```
 
 ## Network support
 
