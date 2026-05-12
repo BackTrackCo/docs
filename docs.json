@@ -18,7 +18,7 @@
             "pages": [
               "index",
               "x402-integration/overview",
-              "x402-integration/escrow-scheme",
+              "x402-integration/auth-capture-scheme",
               "x402-integration/comparison"
             ]
           },
@@ -162,5 +162,11 @@
       "x": "https://x.com/x402rorg",
       "github": "https://github.com/BackTrackCo"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/x402-integration/escrow-scheme",
+      "destination": "/x402-integration/auth-capture-scheme"
+    }
+  ]
 }
