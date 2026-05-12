@@ -114,6 +114,7 @@
           {
             "group": "Reference",
             "pages": [
+              "sdk/cli",
               "sdk/create-client",
               "sdk/examples"
             ]

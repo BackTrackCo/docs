@@ -64,11 +64,25 @@ bun add @x402r/helpers
 ```
 </CodeGroup>
 
+For one-shot payments from the command line (no project install required):
+
+<CodeGroup>
+```bash npm
+npx @x402r/cli pay <url> [options]
+```
+```bash pnpm
+pnpm dlx @x402r/cli pay <url> [options]
+```
+```bash bun
+bunx @x402r/cli pay <url> [options]
+```
+</CodeGroup>
+
 ### Guides
 
-<CardGroup cols={3}>
-  <Card title="@x402r/core" icon="box" href="/sdk/concepts">
-    Shared types, ABIs, chain config, deploy utilities, and condition builders.
+<CardGroup cols={2}>
+  <Card title="Merchants" icon="store" href="/sdk/merchant">
+    Deploy an operator, accept a payment, release funds from escrow.
   </Card>
   <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
     High-level SDK with role-scoped clients (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r` factory.
@@ -81,6 +95,9 @@ bun add @x402r/helpers
   </Card>
   <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
     Framework-agnostic helpers: `refundable()` for escrow configuration, `forwardToArbiter()` for arbiter integration, and re-exported address constants.
+  </Card>
+  <Card title="CLI" icon="terminal" href="/sdk/cli">
+    One-shot payments from the command line or scripts.
   </Card>
 </CardGroup>
 
