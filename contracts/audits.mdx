@@ -6,11 +6,11 @@ icon: "shield-halved"
 
 ## Audit Status
 
-x402r is built on top of a **fork** of Base's [commerce-payments](https://github.com/base/commerce-payments) protocol. The original commerce-payments contracts have been professionally audited. Our fork adds `partialVoid()` to the escrow contract (for partial refunds during escrow), and all x402r-specific contracts built on top of the fork are **not yet audited**.
+x402r is built on top of the canonical [commerce-payments](https://github.com/base/commerce-payments) protocol from Base. The commerce-payments contracts are professionally audited and are used directly at their universal CREATE2 addresses (no fork). The x402r-specific contracts built on top of them are **not yet audited**.
 
 ### What's Audited (Upstream)
 
-The original commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration) were audited by:
+The commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration) were audited by:
 
 - **Spearbit** (2 audits)
 - **Coinbase Protocol Security** (3 audits)
@@ -21,7 +21,6 @@ These audits cover the core escrow lifecycle: authorize, capture, void, reclaim,
 
 | Component | Status | Risk |
 |-----------|--------|------|
-| `partialVoid()` on AuthCaptureEscrow | **Unaudited** (fork addition) | Follows same patterns as audited `void()`, but adds partial amount logic |
 | PaymentOperator | **Unaudited** | Core operator with condition/recorder dispatch and fee system |
 | PaymentOperatorFactory | **Unaudited** | CREATE2 deterministic deployment |
 | ProtocolFeeConfig | **Unaudited** | Timelocked fee governance |
@@ -36,7 +35,6 @@ These audits cover the core escrow lifecycle: authorize, capture, void, reclaim,
 ### What This Means
 
 - The audited escrow layer provides a strong foundation — fund custody, token transfers, and payment state transitions have been professionally reviewed
-- `partialVoid()` is a minimal addition (~20 lines) that mirrors the audited `void()` function with an additional amount parameter and balance check
 - The condition/recorder plugin system is stateless or minimal-state by design, reducing attack surface
 
 <Warning>
@@ -58,11 +56,10 @@ Even without a formal audit, the x402r contracts follow established security pat
 
 We plan to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
 
-1. **`partialVoid()`** — our only change to the audited commerce-payments escrow, and the foundation everything else depends on
-2. **PaymentOperator** — condition dispatch, fee calculation, fee locking, distribution
-3. **Plugin system** — conditions, recorders, combinators, and their factories
-4. **EscrowPeriod + Freeze** — time-lock enforcement and freeze state management
-5. **RefundRequest** — request lifecycle and access control
+1. **PaymentOperator** — condition dispatch, fee calculation, fee locking, distribution
+2. **Plugin system** — conditions, recorders, combinators, and their factories
+3. **EscrowPeriod + Freeze** — time-lock enforcement and freeze state management
+4. **RefundRequest** — request lifecycle and access control
 
 We'll publish audit reports publicly once completed.
 

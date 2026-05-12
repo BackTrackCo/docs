@@ -4,11 +4,7 @@ description: "AuthCaptureEscrow and ERC3009PaymentCollector — the base layer f
 icon: "vault"
 ---
 
-x402r builds on the [Commerce Payments Protocol](https://github.com/base/commerce-payments). Two contracts from this stack form the base layer: **AuthCaptureEscrow** (holds funds) and **ERC3009PaymentCollector** (collects funds via signed authorizations).
-
-<Note>
-x402r uses a [fork of commerce-payments](https://github.com/BackTrackCo/commerce-payments) that adds **partial void** support for handling partially completed orders and partial refunds.
-</Note>
+x402r builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) (no fork). Two contracts from this stack form the base layer: **AuthCaptureEscrow** (holds funds) and **ERC3009PaymentCollector** (collects funds via signed authorizations). Both are deployed at universal CREATE2 addresses.
 
 ## AuthCaptureEscrow
 
@@ -107,19 +103,6 @@ function reclaim(
 **State change:** `Released` -> `Settled`
 
 **Requires:** Receiver has approved escrow for `amount`
-
-#### partialVoid()
-
-Returns partial amount to payer (x402r addition).
-
-```solidity
-function partialVoid(
-    bytes32 paymentId,
-    uint256 amount
-) external onlyOperator
-```
-
-**Use case:** Partial refunds for partially fulfilled orders
 
 ### Security Features
 

@@ -6,7 +6,7 @@ icon: "circle-info"
 
 ## What is x402r?
 
-x402r is a smart contract extension for HTTP-native refundable payments. It builds on [commerce-payments](https://github.com/BackTrackCo/commerce-payments) to add dispute resolution, escrow periods, and flexible refund capabilities.
+x402r is a smart contract extension for HTTP-native refundable payments. It builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) to add dispute resolution, escrow periods, and flexible refund capabilities.
 
 ## Architecture Layers
 
@@ -14,11 +14,7 @@ See the [system architecture diagrams](https://github.com/BackTrackCo/x402r-cont
 
 ## Commerce Payments (Base Layer)
 
-[Commerce Payments](https://github.com/BackTrackCo/commerce-payments) provides the foundational payment infrastructure.
-
-<Note>
-x402r uses a [fork of commerce-payments](https://github.com/BackTrackCo/commerce-payments) that adds **partial void** support for handling partially completed orders and partial refunds.
-</Note>
+The audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) provides the foundational payment infrastructure. x402r uses the canonical contracts directly (no fork) at their universal CREATE2 addresses.
 
 ### AuthCaptureEscrow
 
@@ -28,8 +24,7 @@ Core escrow contract for holding ERC-20 tokens during payments.
 - Authorization-based deposits (no direct transfers)
 - Payment state machine: `NonExistent` → `InEscrow` → `Released` → `Settled`
 - Void/reclaim for failed authorizations
-- **Partial void support** (x402r addition) - Refund partial amounts during escrow
-- Operator-based access control
+- CaptureAuthorizer-based access control
 
 **Key Methods:**
 ```solidity
