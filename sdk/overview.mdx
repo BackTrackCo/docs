@@ -34,7 +34,7 @@ bun add @x402r/sdk
 ```
 </CodeGroup>
 
-`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), and an `.extend()` plugin system. The `erc8004Actions()` plugin adds on-chain identity, reputation, and service discovery via [ERC-8004](/sdk/create-client#erc-8004-plugin).
+`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), an `.extend()` plugin system, and [ERC-8004 helpers](/sdk/helpers/erc8004) for extracting agent identity and reputation data from x402 extension responses.
 
 For low-level access to contract ABIs and deploy utilities:
 

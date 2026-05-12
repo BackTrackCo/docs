@@ -99,84 +99,71 @@ const payments = await extended.query.getPayerPayments(payerAddress)
 
 ### ERC-8004 plugin
 
-The `erc8004Actions()` plugin adds on-chain identity, reputation, and service discovery. Registry addresses are resolved automatically from the chain config, but you can override them via options.
+The `erc8004Actions` plugin adds `identity`, `reputation`, and `discovery` action groups for on-chain agent identity and reputation:
 
 ```typescript
 import { createX402r, erc8004Actions } from '@x402r/sdk'
 
 const client = createX402r({ publicClient, walletClient, operatorAddress: '0x...' })
-  .extend(erc8004Actions())
+
+const extended = client.extend(erc8004Actions())
 
 // Identity
-const isReg = await client.identity.isRegistered('0xABC...')
-const txHash = await client.identity.register('https://example.com/agent.json')
-const verified = await client.identity.verifyAgentId(7n, '0xABC...')
-const agent = await client.identity.resolveAgent(7n)
+await extended.identity.register('https://my-agent.example.com')
+await extended.identity.verifyAgentId(42n, '0xAgentAddress...')
+await extended.identity.resolveAgent(42n)
+await extended.identity.isRegistered('0xAgentAddress...')
+
+// Verify + reputation in one call
+const result = await extended.identity.check(42n, '0xAgentAddress...', [
+  '0xReviewer1...',
+  '0xReviewer2...',
+])
+console.log('Verified:', result.verified)
+console.log('Reputation:', result.reputation) // ReputationSummary | null
 
 // Reputation
-await client.reputation.rate(7n, 90)
-const summary = await client.reputation.getSummary(7n, ['0xReviewer1...'])
-await client.reputation.giveFeedback(7n, {
-  value: 500n,
-  valueDecimals: 2,
-  tag1: 'quality',
-  tag2: 'x402',
-})
+await extended.reputation.rate(42n, 85)
+await extended.reputation.getSummary(42n, ['0xReviewer...'])
 
 // Discovery
-const endpoint = await client.discovery.resolveServiceEndpoint(7n, 'x402r.arbiter')
+await extended.discovery.resolveServiceEndpoint(42n, 'arbiter')
 ```
 
+#### `identity.check()`
+
+Verifies an agent's on-chain identity and optionally fetches their reputation summary in a single call. Both the verification and reputation lookup run in parallel.
+
+```typescript
+const { verified, reputation } = await extended.identity.check(
+  agentId,
+  agentAddress,
+  reviewerAddresses, // optional
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agentId` | `bigint` | The agent's on-chain ID |
+| `address` | `Address` | The address claiming to own the agent ID |
+| `reviewers` | `readonly Address[]` | Optional list of reviewer addresses for reputation lookup |
+
+Returns `CheckAgentResult`:
+
+```typescript
+interface CheckAgentResult {
+  verified: boolean
+  reputation: ReputationSummary | null
+}
+```
+
+When `reviewers` is omitted or empty, `reputation` is `null` and only on-chain verification runs.
+
 <Tip>
-`rate()` is a convenience wrapper around `giveFeedback()` that accepts a 0-100 integer score and uses the default tags (`starred` / `x402`). Use `giveFeedback()` when you need custom tags or decimal precision.
+For standalone helpers that extract identity data from x402 extension responses without a client instance, see [ERC-8004 helpers](/sdk/helpers/erc8004).
 </Tip>
 
-#### Plugin options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `registryAddress` | `Address` | Auto-resolved | Identity registry address override |
-| `reputationRegistryAddress` | `Address` | Auto-resolved | Reputation registry address override |
-| `defaultTag1` | `string` | `'starred'` | Default `tag1` for `rate()` and `getSummary()` |
-| `defaultTag2` | `string` | `'x402'` | Default `tag2` for `rate()` and `getSummary()` |
-
-#### Identity methods
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `register` | `agentURI?: string` | `Hash` | Register the connected wallet as an agent |
-| `verifyAgentId` | `agentId: bigint, claimedAddress: Address` | `boolean` | Check if an agent ID belongs to the claimed address |
-| `resolveAgent` | `agentId: bigint` | `ResolvedAgent` | Look up full agent record by ID |
-| `isRegistered` | `address: Address` | `boolean` | Check if an address is registered |
-
-#### Reputation methods
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `rate` | `agentId: bigint, score: number` | `Hash` | Submit a 0-100 rating using default tags |
-| `getSummary` | `agentId: bigint, reviewers: Address[], options?` | `ReputationSummary` | Aggregate reputation from specific reviewers |
-| `giveFeedback` | `agentId: bigint, params: Erc8004GiveFeedbackParams` | `Hash` | Submit feedback with full control over tags and metadata |
-
-#### Discovery methods
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `resolveServiceEndpoint` | `agentId: bigint, serviceName: string` | `ResolvedServiceEndpoint` | Resolve an agent's service endpoint by name |
-
-#### Re-exported types
-
-The following types from `@x402r/erc8004` are re-exported by `@x402r/sdk` for convenience:
-
-- `ResolvedAgent` - full agent identity record
-- `ReputationSummary` - aggregated reputation data
-- `ResolvedServiceEndpoint` - resolved service endpoint record
-- `Erc8004PluginOptions` - plugin configuration
-- `Erc8004GiveFeedbackParams` - parameters for `giveFeedback()`
-- `Erc8004IdentityActions` - identity namespace type
-- `Erc8004ReputationActions` - reputation namespace type
-- `Erc8004DiscoveryActions` - discovery namespace type
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={3}>
   <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
@@ -185,7 +172,7 @@ The following types from `@x402r/erc8004` are re-exported by `@x402r/sdk` for co
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Get the addresses for your client config.
   </Card>
-  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
-    Conditions and recorders that control on-chain access.
+  <Card title="ERC-8004 Helpers" icon="wrench" href="/sdk/helpers/erc8004">
+    Standalone extraction helpers for arbiter identity and reputation data.
   </Card>
 </CardGroup>
