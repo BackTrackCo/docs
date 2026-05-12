@@ -18,7 +18,7 @@ Three roles interact with the protocol:
 
 **Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Use this for general commerce where most transactions are uncontested.
 
-**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically and is the only address that can release funds. If the arbiter does not release, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
+**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically. The arbiter or a satisfied payer can release funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
 
 ### Packages
 
