@@ -78,7 +78,7 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 10. **Operator** accumulates protocol fees for later distribution
 11. **Operator** calls `RELEASE_RECORDER` to update state
 
-### Refund Flow (In-Escrow)
+### Void Flow (before capture)
 
 **Example: Marketplace with arbiter dispute resolution**
 
@@ -86,9 +86,9 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 2. **RefundRequest** creates request with status `Pending`
 3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
 4. **Designated address** calls `refundRequest.updateStatus(paymentInfo, nonce, Approved)`
-5. **Designated address** calls `operator.void(paymentInfo, amount)`
+5. **Designated address** calls `operator.void(paymentInfo)`
 6. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
-7. **Operator** calls `escrow.partialVoid()` to return funds to payer
+7. **Operator** calls `escrow.void()` to return all escrowed funds to payer
 8. **Operator** calls `VOID_POST_ACTION_HOOK`
 9. Funds transferred back to payer
 

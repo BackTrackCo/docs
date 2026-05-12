@@ -154,35 +154,39 @@ function release(
 **DAO example:** StaticAddressCondition(daoMultisig)
 </Note>
 
-### voidPayment()
+### void()
 
-Refunds payment while still in escrow (partial void).
+Returns all escrowed funds to the payer before capture. Full-only: `escrow.void()` empties the authorization in one transaction.
 
 ```solidity
-function voidPayment(
+function void(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint120 amount
+    bytes calldata data
 ) external nonReentrant
 ```
 
 **Parameters:**
 - `paymentInfo` - Payment info struct
-- `amount` - Amount to return to payer
+- `data` - Optional pass-through data for the pre/post action plugins
 
 **Flow:**
 1. Check `VOID_PRE_ACTION_CONDITION` (if set)
-2. Call `escrow.partialVoid()` to return funds to payer
+2. Call `escrow.void()` to return escrowed funds to payer
 3. Call `VOID_POST_ACTION_HOOK` (if set)
 4. Emit `VoidExecuted`
 
 **Access:** Controlled by `VOID_PRE_ACTION_CONDITION`
 
 <Note>
-**Marketplace example:** StaticAddressCondition(arbiter) - disputes
+**Marketplace example:** StaticAddressCondition(arbiter) for disputes
 **Return policy example:** Receiver OR StaticAddressCondition(arbiter)
 **DAO example:** StaticAddressCondition(daoMultisig)
-**Subscription example:** address(0) - no refunds
+**Subscription example:** address(0), no voids allowed
 </Note>
+
+<Tip>
+For a partial return, call `capture()` for the portion to keep. The unused authorization can then be voided, or it will become reclaimable by the payer after `captureDeadline`.
+</Tip>
 
 ### refund()
 

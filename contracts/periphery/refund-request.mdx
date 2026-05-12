@@ -13,13 +13,13 @@ icon: "rotate-left"
 ## Request Types
 
 <Tabs>
-  <Tab title="In-Escrow Refunds">
+  <Tab title="Void (before capture)">
     **Who can request:** Payer, Receiver, OR Arbiter
 
     **Typical flow:**
-    1. Payer suspects fraud, requests refund
+    1. Payer suspects fraud, requests a refund
     2. Arbiter investigates
-    3. Arbiter approves or denies request
+    3. Arbiter approves or denies the request
     4. If approved, arbiter calls `operator.void()`
 
     **Use cases:**
@@ -28,12 +28,12 @@ icon: "rotate-left"
     - Payment error
   </Tab>
 
-  <Tab title="Post-Escrow Refunds">
+  <Tab title="Refund (after capture)">
     **Who can request:** Receiver only
 
     **Typical flow:**
-    1. Receiver realizes product defect after release
-    2. Receiver requests refund
+    1. Receiver realizes product defect after capture
+    2. Receiver requests a refund
     3. Arbiter investigates
     4. If approved, arbiter calls `operator.refund()`
 
@@ -145,7 +145,9 @@ await refundRequest.updateStatus(
 // Status: Approved
 
 // 3. Execute refund via operator (separate transaction)
-await operator.void(paymentInfo, refundAmount);
+// For pre-capture: operator.void() empties the auth (full only).
+// For post-capture: operator.refund(paymentInfo, amount, tokenCollector, collectorData).
+await operator.void(paymentInfo);
 // Funds returned to payer
 ```
 
