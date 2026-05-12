@@ -34,7 +34,7 @@ bun add @x402r/sdk
 ```
 </CodeGroup>
 
-`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), an `.extend()` plugin system, and [ERC-8004 helpers](/sdk/helpers/erc8004) for extracting agent identity and reputation data from x402 extension responses.
+`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), an `.extend()` plugin system, and ERC-8004 helpers for extracting agent identity and reputation data from x402 extension responses.
 
 For low-level access to contract ABIs and deploy utilities:
 
@@ -84,14 +84,8 @@ bunx @x402r/cli pay <url> [options]
   <Card title="Merchants" icon="store" href="/sdk/merchant">
     Deploy an operator, accept a payment, capture funds from escrow.
   </Card>
-  <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
-    High-level client with role-scoped factories (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r`.
-  </Card>
   <Card title="Merchant guide" icon="store" href="/sdk/merchant/quickstart">
     Capture funds from escrow, charge directly, void, and process refunds using `createMerchantClient`.
-  </Card>
-  <Card title="Arbiter guide" icon="gavel" href="/sdk/arbiter/quickstart">
-    Resolve disputes and act as a captureAuthorizer using `createArbiterClient`.
   </Card>
   <Card title="@x402r/cli" icon="terminal" href="/sdk/cli">
     Wallet-agnostic one-shot payments from the command line or scripts.

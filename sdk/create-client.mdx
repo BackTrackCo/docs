@@ -160,7 +160,7 @@ interface CheckAgentResult {
 When `reviewers` is omitted or empty, `reputation` is `null` and only on-chain verification runs.
 
 <Tip>
-For standalone helpers that extract identity data from x402 extension responses without a client instance, see [ERC-8004 helpers](/sdk/helpers/erc8004).
+For standalone helpers that extract identity data from x402 extension responses without a client instance, use the `extractArbiterIdentity`, `extractReputationRegistrations`, and `fetchArbiterIdentity` exports from `@x402r/sdk`.
 </Tip>
 
 ## Next steps
@@ -171,8 +171,5 @@ For standalone helpers that extract identity data from x402 extension responses 
   </Card>
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Get the addresses for your client config.
-  </Card>
-  <Card title="ERC-8004 Helpers" icon="wrench" href="/sdk/helpers/erc8004">
-    Standalone extraction helpers for arbiter identity and reputation data.
   </Card>
 </CardGroup>

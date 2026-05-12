@@ -95,62 +95,16 @@
             "group": "Getting Started",
             "pages": [
               "sdk/overview",
-              "sdk/create-client",
               "sdk/deploy-operator"
             ]
           },
           {
-            "group": "Concepts",
+            "group": "Marketplace",
             "pages": [
-              "sdk/concepts",
-              "sdk/limitations"
-            ]
-          },
-          {
-            "group": "Merchant",
-            "pages": [
-              "sdk/merchant",
               "sdk/merchant/getting-started",
-              "sdk/merchant/quickstart",
-              "sdk/merchant/payment-operations",
-              "sdk/merchant/refund-handling",
-              "sdk/merchant/subscriptions"
-            ]
-          },
-          {
-            "group": "Payer (Client)",
-            "pages": [
-              "sdk/payer",
-              "sdk/client/quickstart",
-              "sdk/client/escrow-management",
-              "sdk/client/payment-queries",
-              "sdk/client/refund-operations",
-              "sdk/client/subscriptions"
-            ]
-          },
-          {
-            "group": "Arbiter",
-            "pages": [
-              "sdk/arbiter",
-              "sdk/arbiter/quickstart",
-              "sdk/arbiter/decision-submission",
-              "sdk/arbiter/registry",
-              "sdk/arbiter/ai-integration",
-              "sdk/arbiter/batch-operations",
-              "sdk/arbiter/subscriptions"
-            ]
-          },
-          {
-            "group": "Facilitator",
-            "pages": [
-              "sdk/facilitator/getting-started"
-            ]
-          },
-          {
-            "group": "Helpers",
-            "pages": [
               "sdk/helpers/forward-to-arbiter",
-              "sdk/helpers/erc8004"
+              "sdk/merchant/quickstart",
+              "sdk/merchant/refund-handling"
             ]
           },
           {
@@ -165,15 +119,8 @@
             "group": "Reference",
             "pages": [
               "sdk/cli",
+              "sdk/create-client",
               "sdk/examples"
-            ]
-          },
-          {
-            "group": "AI Tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
             ]
           }
         ]

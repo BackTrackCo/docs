@@ -86,11 +86,11 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount)`
 2. **RefundRequest** creates request with status `Pending`
 3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
-4. **Designated address** calls `operator.void(paymentInfo)`; the `VOID_POST_ACTION_HOOK` (RefundRequest) auto-flips status to `Approved`
-6. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
-7. **Operator** calls `escrow.void()` to return all escrowed funds to payer
-8. **Operator** calls `VOID_POST_ACTION_HOOK`
-9. Funds transferred back to payer
+4. **Designated address** calls `operator.void(paymentInfo)`
+5. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
+6. **Operator** calls `escrow.void()` to return all escrowed funds to payer
+7. **Operator** calls `VOID_POST_ACTION_HOOK` (RefundRequest auto-flips status to `Approved`)
+8. Funds transferred back to payer
 
 <Note>
 Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-allowed (return policy), DAO-controlled (governance), or disabled (subscriptions).
@@ -317,8 +317,5 @@ These events enable off-chain monitoring and indexing.
   </Card>
   <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator using the SDK.
-  </Card>
-  <Card title="SDK Concepts" icon="lightbulb" href="/sdk/concepts">
-    Understand how the SDK maps to contract architecture.
   </Card>
 </CardGroup>
