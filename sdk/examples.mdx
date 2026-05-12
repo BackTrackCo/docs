@@ -57,12 +57,42 @@ pnpm example:payer:request-refund
 pnpm example:merchant:charge
 pnpm example:arbiter:approve-refund
 
-# Multi-role scenarios
-pnpm scenario:release
-pnpm scenario:dispute
+Deploys a complete marketplace operator using `deployMarketplaceOperator()`:
+
+```typescript
+import { deployMarketplaceOperator } from '@x402r/core/deploy';
+
+const result = await deployMarketplaceOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,               // Base Sepolia
+    feeRecipient: account.address,
+    arbiter: arbiterAddress,
+    escrowPeriodSeconds: 604800n, // 7 days
+    operatorFeeBps: 100n,         // 1%
+  }
+);
 ```
 
-### Payer
+You can also deploy a simpler delivery protection operator for content verification use cases:
+
+```typescript
+import { deployDeliveryProtectionOperator } from '@x402r/core/deploy';
+
+const result = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: arbiterAddress,
+    feeRecipient: account.address,
+    escrowPeriodSeconds: 604800n,
+  }
+);
+```
+
+See [Deploy an operator](/sdk/deploy-operator) for the full guide.
 
 | Example | What it does |
 |---------|-------------|
