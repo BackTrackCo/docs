@@ -1,0 +1,161 @@
+---
+title: "forwardToArbiter()"
+description: "Forward escrow settlement responses to an arbiter service for dispute evaluation"
+icon: "wrench"
+---
+
+The `@x402r/helpers` package provides `forwardToArbiter()` — an `onAfterSettle` hook that forwards the response body to an arbiter service after successful escrow settlements. It is fire-and-forget and does not block the client response.
+
+<Note>
+This function lives in `@x402r/helpers`. Install it separately:
+```bash
+npm install @x402r/helpers
+```
+
+Peer dependency: `@x402/core >=2.5.0`
+</Note>
+
+## Usage
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers';
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new EscrowServerScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001')
+  );
+```
+
+After a successful escrow settlement, the hook POSTs `{ responseBody, network, transaction, scheme }` to `{arbiterUrl}/verify`. Non-escrow schemes, failed settlements, and missing response bodies are silently skipped.
+
+## Function signature
+
+```typescript
+function forwardToArbiter(
+  arbiterUrl: string,
+  options?: ForwardToArbiterOptions
+): (context: SettleResultContext) => Promise<void>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `arbiterUrl` | `string` | Base URL of your arbiter service (e.g., `http://arbiter:3001`) |
+| `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
+
+### Options
+
+```typescript
+interface ForwardToArbiterOptions {
+  /** Custom error handler. Defaults to `console.warn`. */
+  onError?: (error: unknown) => void;
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `onError` | `console.warn` | Called when the POST to the arbiter fails. Use this to integrate with your error tracking (e.g., Sentry). |
+
+### Return value
+
+Returns an async callback compatible with `onAfterSettle`. The callback:
+
+1. Skips if the settlement failed (`context.result.success === false`)
+2. Skips if the scheme is not `escrow`
+3. Skips if there is no response body in the transport context
+4. POSTs to `{arbiterUrl}/verify` with the settlement data
+5. Catches errors via the `onError` handler (default: `console.warn`)
+
+## Examples
+
+### Basic usage
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers';
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new EscrowServerScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001')
+  );
+```
+
+### Custom error handling
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers';
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new EscrowServerScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001', {
+      onError: (err) => sentry.captureException(err),
+    })
+  );
+```
+
+<Tip>
+You should always provide an `onError` handler in production. The x402 `onAfterSettle` runner does not catch errors internally — without a handler, an unreachable arbiter could break your post-settlement flow.
+</Tip>
+
+### POST payload
+
+The hook sends a JSON POST to `{arbiterUrl}/verify` with this shape:
+
+```json
+{
+  "responseBody": "<utf-8 string of the HTTP response body>",
+  "network": "eip155:84532",
+  "transaction": "0xabc...",
+  "scheme": "escrow"
+}
+```
+
+## Behavior details
+
+- **Escrow-only** — Only fires for `scheme: "escrow"` settlements. Non-escrow schemes (e.g., `exact`) are silently skipped.
+- **Fire-and-forget** — The POST happens asynchronously and does not block the HTTP response to the client.
+- **Trailing slash safe** — `forwardToArbiter('http://arbiter:3001/')` resolves to `http://arbiter:3001/verify`.
+
+## Migration from refundable()
+
+The `refundable()` helper has been removed. If you were using it to wrap payment options with escrow configuration, you should now inline the escrow `extra` config directly:
+
+```typescript
+// Before (removed)
+import { refundable } from '@x402r/helpers';
+const option = refundable(
+  { scheme: 'escrow', price: '$0.01', network: 'eip155:84532', payTo: address },
+  operatorAddress
+);
+
+// After — inline the extra config
+const option = {
+  scheme: 'escrow',
+  network: 'eip155:84532',
+  price: '$0.01',
+  payTo: address,
+  extra: {
+    escrowAddress: authCaptureEscrow,  // from getChainConfig()
+    operatorAddress,
+    feeReceiver: operatorAddress,
+    maxFeeBps: 500,
+  },
+};
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Arbiter quickstart" icon="gavel" href="/sdk/arbiter/quickstart">
+    Build an arbiter service that receives forwarded settlements.
+  </Card>
+  <Card title="Deploy operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy a PaymentOperator for escrow payments.
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    See merchant and arbiter examples.
+  </Card>
+</CardGroup>

@@ -24,7 +24,7 @@ The full source code for this example is available on [GitHub](https://github.co
     ```bash
     mkdir merchant-server && cd merchant-server
     npm init -y
-    npm install express @x402/core @x402/express @x402r/evm @x402r/helpers dotenv
+    npm install express @x402/core @x402/express @x402r/evm dotenv
     ```
   </Step>
 
@@ -35,6 +35,7 @@ The full source code for this example is available on [GitHub](https://github.co
     ADDRESS=0xYourMerchantAddress
     OPERATOR_ADDRESS=0xYourPaymentOperatorAddress
     FACILITATOR_URL=http://localhost:4022
+    
     ```
   </Step>
 
@@ -46,7 +47,7 @@ The full source code for this example is available on [GitHub](https://github.co
     import express from "express";
     import { paymentMiddleware, x402ResourceServer } from "@x402/express";
     import { EscrowServerScheme } from "@x402r/evm/escrow/server";
-    import { refundable } from "@x402r/helpers";
+    import { getChainConfig } from "@x402r/core";
     import { HTTPFacilitatorClient } from "@x402/core/server";
 
     const address = process.env.ADDRESS as `0x${string}`;
@@ -63,6 +64,9 @@ The full source code for this example is available on [GitHub](https://github.co
     }
     const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 
+    const networkId = "eip155:84532";
+    const { authCaptureEscrow } = getChainConfig(networkId);
+
     const app = express();
 
     app.use(
@@ -70,22 +74,25 @@ The full source code for this example is available on [GitHub](https://github.co
         {
           "GET /weather": {
             accepts: [
-              refundable(
-                {
-                  scheme: "escrow",
-                  price: "$0.01",
-                  network: "eip155:84532",
-                  payTo: address,
+              {
+                scheme: "escrow",
+                price: "$0.01",
+                network: networkId,
+                payTo: address,
+                extra: {
+                  escrowAddress: authCaptureEscrow,
+                  operatorAddress,
+                  feeReceiver: operatorAddress,
+                  maxFeeBps: 500,
                 },
-                operatorAddress,
-              ),
+              },
             ],
             description: "Weather data",
             mimeType: "application/json",
           },
         },
         new x402ResourceServer(facilitatorClient).register(
-          "eip155:84532",
+          networkId,
           new EscrowServerScheme() as never,
         ),
       ),
@@ -132,9 +139,8 @@ The full source code for this example is available on [GitHub](https://github.co
         "extra": {
           "escrowAddress": "0x...",
           "operatorAddress": "0x...",
-          "tokenCollector": "0x...",
-          "minFeeBps": 0,
-          "maxFeeBps": 1000
+          "feeReceiver": "0x...",
+          "maxFeeBps": 500
         }
       }]
     }
@@ -144,7 +150,7 @@ The full source code for this example is available on [GitHub](https://github.co
 
 ## How it works
 
-- **`refundable()`** wraps a standard x402 payment option with escrow configuration (contract addresses, fee bounds) from the network config.
+- **Escrow `extra` config** specifies the escrow contract address, operator address, fee receiver, and maximum fee bounds directly on the payment option.
 - **`EscrowServerScheme`** registers the escrow payment scheme with the x402 resource server so it can validate escrow-backed payments.
 - **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 if no payment is provided.
 - **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
@@ -152,8 +158,8 @@ The full source code for this example is available on [GitHub](https://github.co
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
-    Configure escrow options and fee bounds.
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
     Release payments, handle refunds, and manage escrow.

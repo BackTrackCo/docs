@@ -96,9 +96,10 @@
           {
             "group": "Marketplace",
             "pages": [
-              "sdk/merchant",
-              "sdk/payer",
-              "sdk/arbiter"
+              "sdk/merchant/getting-started",
+              "sdk/helpers/forward-to-arbiter",
+              "sdk/merchant/quickstart",
+              "sdk/merchant/refund-handling"
             ]
           },
           {

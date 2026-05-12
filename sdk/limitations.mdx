@@ -49,7 +49,7 @@ const client = createPayerClient({
 
 ### No Express/Hono Middleware
 
-The `refundable()` helper in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware — use `refundable()` directly when constructing payment options.
+The `forwardToArbiter()` hook in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware — configure escrow payment options inline and use `forwardToArbiter()` as an `onAfterSettle` hook.
 
 ## Getting Updates
 

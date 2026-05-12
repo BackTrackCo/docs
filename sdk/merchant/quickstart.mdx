@@ -13,7 +13,7 @@ The `@x402r/sdk` package provides everything merchants need for the post-payment
 ## Installation
 
 ```bash
-npm install @x402r/sdk @x402r/helpers @x402r/core viem
+npm install @x402r/merchant @x402r/core viem
 ```
 
 ## Setup
@@ -191,8 +191,8 @@ flowchart TD
   <Card title="Refund Handling" icon="rotate-left" href="/sdk/merchant/refund-handling">
     Process incoming refund requests with deny workflows.
   </Card>
-  <Card title="Helpers" icon="wrench" href="/sdk/helpers/refundable">
-    Mark payment options as refundable with your operator.
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="PaymentOperator" icon="file-contract" href="/contracts/payment-operator">
     Understand the underlying PaymentOperator contract methods.
