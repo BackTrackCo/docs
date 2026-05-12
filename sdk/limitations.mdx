@@ -8,16 +8,19 @@ The SDK provides full coverage of core payment flows including authorization, re
 
 ## API Constraints
 
-### EIP-155 Network Identifiers
+### Chain ID lookups
 
-Network configuration requires EIP-155 format strings, not chain ID numbers:
+Chain configuration uses numeric chain IDs. Use the CAIP-2 helpers for conversions:
 
 ```typescript
-// Correct
-const config = getNetworkConfig('eip155:84532');
+import { getChainConfig, fromNetworkId, toNetworkId } from '@x402r/core';
 
-// Incorrect - will return undefined
-const config = getNetworkConfig(84532);
+// Correct - numeric chain ID
+const config = getChainConfig(84532);
+
+// Convert from EIP-155 string
+const chainId = fromNetworkId('eip155:84532'); // 84532
+const config2 = getChainConfig(chainId);
 ```
 
 ### PaymentInfo Must Be Complete

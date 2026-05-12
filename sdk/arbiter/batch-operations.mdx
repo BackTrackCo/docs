@@ -76,12 +76,12 @@ The `nonce` identifies which specific charge record the refund request targets. 
 Fetch all pending cases, evaluate each one, then batch approve and deny:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
+import { createArbiterClient } from '@x402r/sdk';
 import { RequestStatus } from '@x402r/core';
 import type { PaymentInfo, RefundRequestData } from '@x402r/core';
 
 async function triageAndProcess(
-  arbiter: X402rArbiter,
+  arbiter: ReturnType<typeof createArbiterClient>,
   receiverAddress: `0x${string}`,
   lookupPaymentInfo: (hash: `0x${string}`) => Promise<PaymentInfo>
 ) {
@@ -130,11 +130,11 @@ function shouldApprove(request: RefundRequestData): boolean {
 After batch approving, execute refunds individually for each approved payment:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
+import { createArbiterClient } from '@x402r/sdk';
 import type { PaymentInfo } from '@x402r/core';
 
 async function batchApproveAndExecute(
-  arbiter: X402rArbiter,
+  arbiter: ReturnType<typeof createArbiterClient>,
   items: Array<{ paymentInfo: PaymentInfo; nonce: bigint }>
 ) {
   // Step 1: Batch approve all items

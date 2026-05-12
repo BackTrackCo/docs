@@ -1,19 +1,19 @@
 ---
 title: "Merchant SDK"
-description: "Release funds, charge payments, process refunds, and query escrow state with @x402r/merchant"
+description: "Release funds, charge payments, process refunds, and query escrow state with @x402r/sdk"
 icon: "rocket"
 ---
 
-The `@x402r/merchant` package provides everything merchants need for the post-payment lifecycle: releasing escrowed funds, charging directly, processing refunds, and querying operator state.
+The `@x402r/sdk` package provides everything merchants need for the post-payment lifecycle: releasing escrowed funds, charging directly, processing refunds, and querying operator state.
 
 <Info>
-**Looking for server setup?** The [Merchant Server Quickstart](/sdk/merchant/getting-started) shows how to accept escrow payments via Express middleware. This page covers the `X402rMerchant` class for managing payments after they arrive.
+**Looking for server setup?** The [Merchant Server Quickstart](/sdk/merchant/getting-started) shows how to accept escrow payments via Express middleware. This page covers `createMerchantClient` for managing payments after they arrive.
 </Info>
 
 ## Installation
 
 ```bash
-npm install @x402r/merchant @x402r/helpers @x402r/core viem
+npm install @x402r/sdk @x402r/helpers @x402r/core viem
 ```
 
 ## Setup
@@ -21,17 +21,12 @@ npm install @x402r/merchant @x402r/helpers @x402r/core viem
 Create viem clients as described in [Installation](/sdk/overview), then:
 
 ```typescript
-import { X402rMerchant } from '@x402r/merchant';
-import { getNetworkConfig } from '@x402r/core';
+import { createMerchantClient } from '@x402r/sdk';
 
-const config = getNetworkConfig('eip155:84532')!;
-
-const merchant = new X402rMerchant({
+const merchant = createMerchantClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...', // Your PaymentOperator address
-  escrowAddress: config.authCaptureEscrow,
-  refundRequestAddress: config.refundRequest,
 });
 ```
 
@@ -138,7 +133,7 @@ if (capturableAmount > 0n) {
 ```
 
 <Info>
-`getPaymentAmounts()` requires the `escrowAddress` to be configured when creating the `X402rMerchant` instance.
+`getPaymentAmounts()` reads amounts directly from the PaymentOperator contract.
 </Info>
 
 ### Get Payment State

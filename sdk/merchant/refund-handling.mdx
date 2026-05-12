@@ -4,7 +4,7 @@ description: "Process, approve, deny, and manage refund requests with the Mercha
 icon: "rotate-left"
 ---
 
-The `X402rMerchant` class provides a complete set of methods for handling refund requests from payers. Every refund-related method requires a `nonce: bigint` parameter that identifies which specific charge the refund targets.
+The `createMerchantClient` factory provides a complete set of methods for handling refund requests from payers. Every refund-related method requires a `nonce: bigint` parameter that identifies which specific charge the refund targets.
 
 <Note>
 The `nonce` parameter corresponds to the record index from the `PaymentIndexRecorder`. For the first charge against a payment, the nonce is `0n`. Each subsequent charge increments the nonce.
@@ -90,7 +90,7 @@ console.log('Status:', request.status);
 
 ### Get Pending Refund Requests
 
-Use `getPendingRefundRequests()` to retrieve paginated refund request keys for the current receiver address. This method uses the wallet address associated with your `X402rMerchant` instance.
+Use `getPendingRefundRequests()` to retrieve paginated refund request keys for the current receiver address. This method uses the wallet address associated with your merchant client.
 
 ```typescript
 // Get the first 10 refund request keys
@@ -204,14 +204,12 @@ console.log('Payment unfrozen:', txHash);
 Here is a full workflow showing how to detect a refund request, review it, make a decision, and execute the refund if approved.
 
 ```typescript
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { X402rMerchant } from '@x402r/merchant';
-import { getNetworkConfig, RequestStatus } from '@x402r/core';
+import { createMerchantClient } from '@x402r/sdk';
+import { RequestStatus } from '@x402r/core';
+import type { PaymentInfo } from '@x402r/core';
 
 async function handleRefundWorkflow(
-  merchant: X402rMerchant,
+  merchant: ReturnType<typeof createMerchantClient>,
   paymentInfo: PaymentInfo,
   nonce: bigint
 ) {

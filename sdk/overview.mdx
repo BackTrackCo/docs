@@ -65,33 +65,30 @@ bun add @x402r/helpers
 ### Guides
 
 <CardGroup cols={3}>
-  <Card title="Merchants" icon="store" href="/sdk/merchant">
-    Deploy an operator, accept a payment, release funds from escrow.
+  <Card title="@x402r/core" icon="box" href="/sdk/concepts">
+    Shared types, ABIs, chain config, deploy utilities, and condition builders.
   </Card>
-  <Card title="Payers" icon="user" href="/sdk/payer">
-    Check payment state, request a refund, submit evidence.
+  <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
+    High-level SDK with role-scoped clients (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r` factory.
   </Card>
-  <Card title="Arbiters" icon="gavel" href="/sdk/arbiter">
-    Review disputes, approve or deny refunds, distribute fees.
+  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
+    Framework-agnostic helper to mark x402 payment options as refundable with escrow configuration.
   </Card>
 </CardGroup>
 
-### Supported Chains
+## Network support
 
-All contracts are deployed to identical addresses on every chain via CREATE3. Only USDC differs.
-
-| Chain | Chain ID | USDC |
-|-------|----------|------|
-| Base Sepolia | `84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-| Ethereum Sepolia | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
-| Arbitrum Sepolia | `421614` | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` |
-| Ethereum | `1` | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
-| Base | `8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
-| Polygon | `137` | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
-| Arbitrum One | `42161` | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
-| Optimism | `10` | `0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85` |
-| Celo | `42220` | `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` |
-| Avalanche C-Chain | `43114` | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
-| Monad | `143` | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
-| Linea | `59144` | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
-| SKALE Base | `1187947933` | `0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20` |
+| Network | Chain ID | Status |
+|---------|----------|--------|
+| Base Sepolia | 84532 | Tested |
+| Base Mainnet | 8453 | Deployed, not yet tested |
+| Ethereum | 1 | Deployed, not yet tested |
+| Ethereum Sepolia | 11155111 | Deployed, not yet tested |
+| Polygon | 137 | Deployed, not yet tested |
+| Arbitrum | 42161 | Deployed, not yet tested |
+| Optimism | 10 | Deployed, not yet tested |
+| Avalanche | 43114 | Deployed, not yet tested |
+| Celo | 42220 | Deployed, not yet tested |
+| Monad | 143 | Deployed, not yet tested |
+| Linea | 59144 | Deployed, not yet tested |
+| SKALE Base | 1187947933 | Deployed, not yet tested |

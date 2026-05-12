@@ -11,17 +11,12 @@ The ArbiterRegistry is an on-chain contract that allows arbiters to register the
 To use registry methods, provide the `arbiterRegistryAddress` when creating the arbiter instance:
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig } from '@x402r/core';
+import { createArbiterClient } from '@x402r/sdk';
 
-const config = getNetworkConfig('eip155:84532')!;
-
-const arbiter = new X402rArbiter({
+const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
-  refundRequestAddress: config.refundRequest,
-  arbiterRegistryAddress: config.arbiterRegistry,
 });
 ```
 
@@ -120,17 +115,13 @@ interface ArbiterList {
 ## Complete Example
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig } from '@x402r/core';
+import { createArbiterClient } from '@x402r/sdk';
 
 async function main() {
-  const config = getNetworkConfig('eip155:84532')!;
-
-  const arbiter = new X402rArbiter({
+  const arbiter = createArbiterClient({
     publicClient,
     walletClient,
     operatorAddress: '0x...',
-    arbiterRegistryAddress: config.arbiterRegistry,
   });
 
   // Register

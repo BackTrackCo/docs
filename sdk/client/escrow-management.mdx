@@ -151,11 +151,11 @@ The escrow period length is configured at the contract level when the `EscrowPer
 A common pattern is to freeze a payment before submitting a refund request, ensuring the merchant cannot release funds while the request is pending.
 
 ```typescript
-import { X402rClient } from '@x402r/client';
+import { createPayerClient } from '@x402r/sdk';
 import type { PaymentInfo } from '@x402r/core';
 
 async function freezeAndRequestRefund(
-  client: X402rClient,
+  client: ReturnType<typeof createPayerClient>,
   paymentInfo: PaymentInfo,
   freezeAddress: `0x${string}`,
   refundAmount: bigint

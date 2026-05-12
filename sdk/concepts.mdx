@@ -52,7 +52,7 @@ interface PaymentInfo {
 ```
 
 <Tip>
-Use `computePaymentInfoHash()` from `@x402r/core` to compute the unique hash of a payment. Use `parsePaymentInfo()` to deserialize a JSON PaymentInfo back into the typed struct.
+Use `computePaymentInfoHash()` from `@x402r/core` to compute the unique hash of a payment. Use `toPaymentInfo()` to deserialize a JSON PaymentInfo back into the typed struct.
 </Tip>
 
 ## Escrow Period
@@ -64,13 +64,15 @@ The **EscrowPeriod** contract tracks when a payment was authorized and enforces 
 - **After the period** — merchants can release funds to themselves
 
 ```typescript
-import { X402rClient } from '@x402r/client';
+import { createPayerClient } from '@x402r/sdk';
 
-// Check when payment was authorized
-const authTime = await client.getAuthorizationTime(paymentInfo, escrowPeriodAddress);
+const client = createPayerClient({ publicClient, walletClient, operatorAddress });
+
+// Check when payment was authorized (requires escrow plugin)
+const authTime = await client.escrow.getAuthorizationTime(paymentInfo);
 
 // Check if still within escrow period
-const inEscrow = await client.isDuringEscrowPeriod(paymentInfo, escrowPeriodAddress);
+const inEscrow = await client.escrow.isDuringEscrow(paymentInfo);
 if (!inEscrow) {
   console.log('Escrow period has passed - funds can be released');
 }
@@ -130,14 +132,14 @@ const status = await client.getRefundStatus(paymentInfo, 0n);
 The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing release until the freeze expires or is lifted:
 
 ```typescript
-// Payer freezes payment (requires payer authorization)
-await client.freezePayment(paymentInfo, freezeAddress);
+// Payer freezes payment (requires freeze plugin)
+await client.freeze.freeze(paymentInfo);
 
-// Merchant unfreezes payment (requires receiver authorization)
-await merchant.unfreezePayment(paymentInfo, freezeAddress);
+// Merchant unfreezes payment (requires freeze plugin)
+await merchant.freeze.unfreeze(paymentInfo);
 
 // Check frozen status
-const frozen = await client.isFrozen(paymentInfo, freezeAddress);
+const frozen = await client.freeze.isFrozen(paymentInfo);
 ```
 
 <Warning>

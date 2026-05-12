@@ -7,7 +7,7 @@ icon: "wrench"
 The `@x402r/helpers` package provides the `refundable()` function — a framework-agnostic helper that adds escrow configuration to x402 payment options.
 
 <Note>
-This function lives in `@x402r/helpers`, not `@x402r/merchant`. Install it separately:
+This function lives in `@x402r/helpers`, not `@x402r/sdk`. Install it separately:
 ```bash
 npm install @x402r/helpers @x402r/core
 ```
@@ -121,12 +121,14 @@ const option = refundable({
 
 ## Supported Networks
 
-The function resolves addresses from the network config for all supported networks. See `getNetworkConfig()` for the full list (Base Sepolia, Base, Ethereum, Ethereum Sepolia, Arbitrum Sepolia, Polygon, Arbitrum, Optimism, Avalanche, Celo, Monad).
+The function resolves addresses from the chain config for all supported networks. See `getChainConfig()` for the full list (Base Sepolia, Base, Ethereum, Ethereum Sepolia, Polygon, Arbitrum, Optimism, Avalanche, Celo, Monad, Linea, SKALE Base).
 
 ```typescript
-refundable({ network: 'eip155:84532', ... }, '0x...');  // Base Sepolia
-refundable({ network: 'eip155:8453', ... }, '0x...');   // Base Mainnet
-refundable({ network: 'eip155:1', ... }, '0x...');      // Ethereum
+refundable({ network: 'eip155:84532', ... }, '0x...');      // Base Sepolia
+refundable({ network: 'eip155:8453', ... }, '0x...');       // Base Mainnet
+refundable({ network: 'eip155:1', ... }, '0x...');          // Ethereum
+refundable({ network: 'eip155:59144', ... }, '0x...');      // Linea
+refundable({ network: 'eip155:1187947933', ... }, '0x...');  // SKALE Base
 ```
 
 ## Integration with x402

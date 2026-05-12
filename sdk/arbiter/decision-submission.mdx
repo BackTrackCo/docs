@@ -176,11 +176,11 @@ if (frozen) {
 This example shows the full arbiter workflow: fetching pending cases, reviewing them, making a decision, and executing the refund.
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
+import { createArbiterClient } from '@x402r/sdk';
 import { RequestStatus } from '@x402r/core';
 import type { PaymentInfo } from '@x402r/core';
 
-async function processAllPendingCases(arbiter: X402rArbiter, receiverAddress: `0x${string}`) {
+async function processAllPendingCases(arbiter: ReturnType<typeof createArbiterClient>, receiverAddress: `0x${string}`) {
   // Step 1: Get all pending refund requests
   const { keys, total } = await arbiter.getPendingRefundRequests(0n, 50n, receiverAddress);
   console.log(`Found ${total} pending cases`);

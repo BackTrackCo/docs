@@ -8,22 +8,17 @@ icon: "rocket"
 The Arbiter SDK is experimental. The dispute resolution system design is actively evolving.
 </Warning>
 
-The `@x402r/arbiter` package provides methods for arbiters to resolve disputes: reviewing refund requests, approving or denying them, and executing refunds.
+The `@x402r/sdk` package provides methods for arbiters to resolve disputes: reviewing refund requests, approving or denying them, and executing refunds.
 
 ## Setup
 
 ```typescript
-import { X402rArbiter } from '@x402r/arbiter';
-import { getNetworkConfig } from '@x402r/core';
+import { createArbiterClient } from '@x402r/sdk';
 
-const config = getNetworkConfig('eip155:84532')!;
-
-const arbiter = new X402rArbiter({
+const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
-  refundRequestAddress: config.refundRequest,
-  arbiterRegistryAddress: config.arbiterRegistry,
 });
 ```
 
