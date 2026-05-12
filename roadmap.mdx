@@ -1,112 +1,121 @@
 ---
 title: "Roadmap"
-description: "Current progress and upcoming features for the x402r protocol and SDK"
+description: "What x402r has shipped, what's in flight, and what's planned next"
 icon: "map"
 ---
 
 ## Protocol
 
-### V0 Demo (Completed)
+### Shipped
 
-- Client SDK wrapper and MCP tool
-- NPM package published
-- Refund request encryption (Lit Protocol)
-- Basic refund flow (cancel, replace, approve/reject)
+- **authCapture scheme** built on the audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) (`AuthCaptureEscrow` + token collectors), used directly at universal CREATE2 addresses (no fork)
+- **Two settlement paths**: two-phase `authorize` then `capture` (default), and single-shot `autoCapture` for atomic `charge`
+- **Client signing**: ERC-3009 (`receiveWithAuthorization`) or Uniswap Permit2 (`permitTransferFrom`), selectable per request via `assetTransferMethod`
+- **PaymentOperator** with pluggable pre-action conditions and post-action hooks for `void`, `refund`, `capture`, `charge`
+- **EscrowPeriod**, **Freeze**, **RefundRequest**, and **RefundRequestEvidence** plugins for dispute and arbitration flows
+- **Factory pattern** with CREATE2 deterministic deployment
+- **Reference implementation**: [x402r-scheme](https://github.com/BackTrackCo/x402r-scheme) (`@x402r/evm`)
+- **Solana (`@x402r/svm`)**: 6-program Anchor pilot landed alongside the EVM mechanism package. See [SVM Pilot](#solana-pilot-alpha) below.
 
-### Protocol V2 (Completed)
+### In flight
 
-- Switched from proxy pattern to authCapture scheme on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments)
-- PaymentOperator with pluggable conditions and recorders
-- EscrowPeriod and Freeze contracts
-- Factory pattern with unified CREATE2 deterministic deployment
-- RefundRequestEvidence for on-chain evidence submission
-- Deployed across supported chains with unified addresses (same address everywhere)
+- **authCapture scheme spec** moving toward upstream merge into the x402 protocol. See the [authCapture Scheme Specification](/x402-integration/auth-capture-scheme) for the wire format and verification logic.
+- Documentation restructure and accuracy fixes (you are reading the result)
+- Simple "API down" arbiter template for first merchants
+- Tenjin: description-vs-content arbiter using an LLM in a TEE
 
-### authCapture Scheme Spec (In Progress)
-
-- Reference implementation: [x402r-scheme](https://github.com/BackTrackCo/x402r-scheme)
-- See the [authCapture Scheme Specification](/x402-integration/auth-capture-scheme) for the wire format and verification logic
-
-### Developer Experience (In Progress)
-
-- Documentation restructure and accuracy fixes
-- LLM-friendly docs with MCP integration
-- Simple "API Down" arbiter template for first merchants
-- CI/CD pipeline for SDK and contracts
-
-### Protocol Extensions (Future)
+### Planned
 
 - Bond-based disputes
-- Multiple arbiter support per operator
-- After capture arbitration handling
-- Reputation system for clients, merchants, and arbiters
-- Arbiter marketplace
+- Multi-level verification (L1 schema/auto, L2 AI review, L3 human arbitration) with per-tier `MaxAmountCondition` exposure caps
+- Multiple arbiters per operator and arbiter marketplace
+- After-capture arbitration handling
+- Reputation system for clients, merchants, and arbiters (via ERC-8004)
 - Token wrapper for enforced refund protection
+
+---
+
+## Solana Pilot (Alpha)
+
+Solana support is **alpha/experimental**. The Anchor programs and TypeScript mechanism package are implemented, but the pilot is **unaudited** and not yet deployed to mainnet-beta. Use at your own risk; flag any production use to the team first.
+
+### Shipped
+
+- Six Anchor programs at [x402r-contracts-svm](https://github.com/BackTrackCo/x402r-contracts-svm): `authCapture` escrow with `authorize`, `charge`, `capture`, `void`, `refund`, `reclaim` instructions, plus address-match condition programs (`static-address`, `receiver`, `payer`)
+- `@x402r/svm` TypeScript package (Solana Kit + Codama-generated client) mirroring `@x402r/evm`'s client/server/facilitator/shared shape
+- Plugin slot plumbing: 5 pre-action `condition_programs` and 5 post-action `hook_programs` per `PaymentInfo`, with canonical `ICondition` / `IHook` instruction signatures so third-party arbiter programs slot in without escrow changes
+- Fee enforcement (protocol + operator splits) parity with EVM
+
+### Planned
+
+- Devnet + mainnet-beta deployment
+- Devnet demo exercising all three lifecycle paths (`authorize, capture`, `authorize, void`, `charge, refund`) with a sample arbiter program
+- `scheme_authCapture_svm.md` spec doc upstream
 
 ---
 
 ## SDK
 
-### Phase 0: Operator Deployment (Completed)
+The SDK lives at [x402r-sdk](https://github.com/BackTrackCo/x402r-sdk). All packages target the canonical `authCapture` contract surface and the `@x402r/evm` v0.2.x scheme adapter.
 
-- Fixed all SDK ABIs to match contracts
-- Factory deployment helpers (`deployMarketplaceOperator`)
-- Condition composition (AND/OR/NOT combinators)
-- Deterministic address computation (CREATE2)
-- Deployed all contracts on Base Sepolia and Base Mainnet
+### Shipped
 
-### Phase 1: MVP Examples (Completed)
+| Package | Purpose |
+|---|---|
+| `@x402r/core` | Stateless viem-style action functions (payment, operator, refund, evidence, escrow, freeze, watch) |
+| `@x402r/sdk` | Stateful client with action groups and a `.extend()` plugin pattern |
+| `@x402r/helpers` | `x402rDefaults()` and wire-format re-exports |
+| `@x402r/cli` | Wallet-agnostic one-shot payment CLI (0.2.0+) |
 
-- 8 examples (deploy-operator, facilitator, server-express, server-hono, merchant-cli, client-cli, arbiter-cli, shared)
-- Full e2e dispute resolution flow
+Other shipped capabilities:
 
-### Phase 2: Core SDK (Completed)
+- **ERC-8004 plugin**: identity, reputation, and discovery actions
+- **ERC-8004 extraction helpers** with `identity.check()`
+- **Anvil fork testing** via prool, 80% coverage threshold in CI
+- **Biome** + **@wagmi/cli** ABI codegen against the contracts
+- Role-based presets: `createPayerClient()`, `createMerchantClient()`, `createArbiterClient()`
 
-- `@x402r/client`, Refund requests, freeze, escrow period queries, subscriptions
-- `@x402r/merchant`, Release, charge, voidPayment, refund, refund handling
-- `@x402r/arbiter`, Decision submission, batch operations, registry, AI hooks
-- `@x402r/helpers`, `refundable()` helper for payment options
-- `@x402r/core`, Types, ABIs, config, deploy utilities
-- 310+ tests across all packages
+### In flight
 
-### Phase 3: Client UX (Upcoming)
+- Pre-payment info extraction (`getOperatorInfo`: discover arbiter and escrow period from an operator address)
+- Combined freeze + refund (`freezeAndRequestRefund` single call)
+- Subgraph integration for historical payment listing and stubbed query methods
 
-- Pre-payment info extraction (`getOperatorInfo`, discover arbiter, escrow period from operator address)
-- Combined freeze + refund (`freezeAndRequestRefund`, single call)
-- Condition awareness for clients
+### Planned
 
-### Phase 4: Subgraph Integration (Upcoming)
-
-- Deploy subgraph for payment event indexing
-- Implement 8 stubbed methods (`getPaymentState`, `getMyPayments`, etc.)
-- Historical payment listing for all roles
-
-### Future SDK Work
-
-- Evidence/metadata system with pluggable backends (IPFS, Arweave)
+- Evidence and metadata system with pluggable backends (IPFS, Arweave)
 - Encrypted communication channels (XMTP)
 - Session-based billing patterns
 - Multi-arbiter support
-- Dedicated Express/Hono middleware
+- Dedicated Express and Hono middleware
+- Garbage-detection / multi-tier verification SDK extensions (paired with the arbiter work above)
 
 ---
 
 ## Contract Status
 
-All contracts use **unified CREATE3 addresses**: same address on every supported chain (11 chains: Base, Ethereum, Polygon, Arbitrum, Optimism, Celo, Avalanche, Monad, Linea, Base Sepolia, Ethereum Sepolia).
+All EVM contracts use **universal CREATE2 addresses**: when a chain is supported, the address is the same as on every other supported chain. The canonical commerce-payments primitives come from [`base/commerce-payments@v1.0.0`](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
+
+### Supported chains
+
+Today: **Base mainnet** and **Base Sepolia**. Additional EVMs will be added as canonical `commerce-payments@v1.0.0` coverage from Base extends.
+
+Solana support is alpha and not yet on mainnet-beta. See [Solana Pilot (Alpha)](#solana-pilot-alpha).
+
+### Contract inventory
 
 | Contract | Status |
-|----------|--------|
-| AuthCaptureEscrow | Deployed |
-| ERC3009PaymentCollector | Deployed |
+|---|---|
+| AuthCaptureEscrow (canonical) | Deployed |
+| ERC3009PaymentCollector (canonical) | Deployed |
+| Permit2PaymentCollector (canonical) | Deployed |
 | PaymentOperatorFactory | Deployed |
 | EscrowPeriodFactory | Deployed |
 | FreezeFactory | Deployed |
 | StaticFeeCalculatorFactory | Deployed |
-| All condition/combinator factories | Deployed |
+| All condition / combinator factories | Deployed |
 | ProtocolFeeConfig | Deployed |
 | RefundRequestEvidence | Deployed |
-| ReceiverRefundCollector | Deployed |
 | Condition singletons (Payer, Receiver, AlwaysTrue) | Deployed |
 
 <Note>
