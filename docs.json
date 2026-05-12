@@ -18,8 +18,13 @@
             "pages": [
               "index",
               "x402-integration/overview",
-              "x402-integration/auth-capture-scheme",
               "x402-integration/comparison"
+            ]
+          },
+          {
+            "group": "authCapture Scheme",
+            "pages": [
+              "x402-integration/auth-capture-scheme"
             ]
           },
           {

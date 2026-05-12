@@ -34,7 +34,7 @@ These audits cover the core escrow lifecycle: authorize, capture, void, reclaim,
 
 ### What This Means
 
-- The audited escrow layer provides a strong foundation — fund custody, token transfers, and payment state transitions have been professionally reviewed
+- The audited escrow layer provides a strong foundation, fund custody, token transfers, and payment state transitions have been professionally reviewed
 - The condition/recorder plugin system is stateless or minimal-state by design, reducing attack surface
 
 <Warning>
@@ -47,7 +47,7 @@ Even without a formal audit, the x402r contracts follow established security pat
 
 - **CEI (Checks-Effects-Interactions)** ordering in all state-changing functions
 - **ReentrancyGuardTransient** (EIP-1153) on all external entry points
-- **Immutable configuration** — operator conditions and fee calculators cannot be changed after deployment
+- **Immutable configuration**: operator conditions and fee calculators cannot be changed after deployment
 - **7-day timelock** on protocol fee changes via ProtocolFeeConfig
 - **2-step ownership transfers** via Solady's Ownable
 - **Comprehensive Forge test suite** covering core flows and edge cases
@@ -56,10 +56,10 @@ Even without a formal audit, the x402r contracts follow established security pat
 
 We plan to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
 
-1. **PaymentOperator** — condition dispatch, fee calculation, fee locking, distribution
-2. **Plugin system** — conditions, recorders, combinators, and their factories
-3. **EscrowPeriod + Freeze** — time-lock enforcement and freeze state management
-4. **RefundRequest** — request lifecycle and access control
+1. **PaymentOperator**: condition dispatch, fee calculation, fee locking, distribution
+2. **Plugin system**: conditions, recorders, combinators, and their factories
+3. **EscrowPeriod + Freeze**: time-lock enforcement and freeze state management
+4. **RefundRequest**: request lifecycle and access control
 
 We'll publish audit reports publicly once completed.
 

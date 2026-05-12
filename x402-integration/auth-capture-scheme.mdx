@@ -6,7 +6,7 @@ icon: "file-contract"
 
 ## Overview
 
-The **`authCapture` scheme** for x402 v2 uses the audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) (`AuthCaptureEscrow` + token collectors) directly — no fork. The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it, either locking funds in escrow for later capture (two-phase) or sending them directly to the receiver with refund capability (single-shot).
+The **`authCapture` scheme** for x402 v2 uses the audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) (`AuthCaptureEscrow` + token collectors) directly, no fork. The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it, either locking funds in escrow for later capture (two-phase) or sending them directly to the receiver with refund capability (single-shot).
 
 Unlike `exact`, which has no built-in mechanism for returning funds, `authCapture` supports returning funds to the client through void, refund, and reclaim.
 
@@ -27,7 +27,7 @@ AUTHORIZE -> RESOURCE DELIVERED -> CAPTURE / VOID -> (REFUND)
 
 <Steps>
   <Step title="Authorize">
-    Client authorization is submitted — funds locked in escrow via `AuthCaptureEscrow.authorize()`. The token collector executes the client's signature (ERC-3009 `receiveWithAuthorization` or Permit2 `permitTransferFrom`) to pull tokens into escrow.
+    Client authorization is submitted, funds locked in escrow via `AuthCaptureEscrow.authorize()`. The token collector executes the client's signature (ERC-3009 `receiveWithAuthorization` or Permit2 `permitTransferFrom`) to pull tokens into escrow.
   </Step>
 
   <Step title="Resource Delivered">
@@ -55,7 +55,7 @@ CHARGE -> RESOURCE DELIVERED -> (REFUND)
 
 <Steps>
   <Step title="Charge">
-    Client authorization is submitted — funds sent directly to receiver via `AuthCaptureEscrow.charge()`. No escrow hold.
+    Client authorization is submitted, funds sent directly to receiver via `AuthCaptureEscrow.charge()`. No escrow hold.
   </Step>
 
   <Step title="Resource Delivered">
@@ -67,7 +67,7 @@ CHARGE -> RESOURCE DELIVERED -> (REFUND)
   </Step>
 </Steps>
 
-No capture, void, or reclaim — funds are never held in escrow.
+No capture, void, or reclaim, funds are never held in escrow.
 
 ## Visual Flow
 
@@ -178,7 +178,7 @@ Server sends this to request payment:
 
 A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals.
 
-### PaymentPayload — EIP-3009 (default)
+### PaymentPayload: EIP-3009 (default)
 
 Client sends this with a signed ERC-3009 authorization:
 
@@ -213,7 +213,7 @@ Client sends this with a signed ERC-3009 authorization:
 }
 ```
 
-### PaymentPayload — Permit2
+### PaymentPayload: Permit2
 
 When `extra.assetTransferMethod === "permit2"`, the client signs a Permit2 `PermitTransferFrom`:
 
@@ -250,8 +250,8 @@ The merchant address is bound through the deterministic nonce (no witness struct
 | `name` | string | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only. |
 | `version` | string | EIP-712 token-domain version (e.g., `"2"`). |
 | `captureAuthorizer` | address | Address authorized to authorize/capture/void/refund/charge. Committed on-chain as `PaymentInfo.operator`. |
-| `captureDeadline` | uint48 | Absolute Unix seconds — capture must occur before this. Encoded as `authorizationExpiry`. |
-| `refundDeadline` | uint48 | Absolute Unix seconds — refunds allowed until this. Encoded as `refundExpiry`. |
+| `captureDeadline` | uint48 | Absolute Unix seconds: capture must occur before this. Encoded as `authorizationExpiry`. |
+| `refundDeadline` | uint48 | Absolute Unix seconds: refunds allowed until this. Encoded as `refundExpiry`. |
 | `feeRecipient` | address | Fee recipient. Set to `address(0)` to let the captureAuthorizer specify any non-zero recipient at capture/charge time. |
 | `minFeeBps` | uint16 | Minimum fee in basis points the captureAuthorizer must take. `0` = no minimum. |
 | `maxFeeBps` | uint16 | Maximum fee in basis points the captureAuthorizer can take. |
@@ -282,19 +282,19 @@ Freshness is enforced by `salt`: each signing call generates a fresh `bytes32` s
 
 The facilitator performs these checks in order:
 
-1. **Type guard** — Payload matches `Eip3009Payload` or `Permit2Payload` (includes `signature` and `salt`).
-2. **Scheme match** — `requirements.scheme === "authCapture"` and `payload.accepted.scheme === "authCapture"`.
-3. **Network match** — `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`.
-4. **Extra validation** — All required `extra` fields present.
-5. **Method routing** — `extra.assetTransferMethod` (default `"eip3009"`) matches the payload shape.
-6. **Deadline ordering** — `refundDeadline >= captureDeadline`, `captureDeadline > now + 6s`, and the payload's `validBefore` (EIP-3009) or `deadline` (Permit2) `<= captureDeadline`.
-7. **Time window** — `validBefore` / `deadline > now + 6s` (not expired) and `validAfter <= now` (active, EIP-3009 only).
-8. **Spender / collector match** — `authorization.to === EIP3009_TOKEN_COLLECTOR_ADDRESS` (EIP-3009) or `permit2Authorization.spender === PERMIT2_TOKEN_COLLECTOR_ADDRESS` (Permit2).
-9. **Token match** — `permit2Authorization.permitted.token === requirements.asset` (Permit2 only — EIP-3009 binds via signing domain).
-10. **Signature verify** — Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match payer.
-11. **Amount** — Authorization amount matches `requirements.amount`.
-12. **Nonce match** — Reconstruct `PaymentInfo` from extra + salt + payer + requirements; recompute the payer-agnostic hash; assert it matches the wire nonce. This transitively enforces equality on every field encoded in `PaymentInfo` (receiver, token, deadlines, fee bounds, feeRecipient).
-13. **Simulate** — Call `AuthCaptureEscrow.authorize(...)` or `.charge(...)` via `eth_call` to verify success.
+1. **Type guard**: Payload matches `Eip3009Payload` or `Permit2Payload` (includes `signature` and `salt`).
+2. **Scheme match**: `requirements.scheme === "authCapture"` and `payload.accepted.scheme === "authCapture"`.
+3. **Network match**: `payload.accepted.network === requirements.network` and format is `eip155:<chainId>`.
+4. **Extra validation**: All required `extra` fields present.
+5. **Method routing**: `extra.assetTransferMethod` (default `"eip3009"`) matches the payload shape.
+6. **Deadline ordering**: `refundDeadline >= captureDeadline`, `captureDeadline > now + 6s`, and the payload's `validBefore` (EIP-3009) or `deadline` (Permit2) `<= captureDeadline`.
+7. **Time window**: `validBefore` / `deadline > now + 6s` (not expired) and `validAfter <= now` (active, EIP-3009 only).
+8. **Spender / collector match**: `authorization.to === EIP3009_TOKEN_COLLECTOR_ADDRESS` (EIP-3009) or `permit2Authorization.spender === PERMIT2_TOKEN_COLLECTOR_ADDRESS` (Permit2).
+9. **Token match**: `permit2Authorization.permitted.token === requirements.asset` (Permit2 only, EIP-3009 binds via signing domain).
+10. **Signature verify**: Recover signer from EIP-712 (`ReceiveWithAuthorization` or `PermitTransferFrom`); must match payer.
+11. **Amount**: Authorization amount matches `requirements.amount`.
+12. **Nonce match**: Reconstruct `PaymentInfo` from extra + salt + payer + requirements; recompute the payer-agnostic hash; assert it matches the wire nonce. This transitively enforces equality on every field encoded in `PaymentInfo` (receiver, token, deadlines, fee bounds, feeRecipient).
+13. **Simulate**: Call `AuthCaptureEscrow.authorize(...)` or `.charge(...)` via `eth_call` to verify success.
 
 ### EIP-6492 Support
 
@@ -303,16 +303,16 @@ For smart wallet clients, the signature may be EIP-6492 wrapped (containing depl
 ## Settlement Logic
 
 1. **Re-verify** the payload (catch expired/invalid payloads before spending gas).
-2. **Determine function** — `extra.autoCapture === true ? "charge" : "authorize"`.
-3. **Resolve collector** — `EIP3009_TOKEN_COLLECTOR_ADDRESS` or `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (per `assetTransferMethod`).
-4. **Encode `collectorData`** — raw ERC-3009 signature, or ABI-encoded Permit2 signature.
-5. **Call escrow** — `AuthCaptureEscrow.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`.
-6. **Wait for receipt** — 60s timeout.
-7. **Return result** — tx hash, network, payer.
+2. **Determine function**: `extra.autoCapture === true ? "charge" : "authorize"`.
+3. **Resolve collector**: `EIP3009_TOKEN_COLLECTOR_ADDRESS` or `PERMIT2_TOKEN_COLLECTOR_ADDRESS` (per `assetTransferMethod`).
+4. **Encode `collectorData`**: raw ERC-3009 signature, or ABI-encoded Permit2 signature.
+5. **Call escrow**: `AuthCaptureEscrow.<functionName>(paymentInfo, amount, tokenCollector, collectorData)`.
+6. **Wait for receipt**: 60s timeout.
+7. **Return result**: tx hash, network, payer.
 
 ## PaymentInfo Struct
 
-This is the on-chain Solidity struct. The `payer` field is not included in the JSON payload — it is derived from the signature recovery at settlement time. Wire-format `extra` uses spec-level field names; the on-chain struct keeps canonical names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
+This is the on-chain Solidity struct. The `payer` field is not included in the JSON payload, it is derived from the signature recovery at settlement time. Wire-format `extra` uses spec-level field names; the on-chain struct keeps canonical names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
 
 ```solidity
 struct PaymentInfo {

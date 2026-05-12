@@ -62,17 +62,17 @@ icon: "map"
 
 ### Phase 2: Core SDK (Completed)
 
-- `@x402r/client` — Refund requests, freeze, escrow period queries, subscriptions
-- `@x402r/merchant` — Release, charge, refundInEscrow, refundPostEscrow, refund handling
-- `@x402r/arbiter` — Decision submission, batch operations, registry, AI hooks
-- `@x402r/helpers` — `refundable()` helper for payment options
-- `@x402r/core` — Types, ABIs, config, deploy utilities
+- `@x402r/client`, Refund requests, freeze, escrow period queries, subscriptions
+- `@x402r/merchant`, Release, charge, refundInEscrow, refundPostEscrow, refund handling
+- `@x402r/arbiter`, Decision submission, batch operations, registry, AI hooks
+- `@x402r/helpers`, `refundable()` helper for payment options
+- `@x402r/core`, Types, ABIs, config, deploy utilities
 - 310+ tests across all packages
 
 ### Phase 3: Client UX (Upcoming)
 
-- Pre-payment info extraction (`getOperatorInfo` — discover arbiter, escrow period from operator address)
-- Combined freeze + refund (`freezeAndRequestRefund` — single call)
+- Pre-payment info extraction (`getOperatorInfo`, discover arbiter, escrow period from operator address)
+- Combined freeze + refund (`freezeAndRequestRefund`, single call)
 - Condition awareness for clients
 
 ### Phase 4: Subgraph Integration (Upcoming)
@@ -93,7 +93,7 @@ icon: "map"
 
 ## Contract Status
 
-All contracts use **unified CREATE3 addresses** — same address on every supported chain (11 chains: Base, Ethereum, Polygon, Arbitrum, Optimism, Celo, Avalanche, Monad, Linea, Base Sepolia, Ethereum Sepolia).
+All contracts use **unified CREATE3 addresses**: same address on every supported chain (11 chains: Base, Ethereum, Polygon, Arbitrum, Optimism, Celo, Avalanche, Monad, Linea, Base Sepolia, Ethereum Sepolia).
 
 | Contract | Status |
 |----------|--------|
