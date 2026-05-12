@@ -19,7 +19,7 @@ const comboAddress = await andConditionFactory.write.deploy([
 ]);
 
 // Use in operator config
-config.captureCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
 **Example:** Capture requires receiver AND escrow period passed.
@@ -34,7 +34,7 @@ const comboAddress = await orConditionFactory.write.deploy([
   [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-config.captureCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
 **Example:** Either receiver or arbiter can capture.
@@ -47,7 +47,7 @@ Inverts a condition (`!A`).
 // Anyone EXCEPT payer can call
 const comboAddress = await notConditionFactory.write.deploy([PAYER_CONDITION]);
 
-config.captureCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
 **Example:** Prevent payer from releasing their own payment.
@@ -66,7 +66,7 @@ const capturePreActionCondition = await andConditionFactory.write.deploy([
   [receiverOrArbiter, ESCROW_PERIOD_ADDRESS]
 ]);
 
-config.captureCondition = capturePreActionCondition;
+config.capturePreActionCondition = capturePreActionConditionAddress;
 ```
 
 **Logic Tree:**

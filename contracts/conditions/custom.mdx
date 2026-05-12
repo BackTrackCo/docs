@@ -51,7 +51,7 @@ Usage, deploy via a factory and use in operator config:
 const businessHours = await timeOfDayConditionFactory.write.deploy([9, 17]);
 
 // Use in operator config
-config.captureCondition = businessHours;
+config.capturePreActionCondition = businessHours;
 ```
 
 ## Security Checklist

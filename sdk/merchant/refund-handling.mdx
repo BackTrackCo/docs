@@ -4,7 +4,9 @@ description: "Process, approve, deny, and manage refund requests as a merchant"
 icon: "rotate-left"
 ---
 
-The merchant client provides refund management through the `refund` and `freeze` action groups. The `refund` group requires `refundRequestAddress` in the client config.
+The merchant client exposes a read-mostly slice of refund actions plus `freeze.isFrozen`. Writes that change refund-request status (`deny`, `refuse`) and writes that lift a freeze (`unfreeze`) live on `createArbiterClient` or on the full `createX402r()` client.
+
+Use `createMerchantClient` for queries below; for executing a refund, see [Capture vs void](/sdk/merchant/quickstart#payment-voidpayment), the merchant client's `payment.voidPayment()` auto-flips the request to `Approved` through the `VOID_POST_ACTION_HOOK`.
 
 ## Refund request queries
 
@@ -85,61 +87,38 @@ const request = await merchant.refund?.getByKey(paymentInfoHash)
 
 ### refund.getReceiverRequests
 
-Retrieve paginated refund requests for a receiver address.
+Retrieve paginated refund request keys for this merchant (the receiver).
 
 ```typescript
-const requests = await merchant.refund?.getReceiverRequests(receiverAddress, 0n, 10n)
+const { keys, total } = await merchant.refund?.getReceiverRequests(
+  receiverAddress,
+  0n,
+  10n,
+) ?? { keys: [], total: 0n }
+
+for (const hash of keys) {
+  const request = await merchant.refund?.getByKey(hash)
+  // ... inspect request.amount, request.status
+}
 ```
 
 **Parameters**
 
 | Name | Type | Description |
 |---|---|---|
-| `receiver` | `Address` | Receiver address to query |
+| `receiver` | `Address` | Receiver address to query (typically the merchant) |
 | `offset` | `bigint` | Index offset |
 | `count` | `bigint` | Max entries to return |
 
-**Returns** `Promise<RefundRequestData[]>`.
+**Returns** `Promise<{ keys: readonly Hex[]; total: bigint }>`. To hydrate each entry, call `refund.getByKey(hash)` per key.
 
-### refund.getOperatorRequests
-
-Retrieve paginated refund requests across all payments on an operator.
-
-```typescript
-const requests = await merchant.refund?.getOperatorRequests(operatorAddress, 0n, 10n)
-```
-
-**Parameters**
-
-| Name | Type | Description |
-|---|---|---|
-| `operator` | `Address` | Operator address to query |
-| `offset` | `bigint` | Index offset |
-| `count` | `bigint` | Max entries to return |
-
-**Returns** `Promise<RefundRequestData[]>`.
+<Note>
+`getOperatorRequests` (paginated across all payments under an operator) lives on `createArbiterClient`, not on the merchant client.
+</Note>
 
 ## Refund request actions
 
-### refund.deny
-
-Deny a pending refund request. Status becomes `Denied`.
-
-```typescript
-const tx = await merchant.refund?.deny(paymentInfo)
-```
-
-**Parameters**
-
-| Name | Type | Description |
-|---|---|---|
-| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
-
-**Returns** `Promise<Hash>`.
-
-<Info>
-If you deny a request, the payer may escalate to an arbiter. Provide a reason off-chain to reduce escalation risk.
-</Info>
+Approving or denying a request through the operator hook is what the merchant does. Terminal `deny` / `refuse` calls on the RefundRequest contract are scoped to the arbiter role; from a merchant, execute the refund through `payment.voidPayment()` (auto-approves) or signal a refusal off-chain and let the arbiter terminalize.
 
 ### payment.voidPayment
 
@@ -180,21 +159,9 @@ const frozen = await merchant.freeze?.isFrozen(paymentInfo)
 
 **Returns** `Promise<boolean>`.
 
-### freeze.unfreeze
-
-Remove a freeze on a payment. Only the receiver (merchant) or an authorized party can unfreeze.
-
-```typescript
-const tx = await merchant.freeze?.unfreeze(paymentInfo)
-```
-
-**Parameters**
-
-| Name | Type | Description |
-|---|---|---|
-| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
-
-**Returns** `Promise<Hash>`.
+<Note>
+The merchant client exposes `freeze.isFrozen` only. Lifting a freeze (`unfreeze`) is an arbiter-role action; use `createArbiterClient` or `createX402r()`.
+</Note>
 
 ## Complete refund workflow
 
@@ -240,13 +207,14 @@ async function handleRefundWorkflow(
   const shouldApprove = request.amount <= amounts.refundableAmount
 
   if (shouldApprove) {
-    // Execute the refund (auto-approves the request)
+    // Execute the refund (auto-approves the request via VOID_POST_ACTION_HOOK)
     const tx = await merchant.payment.voidPayment(paymentInfo)
     console.log('Refund executed:', tx)
   } else {
-    // Deny the request
-    const tx = await merchant.refund?.deny(paymentInfo)
-    console.log('Denied:', tx)
+    // The arbiter can terminalize the request via refund.deny / refund.refuse.
+    // The merchant can simply leave the request Pending and capture as usual,
+    // or escalate off-chain to the arbiter.
+    console.log('Declining; arbiter may deny if escalated')
   }
 }
 ```
@@ -273,26 +241,22 @@ sequenceDiagram
     alt Approve
         M->>O: payment.voidPayment(paymentInfo)
         O->>P: Funds returned to payer
-    else Deny
-        M->>R: refund.deny(paymentInfo)
-        Note over P: Payer may escalate to arbiter
+    else Decline (off-chain) / escalate to arbiter
+        Note over P,R: Arbiter may terminalize via refund.deny / refund.refuse
     end
 ```
 
 ## Method reference
 
 | Method | Parameters | Returns |
-|--------|-----------|---------|
+|---|---|---|
 | `refund.has` | `paymentInfo` | `boolean` |
 | `refund.getStatus` | `paymentInfo` | `RefundRequestStatus` |
 | `refund.get` | `paymentInfo` | `RefundRequestData` |
 | `refund.getByKey` | `paymentInfoHash` | `RefundRequestData` |
-| `refund.deny` | `paymentInfo` | `Hash` |
-| `refund.refuse` | `paymentInfo` | `Hash` |
-| `refund.getReceiverRequests` | `receiver, offset, count` | `RefundRequestData[]` |
-| `refund.getOperatorRequests` | `operator, offset, count` | `RefundRequestData[]` |
+| `refund.getReceiverRequests` | `receiver, offset, count` | `{ keys: readonly Hex[]; total: bigint }` |
 | `freeze.isFrozen` | `paymentInfo` | `boolean` |
-| `freeze.unfreeze` | `paymentInfo` | `Hash` |
+| `payment.voidPayment` | `paymentInfo, data?` | `Hash` (auto-approves the pending RefundRequest) |
 
 ## Next steps
 

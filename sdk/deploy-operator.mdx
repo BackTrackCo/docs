@@ -57,7 +57,7 @@ A complete marketplace operator deployment includes:
 
     | Variable | Default | Description |
     |----------|---------|-------------|
-    | `PRIVATE_KEY` |, | Deployer wallet (required) |
+    | `PRIVATE_KEY` | (none) | Deployer wallet (required) |
     | `ARBITER` | deployer address | Dispute resolver |
     | `FEE_RECEIVER` | deployer address | Receives operator fees |
     | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
@@ -192,7 +192,7 @@ The deployed marketplace operator has the following slot configuration:
 
 | Slot | Contract | Purpose |
 |---|---|---|
-| `AUTHORIZE_PRE_ACTION_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | (none) | Default: anyone with a valid signature can authorize |
 | `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_PRE_ACTION_CONDITION` | (none) | No restrictions on charge |
 | `CAPTURE_PRE_ACTION_CONDITION` | EscrowPeriod (or AND(EscrowPeriod, Freeze) if freeze enabled) | Blocks capture during escrow period |

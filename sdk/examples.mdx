@@ -4,41 +4,32 @@ description: "Runnable examples for every SDK operation."
 icon: "code"
 ---
 
-The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) ships runnable examples for every role. Each starts a local Anvil fork, deploys contracts, and runs end-to-end; no wallet or testnet funds needed.
+The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) ships runnable example scripts organized by role plus end-to-end scenarios.
 
 ## Examples
 
 <CardGroup cols={2}>
-  <Card title="facilitator" icon="handshake" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/facilitator/basic">
-    Operator-agnostic HTTP service implementing x402's facilitator protocol. Handles signature verification and on-chain settlement for `authCapture`.
+  <Card title="payer" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer">
+    Request a refund, freeze a payment, submit IPFS evidence. Three TypeScript scripts.
   </Card>
-  <Card title="deploy-operator" icon="rocket" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator">
-    Deploy a complete marketplace or delivery-protection operator via `deployMarketplaceOperator()` / `deployDeliveryProtectionOperator()`.
+  <Card title="merchant" icon="store" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant">
+    Capture from escrow and charge directly. TypeScript scripts plus README.
   </Card>
-  <Card title="server-express" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express">
-    Express merchant server using `AuthCaptureServerScheme` and `HTTPFacilitatorClient` to accept refundable payments via x402 middleware.
+  <Card title="arbiter" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter">
+    Approve a refund, review on-chain evidence, distribute protocol fees.
   </Card>
-  <Card title="server-hono" icon="server" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/hono">
-    Hono merchant server using `AuthCaptureServerScheme` and `HTTPFacilitatorClient` to accept refundable payments via x402 middleware.
+  <Card title="scenarios" icon="route" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios">
+    End-to-end runners: happy-path capture, dispute resolution. Wires payer + merchant + arbiter together against a local Anvil fork.
   </Card>
-  <Card title="merchant-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/merchant-cli">
-    CLI tool for merchants to capture funds, void / deny / approve refunds, and query escrow state.
-  </Card>
-  <Card title="client-cli" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/client-cli">
-    CLI tool for payers to `pay`, `preview-fee`, request refunds, freeze payments, and check status.
-  </Card>
-  <Card title="arbiter-cli" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/arbiter-cli">
-    CLI tool for arbiters to review cases, deny / refuse / execute refunds, and manage registry.
-  </Card>
-  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/shared">
-    Shared utilities for the CLI examples: `parsePaymentInfo`, `shortAddress`, `formatUSDC`.
+  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
+    Shared setup utilities: Anvil-fork bootstrap, constants, common types.
   </Card>
 </CardGroup>
 
 ## Running examples
 
 <Warning>
-Mainnet runs require funded wallets on Base. For local runs, the Anvil-fork scripts seed accounts automatically.
+Mainnet runs require funded wallets on Base. The scenario runners use a local Anvil fork and seed accounts automatically.
 </Warning>
 
 <CodeGroup>
@@ -59,15 +50,7 @@ bun install && bun run build
 ```
 </CodeGroup>
 
-Then run a per-action example:
-
-```bash
-pnpm example:payer:request-refund
-pnpm example:merchant:charge
-pnpm example:arbiter:approve-refund
-```
-
-See the [examples directory README](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) for the full list of scripts.
+See each example directory's README on GitHub for the exact run command for that script.
 
 ## Next steps
 

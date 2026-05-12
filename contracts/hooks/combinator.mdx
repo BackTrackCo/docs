@@ -17,7 +17,7 @@ const comboAddress = await hookCombinatorFactory.write.deploy([
   [escrowPeriodAddress, paymentIndexRecorderHookAddress]  // Records auth time + payment index
 ]);
 
-config.authorizeHook = comboAddress;
+config.authorizePostActionHook = comboAddress;
 ```
 
 ## Behavior
