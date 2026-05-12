@@ -10,15 +10,19 @@ The merchant client provides refund management through the `refund` and `freeze`
 
 ### refund.has
 
-Check whether a payer has submitted a refund request for a specific payment.
+Check whether a refund request exists for a payment.
 
 ```typescript
 const hasRequest = await merchant.refund?.has(paymentInfo)
-
-if (hasRequest) {
-  console.log('Refund request exists for this payment')
-}
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<boolean>`.
 
 ### refund.getStatus
 
@@ -28,38 +32,38 @@ Retrieve the current status of a refund request.
 import { RefundRequestStatus } from '@x402r/sdk'
 
 const status = await merchant.refund?.getStatus(paymentInfo)
-
-switch (status) {
-  case RefundRequestStatus.Pending:
-    console.log('Awaiting your decision')
-    break
-  case RefundRequestStatus.Approved:
-    console.log('You approved this refund')
-    break
-  case RefundRequestStatus.Denied:
-    console.log('You denied this refund')
-    break
-  case RefundRequestStatus.Cancelled:
-    console.log('Payer cancelled the request')
-    break
-  case RefundRequestStatus.Refused:
-    console.log('Arbiter declined to rule')
-    break
-}
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<RefundRequestStatus>`, `Pending` \| `Approved` \| `Denied` \| `Cancelled` \| `Refused`.
 
 ### refund.get
 
-Retrieve the complete refund request data, including the amount and status.
+Retrieve the complete refund request data.
 
 ```typescript
 const request = await merchant.refund?.get(paymentInfo)
-
-console.log('Payment hash:', request?.paymentInfoHash)
-console.log('Requested amount:', request?.amount)
-console.log('Approved amount:', request?.approvedAmount)
-console.log('Status:', request?.status)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<RefundRequestData>`:
+
+| Field | Type | Description |
+|---|---|---|
+| `paymentInfoHash` | `Hex` | keccak256 of the payment info struct |
+| `amount` | `bigint` | Amount the payer requested |
+| `approvedAmount` | `bigint` | Amount actually executed (0 until approved) |
+| `status` | `RefundRequestStatus` | Lifecycle state |
 
 ### refund.getByKey
 
@@ -67,63 +71,92 @@ Look up a refund request directly by its payment info hash.
 
 ```typescript
 const request = await merchant.refund?.getByKey(paymentInfoHash)
-console.log('Amount:', request?.amount)
-console.log('Status:', request?.status)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfoHash` | `Hex` | keccak256 of the payment info struct |
+
+**Returns** `Promise<RefundRequestData>`.
 
 ## Paginated refund request listing
 
 ### refund.getReceiverRequests
 
-Retrieve paginated refund request data for a receiver address.
+Retrieve paginated refund requests for a receiver address.
 
 ```typescript
-const requests = await merchant.refund?.getReceiverRequests(
-  receiverAddress,
-  0n,   // offset
-  10n,  // count
-)
-
-for (const request of requests ?? []) {
-  console.log('Amount:', request.amount, 'Status:', request.status)
-}
+const requests = await merchant.refund?.getReceiverRequests(receiverAddress, 0n, 10n)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `receiver` | `Address` | Receiver address to query |
+| `offset` | `bigint` | Index offset |
+| `count` | `bigint` | Max entries to return |
+
+**Returns** `Promise<RefundRequestData[]>`.
 
 ### refund.getOperatorRequests
 
 Retrieve paginated refund requests across all payments on an operator.
 
 ```typescript
-const requests = await merchant.refund?.getOperatorRequests(
-  merchant.config.operatorAddress,
-  0n,
-  10n,
-)
+const requests = await merchant.refund?.getOperatorRequests(operatorAddress, 0n, 10n)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `operator` | `Address` | Operator address to query |
+| `offset` | `bigint` | Index offset |
+| `count` | `bigint` | Max entries to return |
+
+**Returns** `Promise<RefundRequestData[]>`.
 
 ## Refund request actions
 
 ### refund.deny
 
-Deny a pending refund request. This changes the request status to `Denied`.
+Deny a pending refund request. Status becomes `Denied`.
 
 ```typescript
 const tx = await merchant.refund?.deny(paymentInfo)
-console.log('Refund denied:', tx)
 ```
 
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<Hash>`.
+
 <Info>
-If you deny a request, the payer may escalate to an arbiter for dispute resolution. Consider providing a reason off-chain to reduce escalation risk.
+If you deny a request, the payer may escalate to an arbiter. Provide a reason off-chain to reduce escalation risk.
 </Info>
 
 ### payment.voidPayment
 
-To approve and execute a refund, call `payment.voidPayment()`. This both auto-approves the pending RefundRequest and transfers funds back to the payer.
+To approve and execute a refund, call `payment.voidPayment()`. The operator's `VOID_POST_ACTION_HOOK` (RefundRequest) auto-flips the request status to `Approved`.
 
 ```typescript
 const tx = await merchant.payment.voidPayment(paymentInfo)
-console.log('Refund approved and executed:', tx)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `data` | `Hex` _(optional)_ | Pass-through data for pre/post action plugins |
+
+**Returns** `Promise<Hash>`.
 
 <Warning>
 `voidPayment()` auto-approves the pending RefundRequest. There is no undo.
@@ -133,15 +166,19 @@ console.log('Refund approved and executed:', tx)
 
 ### freeze.isFrozen
 
-Check whether a payment has been frozen by the payer. Frozen payments cannot be released until unfrozen.
+Check whether a payment is frozen. Frozen payments cannot be captured until unfrozen.
 
 ```typescript
 const frozen = await merchant.freeze?.isFrozen(paymentInfo)
-
-if (frozen) {
-  console.log('Payment is frozen, cannot capture until unfrozen')
-}
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<boolean>`.
 
 ### freeze.unfreeze
 
@@ -149,8 +186,15 @@ Remove a freeze on a payment. Only the receiver (merchant) or an authorized part
 
 ```typescript
 const tx = await merchant.freeze?.unfreeze(paymentInfo)
-console.log('Payment unfrozen:', tx)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<Hash>`.
 
 ## Complete refund workflow
 

@@ -94,6 +94,7 @@
             "group": "Getting Started",
             "pages": [
               "sdk/overview",
+              "sdk/create-client",
               "sdk/deploy-operator"
             ]
           },
@@ -118,7 +119,6 @@
             "group": "Reference",
             "pages": [
               "sdk/cli",
-              "sdk/create-client",
               "sdk/examples"
             ]
           }

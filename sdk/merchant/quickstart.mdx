@@ -1,5 +1,6 @@
 ---
 title: "Merchant SDK"
+sidebarTitle: "Merchant client"
 description: "Capture funds, charge payments, process refunds, and query escrow state"
 icon: "rocket"
 ---
@@ -49,148 +50,202 @@ const merchant = createMerchantClient({
 })
 ```
 
-## Capture funds from escrow
+## payment.capture
 
-Use `payment.capture()` to transfer escrowed funds to the receiver (merchant). The `amount` parameter is required.
+Transfer escrowed funds to the receiver. Specify a smaller amount than `paymentInfo.maxAmount` for a partial capture; the remainder stays in escrow.
 
 ```typescript
-// Capture 10 USDC (6 decimals) from escrow
 const tx = await merchant.payment.capture(paymentInfo, 10_000_000n)
-console.log('Captured:', tx)
 ```
 
-For partial captures, specify a smaller amount. The remaining funds stay in escrow.
+**Parameters**
 
-```typescript
-// Capture 3 USDC of a 10 USDC escrow
-const tx = await merchant.payment.capture(paymentInfo, 3_000_000n)
-console.log('Partial capture:', tx)
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `amount` | `bigint` | Atomic units to capture (must be ≤ `paymentInfo.maxAmount`) |
+| `data` | `Hex` _(optional)_ | Pass-through data for the operator's pre/post action plugins |
 
-// Check what remains
-const amounts = await merchant.payment.getAmounts(paymentInfo)
-console.log('Remaining in escrow:', amounts.capturableAmount) // 7000000n
-```
+**Returns** `Promise<Hash>`, the settlement transaction hash.
 
 <Note>
 Always query `payment.getAmounts()` first to determine the available capturable amount.
 </Note>
 
-## Void while in escrow
+## payment.voidPayment
 
-Use `payment.voidPayment()` to return all escrowed funds to the payer before capture. Void is full-only: it empties the authorization in one transaction.
+Return all escrowed funds to the payer before capture. Full-only: `void()` empties the authorization in one transaction. For a partial return, capture the portion you want to keep first, then void the remainder (or let it expire at `captureDeadline`).
 
 ```typescript
 const tx = await merchant.payment.voidPayment(paymentInfo)
-console.log('Voided:', tx)
 ```
 
-<Note>
-For a partial return (capture some, return the rest), call `payment.capture(paymentInfo, amount)` for the part you want to keep. The unused authorization can then be voided, or it will expire at `captureDeadline` and become reclaimable by the payer.
-</Note>
+**Parameters**
 
-## Charge directly
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `data` | `Hex` _(optional)_ | Pass-through data for the operator's pre/post action plugins |
 
-Use `payment.charge()` for non-escrow flows such as subscriptions or session-based payments. This pulls funds directly from the payer via a token collector (e.g., ERC-3009 `transferWithAuthorization`).
+**Returns** `Promise<Hash>`, the void transaction hash.
+
+## payment.charge
+
+Non-escrow settlement for subscriptions or session-based payments. Pulls funds directly from the payer via a token collector (no escrow hold).
 
 ```typescript
 const tx = await merchant.payment.charge(
   paymentInfo,
-  5_000_000n,                               // 5 USDC
-  '0xTokenCollector...' as `0x${string}`,   // token collector contract
-  '0xSignatureData...' as `0x${string}`,    // authorization data
+  5_000_000n,
+  '0xTokenCollector...' as `0x${string}`,
+  '0xSignatureData...' as `0x${string}`,
 )
-console.log('Charged:', tx)
 ```
 
-<Tip>
-The `charge()` method is designed for recurring payments and session-based billing where funds are not pre-escrowed. The token collector contract handles the actual token transfer.
-</Tip>
+**Parameters**
 
-## Refund after capture (after capture)
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `amount` | `bigint` | Atomic units to charge |
+| `tokenCollector` | `Address` | Canonical token collector for the chosen `assetTransferMethod` |
+| `collectorData` | `Hex` | Raw ERC-3009 signature or ABI-encoded Permit2 signature |
 
-Use `payment.refund()` to refund funds that have already been released. This requires a token collector to source the refund from the merchant's balance.
+**Returns** `Promise<Hash>`, the charge transaction hash.
+
+## payment.refund
+
+Refund funds that have already been captured. Requires a token collector to pull funds from the merchant's balance.
 
 ```typescript
 const tx = await merchant.payment.refund(
   paymentInfo,
-  5_000_000n,                               // 5 USDC to refund
-  '0xTokenCollector...' as `0x${string}`,   // sources the refund
-  '0xSignatureData...' as `0x${string}`,    // authorization data
+  5_000_000n,
+  '0xTokenCollector...' as `0x${string}`,
+  '0xSignatureData...' as `0x${string}`,
 )
-console.log('Refund (after capture):', tx)
 ```
 
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `amount` | `bigint` | Atomic units to refund to the payer |
+| `tokenCollector` | `Address` | Token collector that sources the refund (typically `ReceiverRefundCollector`) |
+| `collectorData` | `Hex` | Data passed to the collector (e.g., receiver signature) |
+
+**Returns** `Promise<Hash>`, the refund transaction hash.
+
 <Warning>
-Refunds (after capture) require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
+Refunds after capture require the merchant to have sufficient token balance and an approved allowance on the refund collector.
 </Warning>
 
-## Query methods
-
-### payment.getAmounts
+## payment.getAmounts
 
 Query the current capturable and refundable amounts for a payment.
 
 ```typescript
 const amounts = await merchant.payment.getAmounts(paymentInfo)
-
-console.log('Capturable:', amounts.capturableAmount)
-console.log('Refundable:', amounts.refundableAmount)
-
-if (amounts.capturableAmount > 0n) {
-  await merchant.payment.capture(paymentInfo, amounts.capturableAmount)
-}
 ```
 
-### payment.getState
+**Parameters**
 
-Returns a tuple of the payment's lifecycle position.
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<PaymentAmounts>`:
+
+| Field | Type | Description |
+|---|---|---|
+| `hasCollectedPayment` | `boolean` | Whether the payment is collected on-chain |
+| `capturableAmount` | `bigint` | Atomic units still capturable from escrow |
+| `refundableAmount` | `bigint` | Atomic units still refundable |
+
+## payment.getState
+
+Returns the payment's lifecycle position as a tuple. There is no `PaymentState` enum.
 
 ```typescript
 const [hasCollectedPayment, capturableAmount, refundableAmount] =
   await merchant.payment.getState(paymentInfo)
 ```
 
-### operator.getConfig
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+
+**Returns** `Promise<readonly [boolean, bigint, bigint]>`, `[hasCollectedPayment, capturableAmount, refundableAmount]`.
+
+## operator.getConfig
 
 Retrieve all slot addresses from the PaymentOperator contract.
 
 ```typescript
 const config = await merchant.operator.getConfig()
-
-console.log('Fee receiver:',      config.feeReceiver)
-console.log('Fee calculator:',    config.feeCalculator)
-console.log('Capture condition:', config.captureCondition)
 ```
 
-### operator.getFeeAddresses
+**Returns** `Promise<OperatorSlots>`, see `packages/core/src/actions/operator/types.ts`. Key fields:
 
-Get the fee-related addresses.
+| Field | Type | Description |
+|---|---|---|
+| `escrow` | `Address` | Canonical AuthCaptureEscrow |
+| `authorizeCondition` / `authorizeHook` | `Address` | Pre/post slots for `authorize` |
+| `chargeCondition` / `chargeHook` | `Address` | Pre/post slots for `charge` |
+| `captureCondition` / `captureHook` | `Address` | Pre/post slots for `capture` |
+| `voidCondition` / `voidHook` | `Address` | Pre/post slots for `void` |
+| `refundCondition` / `refundHook` | `Address` | Pre/post slots for `refund` |
+| `feeCalculator` | `Address` | Per-operator fee calculator |
+| `feeReceiver` | `Address` | Operator fee recipient |
+| `protocolFeeConfig` | `Address` | Protocol fee config contract |
+
+## operator.getFeeAddresses
+
+Fetch the fee-related addresses (subset of `getConfig` with both operator and protocol resolved).
 
 ```typescript
 const fees = await merchant.operator.getFeeAddresses()
-
-console.log('Operator fee calculator:', fees.operatorFeeCalculator)
-console.log('Protocol fee config:',     fees.protocolFeeConfig)
-console.log('Protocol fee calculator:', fees.protocolFeeCalculator)
-console.log('Operator fee recipient:',  fees.operatorFeeRecipient)
-console.log('Protocol fee recipient:',  fees.protocolFeeRecipient)
 ```
 
-### operator.calculateFees
+**Returns** `Promise<FeeAddresses>`:
+
+| Field | Type | Description |
+|---|---|---|
+| `operatorFeeCalculator` | `Address` | Per-operator calculator |
+| `protocolFeeConfig` | `Address` | Protocol fee config contract |
+| `protocolFeeCalculator` | `Address` | Protocol-level calculator |
+| `operatorFeeRecipient` | `Address` | Where operator fees flow |
+| `protocolFeeRecipient` | `Address` | Where protocol fees flow |
+
+## operator.calculateFees
 
 Calculate the full fee breakdown for a payment amount.
 
 ```typescript
 const fees = await merchant.operator.calculateFees(paymentInfo, 1_000_000n)
-
-console.log('Operator fee bps:', fees.operatorFeeBps)
-console.log('Protocol fee bps:', fees.protocolFeeBps)
-console.log('Total fee bps:',    fees.totalFeeBps)
-console.log('Operator fee:',     fees.operatorFeeAmount)
-console.log('Protocol fee:',     fees.protocolFeeAmount)
-console.log('Total fee:',        fees.totalFeeAmount)
-console.log('Net amount:',       fees.netAmount)
 ```
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
+| `amount` | `bigint` | Atomic units to compute fees for |
+
+**Returns** `Promise<FeeCalculationResult>`:
+
+| Field | Type | Description |
+|---|---|---|
+| `protocolFeeBps` | `bigint` | Protocol fee in basis points |
+| `operatorFeeBps` | `bigint` | Operator fee in basis points |
+| `totalFeeBps` | `bigint` | Sum of the two |
+| `protocolFeeAmount` | `bigint` | Atomic units of protocol fee |
+| `operatorFeeAmount` | `bigint` | Atomic units of operator fee |
+| `totalFeeAmount` | `bigint` | Atomic units of total fee |
+| `netAmount` | `bigint` | Amount remaining after fees |
 
 ## Capture vs refund decision flow
 
