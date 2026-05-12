@@ -17,8 +17,7 @@
             "group": "Getting Started",
             "pages": [
               "index",
-              "x402-integration/overview",
-              "x402-integration/comparison"
+              "x402-integration/overview"
             ]
           },
           {
@@ -180,6 +179,10 @@
     {
       "source": "/contracts/recorders/:slug",
       "destination": "/contracts/hooks/:slug"
+    },
+    {
+      "source": "/x402-integration/comparison",
+      "destination": "/x402-integration/auth-capture-scheme"
     }
   ]
 }
