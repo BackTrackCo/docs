@@ -1,18 +1,26 @@
 ---
 title: "Commerce Payments"
-description: "AuthCaptureEscrow and ERC3009PaymentCollector, the base layer from commerce-payments"
+description: "AuthCaptureEscrow and the canonical token collectors that form the authCapture base layer"
 icon: "vault"
 ---
 
-x402r builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) (no fork). Two contracts from this stack form the base layer: **AuthCaptureEscrow** (holds funds) and **ERC3009PaymentCollector** (collects funds via signed authorizations). Both are deployed at universal CREATE2 addresses.
+x402r builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) (no fork). Three contracts from this stack form the base layer:
+
+- **AuthCaptureEscrow**: singleton escrow that holds funds and gates lifecycle actions on the `captureAuthorizer` (committed on-chain as `PaymentInfo.operator`).
+- **ERC3009PaymentCollector**: collects funds via signed ERC-3009 `receiveWithAuthorization`.
+- **Permit2PaymentCollector**: collects funds via Uniswap Permit2 `permitTransferFrom`.
+
+All three are deployed at universal CREATE2 addresses (same address on every supported chain).
+
+| Contract | Canonical address |
+|---|---|
+| `AuthCaptureEscrow` | `0xF8211868187974a7Fb9d99b8fFB171AD70665Dc6` |
+| `ERC3009PaymentCollector` | `0x7561DC178D9aD5bc5fb103C01f448A510d2A36D0` |
+| `Permit2PaymentCollector` | `0xD8490609d2da0ee626b0e676941b225cbc1A8C08` |
 
 ## AuthCaptureEscrow
 
 Core escrow contract for holding ERC-20 tokens during the payment lifecycle.
-
-- **Type:** Singleton (one per network)
-- **Access:** Operator-based (only registered operators can manage payments)
-- **Address:** `0xe050bB89eD43BB02d71343063824614A7fb80B77` (all chains)
 
 ### Payment State Machine
 
@@ -20,95 +28,111 @@ Core escrow contract for holding ERC-20 tokens during the payment lifecycle.
 stateDiagram-v2
     [*] --> NonExistent
     NonExistent --> InEscrow: authorize()
-    InEscrow --> Released: release()
+    InEscrow --> Captured: capture()
     InEscrow --> Settled: void()
-    Released --> Settled: reclaim() / refund()
+    Captured --> Settled: reclaim() / refund()
     Settled --> [*]
 
     note right of InEscrow
-        Funds locked in escrow
-        Payer can reclaim after expiry
+        Funds locked in escrow.
+        Payer can reclaim after captureDeadline.
     end note
 
-    note right of Released
-        Funds transferred to receiver
-        Can still refund
+    note right of Captured
+        Funds transferred to receiver.
+        Can still refund within refundDeadline.
     end note
 
     note right of Settled
-        Terminal state
-        No further actions possible
+        Terminal state.
+        No further actions possible.
     end note
 ```
 
-### Key Methods
+### Key methods
 
 #### authorize()
 
-Locks tokens in escrow. Called by operator.
+Pulls funds into escrow via the token collector. Called by the `captureAuthorizer` (typically the facilitator EOA, or a smart contract acting as captureAuthorizer).
 
 ```solidity
 function authorize(
-    bytes32 paymentId,
-    address payer,
-    address receiver,
+    PaymentInfo calldata paymentInfo,
     uint256 amount,
-    address token,
-    address operator
-) external onlyOperator
+    address tokenCollector,
+    bytes calldata collectorData
+) external
 ```
 
-**Requires:** Payer has approved escrow contract for `amount` of `token`
+`tokenCollector` is `ERC3009PaymentCollector` or `Permit2PaymentCollector` depending on `assetTransferMethod` in the scheme `extra`. `collectorData` carries the raw ERC-3009 signature or the ABI-encoded Permit2 signature.
 
-<Note>
-The base escrow contract uses individual parameters (paymentId, payer, receiver, etc.) while the PaymentOperator wraps them in a `PaymentInfo` struct. The operator translates between the two formats internally.
-</Note>
+#### charge()
 
-#### release()
-
-Releases tokens to receiver. Called by operator.
+Single-shot atomic settlement: pulls funds and transfers directly to the receiver, no escrow hold.
 
 ```solidity
-function release(
-    bytes32 paymentId
-) external onlyOperator returns (uint256 amount)
+function charge(
+    PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address tokenCollector,
+    bytes calldata collectorData
+) external
 ```
 
-**State change:** `InEscrow` -> `Released`
+#### capture()
+
+Releases escrowed funds to the receiver, minus fees.
+
+```solidity
+function capture(
+    PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    uint16 feeBps,
+    address feeReceiver
+) external
+```
 
 #### void()
 
-Returns tokens to payer (full refund). Called by operator.
+Returns all escrowed funds to the payer. Full-only: `void()` empties the authorization in one transaction.
 
 ```solidity
-function void(
-    bytes32 paymentId
-) external onlyOperator
+function void(PaymentInfo calldata paymentInfo) external
 ```
-
-**State change:** `InEscrow` -> `Settled`
 
 #### reclaim()
 
-Takes tokens back from receiver to give to payer. Called by operator.
+Permissionless: the payer can pull funds back out of escrow after `captureDeadline` if the captureAuthorizer never captured.
 
 ```solidity
-function reclaim(
-    bytes32 paymentId,
-    address from,
-    uint256 amount
-) external onlyOperator
+function reclaim(PaymentInfo calldata paymentInfo) external
 ```
 
-**State change:** `Released` -> `Settled`
+#### refund()
 
-**Requires:** Receiver has approved escrow for `amount`
+Returns funds to the payer after capture, sourced via a token collector (typically pulled from the merchant's balance).
 
-### Security Features
+```solidity
+function refund(
+    PaymentInfo calldata paymentInfo,
+    uint256 amount,
+    address tokenCollector,
+    bytes calldata collectorData
+) external
+```
 
-- **Operator whitelist** - Only registered operators can manage payments
-- **Reentrancy protection** - All state changes protected
-- **Event logging** - Complete audit trail
+### Access control
+
+Lifecycle actions (`authorize`, `charge`, `capture`, `void`, `refund`) check `msg.sender` against `PaymentInfo.operator` (the captureAuthorizer). `reclaim` is permissionless after `captureDeadline`.
+
+There is no escrow-wide "operator whitelist", access is per-payment via the signed `PaymentInfo`.
+
+### Security features
+
+- **Replay prevention**: each payment has a unique nonce derived from `(chainId, escrowAddress, paymentInfoHash)`, consumed on-chain at settlement
+- **Fee bounds enforcement**: `minFeeBps` / `maxFeeBps` / `feeReceiver` in `PaymentInfo` are signed by the client; the escrow rejects out-of-bounds captures/charges
+- **Expiry ordering**: contract enforces `preApprovalExpiry <= authorizationExpiry <= refundExpiry`
+- **Reentrancy protection** on all state-changing entry points
 
 ---
 
@@ -116,35 +140,42 @@ function reclaim(
 
 Collects ERC-20 tokens into escrow using the client's off-chain ERC-3009 signature. The payer never submits a transaction.
 
-- **Type:** Singleton (one per network)
-- **Address:** `0xcE66Ab399EDA513BD12760b6427C87D6602344a7` (all chains)
+### How it works
 
-### How It Works
-
-The operator calls the token collector during `authorize()` or `charge()`, passing the client's signature as `collectorData`. The collector executes `receiveWithAuthorization` (ERC-3009) to pull tokens from the payer into escrow.
+The escrow calls the token collector during `authorize()` or `charge()`, passing the client's signature as `collectorData`. The collector executes `receiveWithAuthorization` (ERC-3009) to pull tokens from the payer.
 
 ### Features
 
-- **ERC-3009 `receiveWithAuthorization()`** - Gasless token transfers via signed messages
-- **EIP-6492 support** - Handles smart wallet clients with deployment bytecode in signatures
-- **Nonce-based replay protection** - Each authorization can only be used once
-- **Deadline-based expiry** - `validBefore` timestamp prevents stale authorizations
+- **ERC-3009 `receiveWithAuthorization()`**: gasless token transfers via signed messages
+- **EIP-6492 support**: handles smart wallet clients with deployment bytecode in signatures (via `ERC6492SignatureHandler`)
+- **Nonce-based replay protection**: each authorization can only be used once; the nonce is the payer-agnostic `PaymentInfo` hash
+- **Deadline-based expiry**: `validBefore` (typically `now + maxTimeoutSeconds`) prevents stale authorizations
 
-### ERC-3009 Signature
+### ERC-3009 signature
 
 The client signs an EIP-712 typed data message with primary type `ReceiveWithAuthorization`:
 
 ```typescript
 const authorization = {
   from: payerAddress,         // Who is paying
-  to: tokenCollectorAddress,  // ERC3009PaymentCollector
+  to: tokenCollectorAddress,  // ERC3009PaymentCollector (canonical)
   value: amount,              // Amount in token decimals
   validAfter: 0,              // Earliest valid time (0 = immediately)
   validBefore: deadline,      // Latest valid time
-  nonce: derivedNonce         // Deterministic nonce from payment params
-};
+  nonce: derivedNonce,        // Payer-agnostic PaymentInfo hash
+}
 ```
 
 <Note>
-The escrow scheme uses `receiveWithAuthorization` (not `transferWithAuthorization`). The token collector is the `to` address, which then routes tokens to the escrow contract.
+The authCapture scheme uses `receiveWithAuthorization` (not `transferWithAuthorization`). The token collector is the `to` address, which then routes tokens into the escrow.
 </Note>
+
+---
+
+## Permit2PaymentCollector
+
+Collects ERC-20 tokens via Uniswap Permit2 `permitTransferFrom`. Used when `assetTransferMethod === "permit2"` in the scheme `extra`. Any ERC-20 the payer has approved Permit2 for becomes spendable through this collector.
+
+The client signs a Permit2 `PermitTransferFrom`; the merchant address is bound through the deterministic nonce, so no separate witness struct is needed.
+
+See the [authCapture Scheme Specification](/x402-integration/auth-capture-scheme) for the full Permit2 wire format.

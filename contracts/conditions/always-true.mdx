@@ -28,10 +28,10 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 
 | Slot | Use Case |
 |------|----------|
-| `AUTHORIZE_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
 
 <Warning>
-**Use with caution for release/refund slots.** Setting `RELEASE_CONDITION` or `VOID_PRE_ACTION_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
+**Use with caution for release/refund slots.** Setting `CAPTURE_PRE_ACTION_CONDITION` or `VOID_PRE_ACTION_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
 </Warning>
 
 ## AlwaysTrueCondition vs `address(0)`

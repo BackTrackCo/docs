@@ -73,7 +73,7 @@ app.post('/verify', async (req, res) => {
 
   if (passed) {
     const amounts = await arbiter.payment.getAmounts(paymentInfo)
-    await arbiter.payment.release(paymentInfo, amounts.capturableAmount)
+    await arbiter.payment.capture(paymentInfo, amounts.capturableAmount)
     res.json({ verdict: 'PASS' })
   } else {
     // Arbiter can refund immediately without waiting for escrow expiry.

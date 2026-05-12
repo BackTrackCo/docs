@@ -36,9 +36,9 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ## 10-Slot Configuration
 
 <Accordion title="Condition Slots (Before Actions)">
-1. **AUTHORIZE_CONDITION** - Who can authorize payments
-2. **CHARGE_CONDITION** - Who can charge partial amounts
-3. **RELEASE_CONDITION** - Who can release from escrow
+1. **AUTHORIZE_PRE_ACTION_CONDITION** - Who can authorize payments
+2. **CHARGE_PRE_ACTION_CONDITION** - Who can charge partial amounts
+3. **CAPTURE_PRE_ACTION_CONDITION** - Who can release from escrow
 4. **VOID_PRE_ACTION_CONDITION** - Who can refund during escrow
 5. **REFUND_PRE_ACTION_CONDITION** - Who can refund after release
 
@@ -46,9 +46,9 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 </Accordion>
 
 <Accordion title="Recorder Slots (After Actions)">
-1. **AUTHORIZE_RECORDER** - Record authorization (e.g., timestamp)
-2. **CHARGE_RECORDER** - Record charge event
-3. **RELEASE_RECORDER** - Record release
+1. **AUTHORIZE_POST_ACTION_HOOK** - Record authorization (e.g., timestamp)
+2. **CHARGE_POST_ACTION_HOOK** - Record charge event
+3. **CAPTURE_POST_ACTION_HOOK** - Record release
 4. **VOID_POST_ACTION_HOOK** - Record void
 5. **REFUND_POST_ACTION_HOOK** - Record refund
 
@@ -77,14 +77,14 @@ function authorize(
 - `collectorData` - Data to pass to the token collector
 
 **Flow:**
-1. Check `AUTHORIZE_CONDITION` (if set)
+1. Check `AUTHORIZE_PRE_ACTION_CONDITION` (if set)
 2. Validate fee bounds compatibility
 3. Store fees at authorization time (prevents protocol fee changes from breaking capture)
 4. Call `escrow.authorize()`
-5. Call `AUTHORIZE_RECORDER` (if set)
-6. Emit `AuthorizationCreated`
+5. Call `AUTHORIZE_POST_ACTION_HOOK` (if set)
+6. Emit `AuthorizeExecuted`
 
-**Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
+**Access:** Controlled by `AUTHORIZE_PRE_ACTION_CONDITION` (default: anyone)
 
 <Tip>
 **Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
@@ -110,25 +110,25 @@ function charge(
 - `collectorData` - Data to pass to the token collector
 
 **Flow:**
-1. Check `CHARGE_CONDITION` (if set)
+1. Check `CHARGE_PRE_ACTION_CONDITION` (if set)
 2. Validate fee bounds compatibility
 3. Call `escrow.charge()` - funds go directly to receiver
 4. Accumulate protocol fees for later distribution
-5. Call `CHARGE_RECORDER` (if set)
+5. Call `CHARGE_POST_ACTION_HOOK` (if set)
 6. Emit `ChargeExecuted`
 
-**Access:** Controlled by `CHARGE_CONDITION` (default: anyone)
+**Access:** Controlled by `CHARGE_PRE_ACTION_CONDITION` (default: anyone)
 
 <Note>
 Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refund()`.
 </Note>
 
-### release()
+### capture()
 
 Releases funds from escrow to receiver (capture).
 
 ```solidity
-function release(
+function capture(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256 amount
 ) external nonReentrant
@@ -139,14 +139,14 @@ function release(
 - `amount` - Amount to release
 
 **Flow:**
-1. Check `RELEASE_CONDITION` (if set)
+1. Check `CAPTURE_PRE_ACTION_CONDITION` (if set)
 2. Use fees stored at authorization time
 3. Call `escrow.capture()`
 4. Accumulate protocol fees for later distribution
-5. Call `RELEASE_RECORDER` (if set)
-6. Emit `ReleaseExecuted`
+5. Call `CAPTURE_POST_ACTION_HOOK` (if set)
+6. Emit `CaptureExecuted`
 
-**Access:** Controlled by `RELEASE_CONDITION`
+**Access:** Controlled by `CAPTURE_PRE_ACTION_CONDITION`
 
 <Note>
 **Marketplace example:** Receiver OR StaticAddressCondition(arbiter) + escrow passed

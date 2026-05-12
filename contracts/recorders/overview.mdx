@@ -10,9 +10,9 @@ Recorders are pluggable contracts that update state **after** an action successf
 
 | Slot | Records After |
 |------|---------------|
-| `AUTHORIZE_RECORDER` | Authorization (e.g., timestamp) |
-| `CHARGE_RECORDER` | Charge event |
-| `RELEASE_RECORDER` | Release from escrow |
+| `AUTHORIZE_POST_ACTION_HOOK` | Authorization (e.g., timestamp) |
+| `CHARGE_POST_ACTION_HOOK` | Charge event |
+| `CAPTURE_POST_ACTION_HOOK` | Release from escrow |
 | `VOID_POST_ACTION_HOOK` | Void |
 | `REFUND_POST_ACTION_HOOK` | Refund (after capture) |
 
@@ -49,7 +49,7 @@ Not every payment needs on-chain recorders. Choose based on your use case:
 
 ### Events Only (~0 Extra Gas)
 
-The operator already emits events (`AuthorizationCreated`, `ReleaseExecuted`, etc.) for every action. If you only need payment history for analytics or display, skip recorders entirely and index events off-chain.
+The operator already emits events (`AuthorizeExecuted`, `CaptureExecuted`, etc.) for every action. If you only need payment history for analytics or display, skip recorders entirely and index events off-chain.
 
 **Best for:** Micropayments, high-volume payments where gas overhead matters, simple UIs.
 
@@ -75,12 +75,12 @@ Use recorders when you need **on-chain reads**: other contracts or conditions th
 |------|----------|---------------|
 | Payment history for UI | Events only | `address(0)` |
 | Rich queries, analytics | Events + Subgraph | `address(0)` |
-| Time-locked releases | On-chain | [EscrowPeriod](/contracts/conditions/escrow-period) on `AUTHORIZE_RECORDER` |
+| Time-locked releases | On-chain | [EscrowPeriod](/contracts/conditions/escrow-period) on `AUTHORIZE_POST_ACTION_HOOK` |
 | On-chain payment index | On-chain | [PaymentIndexRecorder](/contracts/recorders/payment-index) |
 | Multiple data points | On-chain | [RecorderCombinator](/contracts/recorders/combinator) |
 
 <Tip>
-For most configurations, you only need a recorder on the `AUTHORIZE_RECORDER` slot (for [EscrowPeriod](/contracts/conditions/escrow-period)). Leave other recorder slots as `address(0)`.
+For most configurations, you only need a recorder on the `AUTHORIZE_POST_ACTION_HOOK` slot (for [EscrowPeriod](/contracts/conditions/escrow-period)). Leave other recorder slots as `address(0)`.
 </Tip>
 
 ## Next Steps

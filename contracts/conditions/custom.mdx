@@ -12,9 +12,9 @@ You can create custom conditions for specialized logic beyond what the built-in 
 
 From the `ICondition.sol` NatSpec:
 
-1. **MUST NOT revert** — return `false` to deny, never `revert`
-2. **Should be `view` or `pure`** — no state-changing operations
-3. **No external calls** — avoid calling other contracts to prevent reentrancy risks
+1. **MUST NOT revert**: return `false` to deny, never `revert`
+2. **Should be `view` or `pure`**: no state-changing operations
+3. **No external calls**: avoid calling other contracts to prevent reentrancy risks
 4. **Return `true` to allow, `false` to deny**
 
 The operator converts a `false` return into a `ConditionNotMet` revert.
@@ -44,14 +44,14 @@ contract TimeOfDayCondition is ICondition {
 }
 ```
 
-Usage — deploy via a factory and use in operator config:
+Usage, deploy via a factory and use in operator config:
 
 ```typescript
 // Deploy via your custom factory
 const businessHours = await timeOfDayConditionFactory.write.deploy([9, 17]);
 
 // Use in operator config
-config.releaseCondition = businessHours;
+config.capturePreActionCondition = businessHours;
 ```
 
 ## Security Checklist

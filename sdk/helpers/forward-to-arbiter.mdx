@@ -16,7 +16,7 @@ The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards 
 import { forwardToArbiter } from '@x402r/helpers';
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register(networkId, new EscrowServerScheme())
+  .register(networkId, new AuthCaptureServerScheme())
   .onAfterSettle(
     forwardToArbiter('http://arbiter:3001')
   );
@@ -75,7 +75,7 @@ When a commerce settlement succeeds, the hook POSTs the following JSON to `{arbi
 ```
 
 <Tip>
-Arbiters that need `paymentInfo` for `release()` can read it directly from `paymentPayload.payload.paymentInfo` — no extra RPC call needed.
+Arbiters that need `paymentInfo` for `capture()` can read it directly from `paymentPayload.payload.paymentInfo`, no extra RPC call needed.
 </Tip>
 
 ## Error handling
@@ -86,7 +86,7 @@ By default, fetch errors are logged with `console.warn`. You can override this w
 import { forwardToArbiter } from '@x402r/helpers';
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register(networkId, new EscrowServerScheme())
+  .register(networkId, new AuthCaptureServerScheme())
   .onAfterSettle(
     forwardToArbiter('http://arbiter:3001', {
       onError: (err) => sentry.captureException(err),
@@ -123,14 +123,11 @@ import {
 } from '@x402r/helpers';
 ```
 
-These are the same CREATE3 addresses available from `@x402r/core`. You can import from either package depending on which you already have installed.
+These are the same CREATE2 addresses available from `@x402r/core`. You can import from either package depending on which you already have installed.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
-    Configure escrow options and fee bounds.
-  </Card>
   <Card title="Arbiter SDK" icon="gavel" href="/sdk/arbiter/quickstart">
     Build an arbiter that processes forwarded settlements.
   </Card>

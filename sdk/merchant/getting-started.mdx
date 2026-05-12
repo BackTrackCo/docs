@@ -46,7 +46,7 @@ The full source code for this example is available on [GitHub](https://github.co
     import "dotenv/config";
     import express from "express";
     import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-    import { EscrowServerScheme } from "@x402r/evm/escrow/server";
+    import { AuthCaptureServerScheme } from "@x402r/evm/authCapture/server";
     import { getChainConfig } from "@x402r/core";
     import { HTTPFacilitatorClient } from "@x402/core/server";
 
@@ -65,9 +65,10 @@ The full source code for this example is available on [GitHub](https://github.co
     const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 
     const networkId = "eip155:84532";
-    const { authCaptureEscrow } = getChainConfig(networkId);
 
     const app = express();
+
+    const now = Math.floor(Date.now() / 1000);
 
     app.use(
       paymentMiddleware(
@@ -75,15 +76,22 @@ The full source code for this example is available on [GitHub](https://github.co
           "GET /weather": {
             accepts: [
               {
-                scheme: "escrow",
+                scheme: "authCapture",
                 price: "$0.01",
                 network: networkId,
                 payTo: address,
+                maxTimeoutSeconds: 60,
                 extra: {
-                  escrowAddress: authCaptureEscrow,
-                  operatorAddress,
-                  feeReceiver: operatorAddress,
+                  name: "USDC",
+                  version: "2",
+                  captureAuthorizer: operatorAddress,
+                  captureDeadline: now + 60 * 60,         // capture within 1 hour
+                  refundDeadline: now + 24 * 60 * 60,     // refund window 24 hours
+                  feeRecipient: operatorAddress,
+                  minFeeBps: 0,
                   maxFeeBps: 500,
+                  // assetTransferMethod defaults to "eip3009"
+                  // autoCapture defaults to false (two-phase)
                 },
               },
             ],
@@ -93,7 +101,7 @@ The full source code for this example is available on [GitHub](https://github.co
         },
         new x402ResourceServer(facilitatorClient).register(
           networkId,
-          new EscrowServerScheme() as never,
+          new AuthCaptureServerScheme() as never,
         ),
       ),
     );
@@ -126,20 +134,25 @@ The full source code for this example is available on [GitHub](https://github.co
     curl http://localhost:4021/weather
     ```
 
-    Without a valid payment header, the server responds with HTTP 402 and the escrow payment requirements:
+    Without a valid payment header, the server responds with HTTP 402 and the authCapture payment requirements:
 
     ```json
     {
       "x402Version": 2,
       "accepts": [{
-        "scheme": "escrow",
+        "scheme": "authCapture",
         "price": "$0.01",
         "network": "eip155:84532",
         "payTo": "0x...",
+        "maxTimeoutSeconds": 60,
         "extra": {
-          "escrowAddress": "0x...",
-          "operatorAddress": "0x...",
-          "feeReceiver": "0x...",
+          "name": "USDC",
+          "version": "2",
+          "captureAuthorizer": "0x...",
+          "captureDeadline": 1740758554,
+          "refundDeadline": 1741276954,
+          "feeRecipient": "0x...",
+          "minFeeBps": 0,
           "maxFeeBps": 500
         }
       }]
@@ -150,8 +163,8 @@ The full source code for this example is available on [GitHub](https://github.co
 
 ## How it works
 
-- **Escrow `extra` config** specifies the escrow contract address, operator address, fee receiver, and maximum fee bounds directly on the payment option.
-- **`EscrowServerScheme`** registers the escrow payment scheme with the x402 resource server so it can validate escrow-backed payments.
+- **`extra` config** declares the captureAuthorizer, capture/refund deadlines, fee recipient, and fee bounds. The canonical `AuthCaptureEscrow` and token collector addresses are universal CREATE2 deploys, so they do not need to be repeated per-route.
+- **`AuthCaptureServerScheme`** registers the authCapture payment scheme with the x402 resource server so it can validate authCapture-backed payments.
 - **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 if no payment is provided.
 - **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
 

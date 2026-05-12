@@ -276,18 +276,22 @@ You can support **both schemes** and let clients choose:
       "payTo": "0xReceiver..."
     },
     {
-      "scheme": "escrow",
+      "scheme": "authCapture",
       "network": "eip155:8453",
       "amount": "10000000",
       "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "payTo": "0xReceiver...",
+      "maxTimeoutSeconds": 60,
       "extra": {
         "name": "USDC",
         "version": "2",
-        "escrowAddress": "0xe050bB89eD43BB02d71343063824614A7fb80B77",
-        "operatorAddress": "0xOperator...",
-        "tokenCollector": "0xcE66Ab399EDA513BD12760b6427C87D6602344a7",
-        "settlementMethod": "authorize"
+        "captureAuthorizer": "0xCaptureAuthorizer...",
+        "captureDeadline": 1740758554,
+        "refundDeadline": 1741276954,
+        "feeRecipient": "0xFeeRecipient...",
+        "minFeeBps": 0,
+        "maxFeeBps": 500,
+        "autoCapture": false
       }
     }
   ]
@@ -302,16 +306,16 @@ You can support **both schemes** and let clients choose:
 
 ## Migration Strategy
 
-### From exact to escrow
+### From exact to authCapture
 
-Existing `exact` integrations can add `escrow` support:
+Existing `exact` integrations can add `authCapture` support:
 
-1. Deploy operator contract
-2. Add `escrow` to `accepts` array
+1. Pick a captureAuthorizer (facilitator EOA or arbiter contract)
+2. Add an `authCapture` entry to `accepts` array
 3. Keep `exact` as fallback
 4. Clients upgrade when ready
 
-### From escrow to exact
+### From authCapture to exact
 
 If escrow proves unnecessary:
 

@@ -38,7 +38,7 @@ const request = await client.refund?.getByKey(paymentInfoHash)
 
 ### Event Log Scanning Limits
 
-The event-based query provider scans `AuthorizationCreated` and `ChargeExecuted` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Configure `eventFromBlock` in your client config to set the scan start:
+The event-based query provider scans `AuthorizeExecuted` and `ChargeExecuted` events using `eth_getLogs`. Base Sepolia RPCs typically limit responses to 10,000 blocks. Configure `eventFromBlock` in your client config to set the scan start:
 
 ```typescript
 // Pass eventFromBlock when creating the client to limit scan range
@@ -55,7 +55,7 @@ const payments = await client.query?.getPayerPayments(payerAddress)
 
 ### No Express/Hono Middleware
 
-The `forwardToArbiter()` hook in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware — configure escrow payment options inline and use `forwardToArbiter()` as an `onAfterSettle` hook.
+The `forwardToArbiter()` hook in `@x402r/helpers` is framework-agnostic. There is no dedicated Express or Hono middleware, configure escrow payment options inline and use `forwardToArbiter()` as an `onAfterSettle` hook.
 
 ## Getting Updates
 

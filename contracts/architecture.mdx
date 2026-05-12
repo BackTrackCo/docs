@@ -67,16 +67,16 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 ### Standard Payment (Happy Path)
 
 1. **Payer** calls `operator.authorize(paymentInfo, amount, tokenCollector, collectorData)`
-2. **Operator** checks `AUTHORIZE_CONDITION` (if set)
+2. **Operator** checks `AUTHORIZE_PRE_ACTION_CONDITION` (if set)
 3. **Operator** validates fee bounds and stores fees at authorization time
 4. **Operator** calls `escrow.authorize()` to lock funds
-5. **Operator** calls `AUTHORIZE_RECORDER` to record timestamp
+5. **Operator** calls `AUTHORIZE_POST_ACTION_HOOK` to record timestamp
 6. **Escrow period** begins (e.g., 7 days) - if configured
-7. After escrow period: **Authorized address(es)** call `operator.release(paymentInfo, amount)` (e.g., receiver, designated address, or both)
-8. **Operator** checks `RELEASE_CONDITION` (configurable - can include time checks, role checks, etc.)
+7. After escrow period: **Authorized address(es)** call `operator.capture(paymentInfo, amount)` (e.g., receiver, designated address, or both)
+8. **Operator** checks `CAPTURE_PRE_ACTION_CONDITION` (configurable - can include time checks, role checks, etc.)
 9. **Operator** calls `escrow.capture()` to transfer funds to receiver
 10. **Operator** accumulates protocol fees for later distribution
-11. **Operator** calls `RELEASE_RECORDER` to update state
+11. **Operator** calls `CAPTURE_POST_ACTION_HOOK` to update state
 
 ### Void Flow (before capture)
 
@@ -121,7 +121,7 @@ Freeze policies are optional and configurable. Define who can freeze, who can un
 
 ### Authorization Check (Before Action)
 
-When an action is called (e.g., `release()`):
+When an action is called (e.g., `capture()`):
 
 1. **Load Condition** - Get the condition address from operator slot
 2. **Evaluate Condition** - Call `condition.check(paymentInfo, amount, caller)`
@@ -223,8 +223,8 @@ Fees accumulate in the operator and are distributed via `distributeFees(token)`.
 | Role | Capabilities | Restrictions |
 |------|-------------|--------------|
 | **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
-| **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
-| **Designated Address** | Any action per conditions (e.g., `voidPayment()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
+| **Receiver** | `capture()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
+| **Designated Address** | Any action per conditions (e.g., `voidPayment()`, `capture()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
 | **Protocol Owner** | `queueCalculator()`, `executeCalculator()`, `queueRecipient()`, `executeRecipient()` | 7-day timelock on ProtocolFeeConfig changes |
 
 <Note>
@@ -289,15 +289,15 @@ Ownership transfers use Solady's Ownable pattern:
 
 ```solidity
 // Payment lifecycle (PaymentOperator events)
-event AuthorizationCreated(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
+event AuthorizeExecuted(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
 event ChargeExecuted(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
-event ReleaseExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, uint256 amount, uint256 timestamp);
+event CaptureExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, uint256 amount, uint256 timestamp);
 event VoidExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
 event RefundExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
 
 // Fee distribution
 event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 arbiterAmount);
-event OperatorDeployed(address indexed operator, address indexed feeRecipient, address indexed releaseCondition);
+event OperatorDeployed(address indexed operator, address indexed feeRecipient, address indexed capturePreActionCondition);
 
 // Freeze state (Freeze contract events)
 event PaymentFrozen(bytes32 indexed paymentInfoHash, uint40 frozenAt);

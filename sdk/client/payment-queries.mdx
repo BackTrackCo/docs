@@ -72,7 +72,7 @@ Retrieve all slot addresses from the PaymentOperator contract.
 ```typescript
 const config = await client.operator.getConfig()
 
-console.log('Release condition:', config.releaseCondition)
+console.log('Release condition:', config.capturePreActionCondition)
 console.log('Fee calculator:', config.feeCalculator)
 console.log('Fee recipient:', config.feeRecipient)
 ```

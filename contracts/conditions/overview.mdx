@@ -10,9 +10,9 @@ Conditions are pluggable contracts that control who can perform actions on a Pay
 
 | Slot | Controls |
 |------|----------|
-| `AUTHORIZE_CONDITION` | Who can authorize payments |
-| `CHARGE_CONDITION` | Who can charge partial amounts |
-| `RELEASE_CONDITION` | Who can release from escrow |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Who can authorize payments |
+| `CHARGE_PRE_ACTION_CONDITION` | Who can charge partial amounts |
+| `CAPTURE_PRE_ACTION_CONDITION` | Who can release from escrow |
 | `VOID_PRE_ACTION_CONDITION` | Who can refund during escrow |
 | `REFUND_PRE_ACTION_CONDITION` | Who can refund after release |
 
@@ -67,9 +67,9 @@ Conditions compose to create flexible authorization policies. Here are common pa
 
 ```solidity
 config = {
-    authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
-    authorizeRecorder: escrowRecorder,          // Record time
-    releaseCondition: releaseCondition,         // Restricted
+    authorizePreActionCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
+    authorizePostActionHook: escrowRecorder,          // Record time
+    capturePreActionCondition: capturePreActionCondition,         // Restricted
     // ...
 };
 ```
@@ -78,8 +78,8 @@ config = {
 
 ```solidity
 config = {
-    authorizeCondition: PAYER_CONDITION,        // Only payer
-    releaseCondition: PAYER_CONDITION,          // Only payer
+    authorizePreActionCondition: PAYER_CONDITION,        // Only payer
+    capturePreActionCondition: PAYER_CONDITION,          // Only payer
     // ...
 };
 ```
@@ -88,9 +88,9 @@ config = {
 
 ```solidity
 config = {
-    authorizeCondition: ARBITER_CONDITION,      // Only arbiter
-    chargeCondition: ARBITER_CONDITION,         // Only arbiter
-    releaseCondition: ARBITER_CONDITION,        // Only arbiter
+    authorizePreActionCondition: ARBITER_CONDITION,      // Only arbiter
+    chargePreActionCondition: ARBITER_CONDITION,         // Only arbiter
+    capturePreActionCondition: ARBITER_CONDITION,        // Only arbiter
     voidPreActionCondition: ARBITER_CONDITION, // Only arbiter
     refundPreActionCondition: ARBITER_CONDITION,
     // ...
@@ -107,8 +107,8 @@ Singleton conditions are deployed once and reused by all operators. Reference th
 
 ```typescript
 // Good: Reference the singleton address
-const config1 = { authorizeCondition: PAYER_CONDITION };
-const config2 = { authorizeCondition: PAYER_CONDITION }; // Same address
+const config1 = { authorizePreActionCondition: PAYER_CONDITION };
+const config2 = { authorizePreActionCondition: PAYER_CONDITION }; // Same address
 ```
 
 ### Stateless Conditions

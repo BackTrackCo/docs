@@ -17,13 +17,13 @@ const comboAddress = await recorderCombinatorFactory.write.deploy([
   [escrowPeriodAddress, paymentIndexRecorderAddress]  // Records auth time + payment index
 ]);
 
-config.authorizeRecorder = comboAddress;
+config.authorizePostActionHook = comboAddress;
 ```
 
 ## Behavior
 
 - Recorders are called in the order provided
-- **If any recorder reverts, all revert** — the entire recording is atomic
+- **If any recorder reverts, all revert**: the entire recording is atomic
 - Each recorder receives the same `paymentInfo`, `amount`, and `caller` parameters
 
 ## Limits

@@ -107,7 +107,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 ### 5. Factory Pattern
 
-**PaymentOperatorFactory** - Deploys operators with deterministic CREATE3 addresses
+**PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
 
 **EscrowPeriodFactory** - Deploys EscrowPeriod contracts
 
@@ -115,7 +115,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, RecorderCombinator.
 
-All factories use **unified CREATE3 addresses**: same address on every supported chain.
+All factories use **universal CREATE2 addresses**: same address on every supported chain.
 
 **Benefits:**
 - Predictable addresses for off-chain address generation
@@ -133,9 +133,9 @@ All factories use **unified CREATE3 addresses**: same address on every supported
 | **Dispute Resolution** | Not built-in | Arbiter workflow via conditions, signatures, and evidence |
 | **Authorization** | Operator-based only | Pluggable conditions (access, time, signature, combinators) |
 | **Freeze Mechanism** | Not available | Configurable freeze during escrow period |
-| **Deployment** | Direct deployment | Factory pattern with unified CREATE3 (same address every chain) |
+| **Deployment** | Direct deployment | Factory pattern with universal CREATE2 (same address every chain) |
 | **Fees** | Not enforced | Additive protocol + operator fees with 7-day timelock |
-| **Multi-chain** | Per-chain deployment | Unified CREATE3 addresses across 11 chains |
+| **Multi-chain** | Per-chain deployment | Universal CREATE2 addresses on supported chains |
 
 ## Use Cases
 

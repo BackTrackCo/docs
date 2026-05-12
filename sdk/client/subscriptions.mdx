@@ -10,7 +10,7 @@ The `watch` group is always available on the client (no optional address require
 
 ## watch.onPayment
 
-Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` on the PaymentOperator contract.
+Watch for payment lifecycle events: `AuthorizeExecuted`, `ChargeExecuted`, and `CaptureExecuted` on the PaymentOperator contract.
 
 ```typescript
 const unwatch = client.watch.onPayment((logs) => {
@@ -18,13 +18,13 @@ const unwatch = client.watch.onPayment((logs) => {
     console.log('Payment event:', log.eventName)
 
     switch (log.eventName) {
-      case 'AuthorizationCreated':
+      case 'AuthorizeExecuted':
         console.log('New payment authorized')
         break
       case 'ChargeExecuted':
         console.log('Payment charged')
         break
-      case 'ReleaseExecuted':
+      case 'CaptureExecuted':
         console.log('Funds released to merchant')
         break
     }
@@ -82,7 +82,7 @@ unwatch()
 
 | Method | Events Watched | Contract |
 |--------|---------------|----------|
-| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onPayment` | `AuthorizeExecuted`, `ChargeExecuted`, `CaptureExecuted` | PaymentOperator |
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
 | `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |

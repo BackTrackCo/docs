@@ -63,7 +63,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
       freeze               // Not frozen
     ]);
 
-    const releaseCondition = await new AndCondition([
+    const capturePreActionCondition = await new AndCondition([
       receiverOrArbiter,
       escrowAndFreeze
     ]);
@@ -75,12 +75,12 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
     const config = {
       feeRecipient: arbiterAddress,         // Arbiter earns fees for dispute resolution
       feeCalculator: feeCalculatorAddress,  // Operator fee calculator
-      authorizeCondition: ALWAYS_TRUE_CONDITION,
-      authorizeRecorder: escrowPeriod,      // Same address for recording auth time
-      chargeCondition: RECEIVER_CONDITION,
-      chargeRecorder: '0x0000000000000000000000000000000000000000',
-      releaseCondition: releaseCondition,
-      releaseRecorder: '0x0000000000000000000000000000000000000000',
+      authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+      authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
+      chargePreActionCondition: RECEIVER_CONDITION,
+      chargePostActionHook: '0x0000000000000000000000000000000000000000',
+      capturePreActionCondition: capturePreActionCondition,
+      capturePostActionHook: '0x0000000000000000000000000000000000000000',
       voidPreActionCondition: arbiterCondition.address,
       voidPostActionHook: '0x0000000000000000000000000000000000000000',
       refundPreActionCondition: arbiterCondition.address,
@@ -137,12 +137,12 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: RECEIVER_CONDITION,        // Only receiver can charge
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Fallback to release remaining
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: arbiterCondition.address,
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: arbiterCondition.address,
@@ -195,7 +195,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
 const freeze = await freezeFactory.deploy(freezePolicy, escrowPeriod);
 
 // Receiver OR Arbiter can release (after escrow + not frozen)
-const releaseCondition = await new AndCondition([
+const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   await new AndCondition([escrowPeriod, freeze])
 ]);
@@ -203,12 +203,12 @@ const releaseCondition = await new AndCondition([
 const config = {
   feeRecipient: arbiterAddress,         // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,  // Operator fee calculator
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriod,      // Same address for recording auth time
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: arbiterCondition.address,
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: arbiterCondition.address,
@@ -270,7 +270,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
 );
 
 // Receiver can release after short escrow
-const releaseCondition = await new AndCondition([
+const capturePreActionCondition = await new AndCondition([
   RECEIVER_CONDITION,    // Only receiver
   escrowPeriod           // Escrow period passed
 ]);
@@ -278,12 +278,12 @@ const releaseCondition = await new AndCondition([
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
-  authorizeRecorder: escrowPeriod,            // Record auth time
-  chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: PAYER_CONDITION,        // Only payer authorizes
+  authorizePostActionHook: escrowPeriod,            // Record auth time
+  chargePreActionCondition: RECEIVER_CONDITION,        // Receiver can charge partials
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: arbiterCondition.address,
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: arbiterCondition.address,
@@ -340,12 +340,12 @@ const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns all fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: arbiterCondition.address,      // Arbiter creates payments
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: arbiterCondition.address,         // Arbiter charges
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: arbiterCondition.address,        // Arbiter releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: arbiterCondition.address,      // Arbiter creates payments
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: arbiterCondition.address,         // Arbiter charges
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: arbiterCondition.address,        // Arbiter releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: arbiterCondition.address, // Arbiter refunds
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: arbiterCondition.address,
@@ -383,7 +383,7 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
 );
 
 // Receiver OR Arbiter can release
-const releaseCondition = await new AndCondition([
+const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   escrowPeriod          // Escrow period passed
 ]);
@@ -397,12 +397,12 @@ const refundCondition = await new OrCondition([
 const config = {
   feeRecipient: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriod,            // Record auth time
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriod,            // Record auth time
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: refundCondition,    // Receiver OR Arbiter
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: RECEIVER_CONDITION, // Only receiver after capture
@@ -454,12 +454,12 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 const config = {
   feeRecipient: serviceProviderAddress,       // Service provider earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: providerCondition.address, // Provider charges monthly
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: providerCondition.address,// Provider releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer sets up subscription
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: providerCondition.address, // Provider charges monthly
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: providerCondition.address,// Provider releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: '0x0000000000000000000000000000000000000000',
@@ -526,12 +526,12 @@ const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
 const config = {
   feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: daoCondition.address,   // DAO authorizes grants
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: daoCondition.address,     // DAO must approve releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: daoCondition.address,   // DAO authorizes grants
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: daoCondition.address,     // DAO must approve releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: daoCondition.address,  // DAO can refund if needed
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds
@@ -595,15 +595,15 @@ const timeProportionalCondition = await new TimeProportionalCondition();
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer authorizes stream
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: new AndCondition([
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer authorizes stream
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: new AndCondition([
     RECEIVER_CONDITION,
     timeProportionalCondition                 // Can only charge proportional to time
   ]),
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Receiver releases remaining
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Receiver releases remaining
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: PAYER_CONDITION,   // Payer can cancel stream
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
@@ -667,12 +667,12 @@ const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 const config = {
   feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer creates invoice payment
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer creates invoice payment
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds

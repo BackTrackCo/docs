@@ -48,7 +48,7 @@ Never commit private keys to source control. Use environment variables or a secr
     import { x402Facilitator } from "@x402/core/facilitator";
     import { PaymentPayload, PaymentRequirements } from "@x402/core/types";
     import { toFacilitatorEvmSigner } from "@x402/evm";
-    import { registerEscrowScheme } from "@x402r/evm/escrow/facilitator";
+    import { registerEscrowScheme } from "@x402r/evm/authCapture/facilitator";
     import { createWalletClient, http, publicActions } from "viem";
     import { privateKeyToAccount } from "viem/accounts";
     import { baseSepolia } from "viem/chains";

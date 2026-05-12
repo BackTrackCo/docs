@@ -27,7 +27,7 @@ This is a no-op if `refundRequestAddress` was not provided in the client config.
 
 ## watch.onPayment
 
-Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted`.
+Watch for payment lifecycle events: `AuthorizeExecuted`, `ChargeExecuted`, and `CaptureExecuted`.
 
 ```typescript
 const unwatch = arbiter.watch.onPayment((logs) => {
@@ -72,7 +72,7 @@ unwatch()
 | Method | Events Watched | Contract |
 |--------|---------------|----------|
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
-| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onPayment` | `AuthorizeExecuted`, `ChargeExecuted`, `CaptureExecuted` | PaymentOperator |
 | `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 

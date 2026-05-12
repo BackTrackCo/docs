@@ -77,7 +77,7 @@ console.log('In escrow:', inEscrow)                        // true
 </Warning>
 
 ```typescript
-const releaseTx = await merchant.payment.release(paymentInfo, 1_000_000n)
+const releaseTx = await merchant.payment.capture(paymentInfo, 1_000_000n)
 console.log('Released:', releaseTx)
 
 // Verify

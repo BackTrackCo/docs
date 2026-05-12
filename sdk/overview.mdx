@@ -85,44 +85,29 @@ bunx @x402r/cli pay <url> [options]
     Deploy an operator, accept a payment, release funds from escrow.
   </Card>
   <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
-    High-level SDK with role-scoped clients (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r` factory.
+    High-level client with role-scoped factories (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r`.
   </Card>
-  <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
-    SDK for merchants to release payments, charge, and handle refunds.
+  <Card title="Merchant guide" icon="store" href="/sdk/merchant/quickstart">
+    Capture funds from escrow, charge directly, void, and process refunds using `createMerchantClient`.
   </Card>
-  <Card title="@x402r/arbiter" icon="gavel" href="/sdk/arbiter/quickstart">
-    SDK for arbiters to resolve disputes and manage refund decisions.
+  <Card title="Arbiter guide" icon="gavel" href="/sdk/arbiter/quickstart">
+    Resolve disputes and act as a captureAuthorizer using `createArbiterClient`.
   </Card>
-  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
-    Framework-agnostic helpers: `refundable()` for escrow configuration, `forwardToArbiter()` for arbiter integration, and re-exported address constants.
-  </Card>
-  <Card title="CLI" icon="terminal" href="/sdk/cli">
-    One-shot payments from the command line or scripts.
+  <Card title="@x402r/cli" icon="terminal" href="/sdk/cli">
+    Wallet-agnostic one-shot payments from the command line or scripts.
   </Card>
 </CardGroup>
 
 ## Network support
 
-All v3 contracts are deployed to the same address on every chain via CREATE3.
+All x402r-authored contracts use universal CREATE2 addresses: when a chain is supported, the address is the same as on every other supported chain.
+
+Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. Additional EVMs will be added as canonical `base/commerce-payments@v1.0.0` coverage extends.
 
 | Chain | Chain ID | USDC |
-|-------|----------|------|
-| Base Sepolia | `84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-| Ethereum Sepolia | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
-| Arbitrum Sepolia | `421614` | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` |
-| Ethereum | `1` | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+|---|---|---|
 | Base | `8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
-| Polygon | `137` | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
-| Arbitrum One | `42161` | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` |
-| Optimism | `10` | `0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85` |
-| Celo | `42220` | `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` |
-| Avalanche C-Chain | `43114` | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
-| Monad | `143` | `0x754704Bc059F8C67012fEd69BC8A327a5aafb603` |
-| Linea | `59144` | `0x176211869cA2b568f2A7D4EE941E073a821EE1ff` |
-
-<Note>
-SKALE Base (`1187947933`) was removed from the registry. Its Shanghai EVM is incompatible with the Cancun-locked canonical bytecode used by the commerce-payments v1 primitives.
-</Note>
+| Base Sepolia | `84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ### commerce-payments v1 primitives
 
@@ -152,8 +137,4 @@ commercePaymentsAddresses.erc3009PaymentCollector;
 commercePaymentsAddresses.permit2PaymentCollector;
 ```
 
-The primitives are live on Base, Optimism, Arbitrum One, Polygon, Celo, Avalanche C-Chain, Linea, Base Sepolia, Ethereum Sepolia, and Arbitrum Sepolia. Ethereum mainnet and Monad are listed in the registry pending an imminent deploy.
-
-<Info>
-The legacy CREATE3 exports (`authCaptureEscrow`, `tokenCollector`, `factories`, `conditions`, `recorders`) remain unchanged. They will be retired in the SDK v2 migration that ships the x402r-authored contracts at CREATE2 addresses.
-</Info>
+The primitives are exposed to SDK consumers on the chains listed in `@x402r/core`'s `x402rChains` (Base + Base Sepolia today). The CREATE2 addresses themselves have been prepositioned via CreateX on additional chains and will be enabled in the registry as canonical `base/commerce-payments@v1.0.0` coverage extends.

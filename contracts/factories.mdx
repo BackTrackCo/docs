@@ -46,7 +46,7 @@ Deploys PaymentOperator instances with deterministic addresses.
 
 ### Contract Address
 
-All factories use unified CREATE3 addresses (same on every chain).
+All factories use universal CREATE2 addresses (same on every chain).
 
 **PaymentOperatorFactory:** `0x4D9BC2Ba2D0d9AFb6B63E3afBbfC95143E6E8Da9`
 
@@ -56,12 +56,12 @@ All factories use unified CREATE3 addresses (same on every chain).
 struct OperatorConfig {
     address feeRecipient;             // Who receives operator fees
     address feeCalculator;            // Operator fee calculator (IFeeCalculator)
-    address authorizeCondition;
-    address authorizeRecorder;
-    address chargeCondition;
-    address chargeRecorder;
-    address releaseCondition;
-    address releaseRecorder;
+    address authorizePreActionCondition;
+    address authorizePostActionHook;
+    address chargePreActionCondition;
+    address chargePostActionHook;
+    address capturePreActionCondition;
+    address capturePostActionHook;
     address voidPreActionCondition;
     address voidPostActionHook;
     address refundPreActionCondition;
@@ -79,7 +79,7 @@ function deployOperator(
 
 **Parameters (in config):**
 - `feeRecipient` - Who receives operator fees (arbiter, service provider, treasury, etc.)
-- `authorizeCondition` through `refundPostActionHook` - 10-slot configuration
+- `authorizePreActionCondition` through `refundPostActionHook` - 10-slot configuration
 
 **Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
 
@@ -99,7 +99,7 @@ function computeAddress(
 ```typescript
 const config = {
   feeRecipient: arbiterAddress,
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   // ... rest of config
 };
 
@@ -143,21 +143,21 @@ const arbiterConditionHash = await staticAddressConditionFactory.write.deploy([a
 const arbiterConditionAddress = /* get from receipt */;
 
 // Deploy release condition: arbiter AND escrow period passed
-const releaseConditionHash = await andConditionFactory.write.deploy([
+const capturePreActionConditionHash = await andConditionFactory.write.deploy([
   [arbiterConditionAddress, escrowPeriodAddress]
 ]);
-const releaseConditionAddress = /* get from receipt */;
+const capturePreActionConditionAddress = /* get from receipt */;
 
 // Define configuration
 const config = {
   feeRecipient: arbiterAddress,  // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriodAddress,
-  chargeCondition: zeroAddress,  // Default allow
-  chargeRecorder: zeroAddress,   // No recording
-  releaseCondition: releaseConditionAddress,
-  releaseRecorder: zeroAddress,
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriodAddress,
+  chargePreActionCondition: zeroAddress,  // Default allow
+  chargePostActionHook: zeroAddress,   // No recording
+  capturePreActionCondition: capturePreActionConditionAddress,
+  capturePostActionHook: zeroAddress,
   voidPreActionCondition: arbiterConditionAddress,
   voidPostActionHook: zeroAddress,
   refundPreActionCondition: arbiterConditionAddress,
@@ -180,12 +180,12 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 
 const config = {
   feeRecipient: serviceProviderAddress,  // Provider earns fees
-  authorizeCondition: PAYER_CONDITION,
-  authorizeRecorder: zeroAddress,
-  chargeCondition: providerCondition.address,
-  chargeRecorder: zeroAddress,
-  releaseCondition: providerCondition.address,
-  releaseRecorder: zeroAddress,
+  authorizePreActionCondition: PAYER_CONDITION,
+  authorizePostActionHook: zeroAddress,
+  chargePreActionCondition: providerCondition.address,
+  chargePostActionHook: zeroAddress,
+  capturePreActionCondition: providerCondition.address,
+  capturePostActionHook: zeroAddress,
   voidPreActionCondition: zeroAddress,  // No refunds
   voidPostActionHook: zeroAddress,
   refundPreActionCondition: zeroAddress,
@@ -243,7 +243,7 @@ flowchart LR
 ```
 
 <Note>
-Use the SAME `EscrowPeriod` address for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots on the operator. For freeze functionality, deploy a separate `Freeze` condition and compose via `AndCondition([escrowPeriod, freeze])`.
+Use the SAME `EscrowPeriod` address for both `AUTHORIZE_POST_ACTION_HOOK` and `CAPTURE_PRE_ACTION_CONDITION` slots on the operator. For freeze functionality, deploy a separate `Freeze` condition and compose via `AndCondition([escrowPeriod, freeze])`.
 </Note>
 
 ### Example Deployment
@@ -270,11 +270,11 @@ console.log("EscrowPeriod:", escrowPeriodAddress);
 
 // Use SAME address for both recorder and condition
 const config = {
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriodAddress,     // Record auth time
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriodAddress,     // Record auth time
   // ...
-  releaseCondition: escrowPeriodAddress,      // Check escrow passed
-  releaseRecorder: zeroAddress,               // No additional recording needed
+  capturePreActionCondition: escrowPeriodAddress,      // Check escrow passed
+  capturePostActionHook: zeroAddress,               // No additional recording needed
   // ...
 };
 ```
@@ -336,14 +336,14 @@ const freeze = await freezeFactory.write.deploy([
 ]);
 
 // Step 3: Compose with EscrowPeriod for release condition
-const releaseCondition = await andConditionFactory.write.deploy([
+const capturePreActionCondition = await andConditionFactory.write.deploy([
   [escrowPeriod, freeze]
 ]);
 
 // Use in operator config
 const config = {
   // ...
-  releaseCondition: releaseCondition,
+  capturePreActionCondition: capturePreActionCondition,
   // ...
 };
 ```
@@ -491,12 +491,12 @@ Each factory uses different salt strategies:
 bytes32 key = keccak256(abi.encodePacked(
     config.feeRecipient,
     config.feeCalculator,
-    config.authorizeCondition,
-    config.authorizeRecorder,
-    config.chargeCondition,
-    config.chargeRecorder,
-    config.releaseCondition,
-    config.releaseRecorder,
+    config.authorizePreActionCondition,
+    config.authorizePostActionHook,
+    config.chargePreActionCondition,
+    config.chargePostActionHook,
+    config.capturePreActionCondition,
+    config.capturePostActionHook,
     config.voidPreActionCondition,
     config.voidPostActionHook,
     config.refundPreActionCondition,
@@ -518,37 +518,7 @@ bytes32 salt = keccak256(abi.encodePacked("freeze", key));
 
 ### Cross-Chain Addresses
 
-Same configuration on different chains = same address:
-
-```typescript
-import { createPublicClient } from 'viem';
-import { baseSepolia, optimismSepolia } from 'viem/chains';
-
-// Deploy on Base Sepolia
-const baseFactory = getContract({
-  address: FACTORY_ADDRESS,
-  abi: PaymentOperatorFactory.abi,
-  client: baseWalletClient
-});
-
-const baseHash = await baseFactory.write.deployOperator([config]);
-const baseReceipt = await baseWalletClient.waitForTransactionReceipt({ hash: baseHash });
-const addressBaseSepolia = baseReceipt.logs[0].address;
-
-// Deploy on Optimism Sepolia with identical params
-const opFactory = getContract({
-  address: FACTORY_ADDRESS,
-  abi: PaymentOperatorFactory.abi,
-  client: opWalletClient
-});
-
-const opHash = await opFactory.write.deployOperator([config]);
-const opReceipt = await opWalletClient.waitForTransactionReceipt({ hash: opHash });
-const addressOptimismSepolia = opReceipt.logs[0].address;
-
-// Addresses are identical!
-console.assert(addressBaseSepolia === addressOptimismSepolia);
-```
+Because the factory uses CREATE2, the same configuration produces the same operator address on any chain where the factory itself lives at the canonical address. As supported chains expand beyond Base, an operator deployed with identical config will land at the same address on each new chain without the integrator needing per-chain bookkeeping.
 
 This enables:
 - Consistent addressing across chains
@@ -577,14 +547,14 @@ Don't deploy new PayerCondition/ReceiverCondition - use existing singletons:
 ```typescript
 // ✅ Good: Reuse singleton
 const config = {
-  authorizeCondition: PAYER_CONDITION,  // Pre-deployed singleton
+  authorizePreActionCondition: PAYER_CONDITION,  // Pre-deployed singleton
   // ...
 };
 
 // ❌ Bad: Deploy new instance
 const payerCondition = await new PayerCondition();
 const config = {
-  authorizeCondition: payerCondition.address,  // Wastes gas
+  authorizePreActionCondition: payerCondition.address,  // Wastes gas
   // ...
 };
 ```

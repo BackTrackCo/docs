@@ -50,7 +50,7 @@ Parses agent registrations from the upstream x402 reputation extension (`extensi
 Returns an empty array if the reputation extension is absent or malformed.
 
 <Warning>
-The upstream x402 reputation extension is not yet merged. The shape of `extensions["reputation"]` may change. See [x402-foundation/x402#931](https://github.com/x402-foundation/x402/issues/931).
+The upstream x402 reputation extension is not yet merged. The shape of `extensions["reputation"]` may change.
 </Warning>
 
 ```typescript
@@ -150,9 +150,6 @@ function handlePayment(paymentRequired: { extensions?: Record<string, unknown> }
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
-    Add escrow config to x402 payment options.
-  </Card>
   <Card title="Create Client" icon="plug" href="/sdk/create-client">
     Client factory with identity.check() for combined verification.
   </Card>

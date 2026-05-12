@@ -8,7 +8,7 @@ The merchant client provides real-time event subscriptions through the `watch` a
 
 ## watch.onPayment
 
-Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` on the PaymentOperator contract.
+Watch for payment lifecycle events: `AuthorizeExecuted`, `ChargeExecuted`, and `CaptureExecuted` on the PaymentOperator contract.
 
 ```typescript
 const unwatch = merchant.watch.onPayment((logs) => {
@@ -28,7 +28,7 @@ let totalReleased = 0n
 
 const unwatch = merchant.watch.onPayment((logs) => {
   for (const log of logs) {
-    if (log.eventName === 'ReleaseExecuted') {
+    if (log.eventName === 'CaptureExecuted') {
       const amount = log.args?.amount ?? 0n
       totalReleased += amount
       console.log('Release: +', amount, 'Total:', totalReleased)
@@ -106,7 +106,7 @@ unwatch()
 
 | Method | Events Watched | Contract |
 |--------|---------------|----------|
-| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onPayment` | `AuthorizeExecuted`, `ChargeExecuted`, `CaptureExecuted` | PaymentOperator |
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
 | `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |

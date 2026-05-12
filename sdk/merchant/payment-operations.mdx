@@ -8,13 +8,13 @@ The merchant client provides methods for managing the full payment lifecycle thr
 
 ## Payment operations
 
-### payment.release
+### payment.capture
 
 Transfer escrowed funds to the receiver (merchant). The `amount` parameter is required.
 
 ```typescript
 // Release 10 USDC (6 decimals) from escrow
-const tx = await merchant.payment.release(paymentInfo, 10_000_000n)
+const tx = await merchant.payment.capture(paymentInfo, 10_000_000n)
 console.log('Released:', tx)
 ```
 
@@ -22,7 +22,7 @@ For partial releases, specify a smaller amount. The remaining funds stay in escr
 
 ```typescript
 // Release 3 USDC of a 10 USDC escrow
-const tx = await merchant.payment.release(paymentInfo, 3_000_000n)
+const tx = await merchant.payment.capture(paymentInfo, 3_000_000n)
 
 // Check what remains
 const amounts = await merchant.payment.getAmounts(paymentInfo)
@@ -134,7 +134,7 @@ const config = await merchant.operator.getConfig()
 
 console.log('Fee recipient:', config.feeRecipient)
 console.log('Fee calculator:', config.feeCalculator)
-console.log('Release condition:', config.releaseCondition)
+console.log('Release condition:', config.capturePreActionCondition)
 ```
 
 ### operator.getFeeAddresses
@@ -172,7 +172,7 @@ flowchart TD
     C -->|No| E[Nothing to release]
     D -->|No| F[Safe to release]
     D -->|Yes| G{Approve refund?}
-    F --> H["payment.release(paymentInfo, amount)"]
+    F --> H["payment.capture(paymentInfo, amount)"]
     G -->|Yes| I["payment.voidPayment(paymentInfo)"]
     G -->|No| J[Deny request, then release]
     J --> H
