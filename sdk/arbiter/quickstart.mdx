@@ -19,9 +19,7 @@ const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
-  // Optional: enable escrow and freeze features
-  escrowPeriodAddress: '0x...',
-  freezeAddress: '0x...',
+  refundRequestAddress: config.refundRequest,
 });
 ```
 
@@ -29,7 +27,15 @@ Refund request and evidence addresses are auto-resolved from the chain config.
 
 ## Available methods
 
-The arbiter client currently supports:
+- **`approveRefundRequest()`** — Approve a pending refund request
+- **`denyRefundRequest()`** — Deny a pending refund request
+- **`executeRefundInEscrow()`** — Execute an approved refund to transfer funds back
+- **`getPendingRefundRequests()`** — List refund requests awaiting decision
+- **`getRefundRequestByKey()`** — Get details of a specific refund request
+- **`isArbiterRegistered()`** — Check registration status
+- **`submitEvidence()`** — Attach evidence (IPFS CID) to a refund request
+- **`getEvidence()`** — Retrieve a single evidence entry by index
+- **`getAllEvidence()`** — Retrieve all evidence for a refund request
 
 - **`payment.refundInEscrow()`** — Execute a refund (auto-approves pending request)
 - **`refund.deny()`** — Deny a pending refund request

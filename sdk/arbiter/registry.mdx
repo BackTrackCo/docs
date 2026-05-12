@@ -1,14 +1,26 @@
 ---
-title: "Arbiter Registry"
-description: "Register, update, and discover arbiters using the on-chain ArbiterRegistry"
+title: "Arbiter discovery"
+description: "How arbiters are discovered by merchants and clients"
 icon: "clipboard-list"
 ---
 
-The ArbiterRegistry is an on-chain contract that allows arbiters to register themselves, publish metadata URIs, and be discovered by merchants and clients.
+<Warning>
+The on-chain `ArbiterRegistry` contract has been removed. Arbiter discovery is now handled off-chain. If you were using `arbiterRegistry`, `arbiterRegistryAbi`, or `config.arbiterRegistry`, remove those references from your code.
+</Warning>
 
-## Setup
+## What changed
 
-To use registry methods, provide the `arbiterRegistryAddress` when creating the arbiter instance:
+The `ArbiterRegistry` contract was deleted from x402r-contracts. ERC-8004 replaces on-chain arbiter discovery with off-chain mechanisms.
+
+The following exports have been removed from `@x402r/core` and `@x402r/helpers`:
+
+- `arbiterRegistry` (constant address)
+- `arbiterRegistryAbi`
+- `X402rChainConfig.arbiterRegistry` field
+
+## Migrating existing code
+
+Remove any references to `arbiterRegistryAddress` from your client setup:
 
 ```typescript
 import { createArbiterClient } from '@x402r/sdk';
@@ -20,153 +32,24 @@ const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
+  refundRequestAddress: config.refundRequest,
+  // arbiterRegistryAddress is no longer needed
 });
 ```
 
-<Note>
-The arbiter registry address is resolved automatically from the chain config. Registry methods are not currently exposed on the preset client — use `createX402r()` for direct access if needed.
-</Note>
-
-## Register as an Arbiter
-
-Register your address in the on-chain registry with a URI pointing to your metadata or API endpoint:
-
-```typescript
-const { txHash } = await arbiter.registerArbiter(
-  'https://arbiter.example.com/api/disputes'
-);
-console.log('Registered:', txHash);
-```
-
-The URI can point to:
-- An API endpoint for receiving dispute notifications
-- A JSON metadata file describing your arbitration services
-- An IPFS hash with your arbiter profile
-
-## Update Your URI
-
-Change your registered URI:
-
-```typescript
-const { txHash } = await arbiter.updateArbiterUri(
-  'https://new-arbiter.example.com/api'
-);
-console.log('URI updated:', txHash);
-```
-
-## Deregister
-
-Remove yourself from the registry:
-
-```typescript
-const { txHash } = await arbiter.deregisterArbiter();
-console.log('Deregistered:', txHash);
-```
-
-## Query the Registry
-
-### Check if an Address is Registered
-
-```typescript
-const isRegistered = await arbiter.isArbiterRegistered('0xArbiterAddress...');
-console.log('Is registered:', isRegistered);
-```
-
-### Get an Arbiter's URI
-
-```typescript
-const uri = await arbiter.getArbiterUri('0xArbiterAddress...');
-console.log('URI:', uri); // empty string if not registered
-```
-
-### Get Total Arbiter Count
-
-```typescript
-const count = await arbiter.getArbiterCount();
-console.log('Total arbiters:', count);
-```
-
-### List Arbiters (Paginated)
-
-```typescript
-const { arbiters, uris, total } = await arbiter.listArbiters(0n, 10n);
-console.log(`Showing ${arbiters.length} of ${total} arbiters`);
-
-for (let i = 0; i < arbiters.length; i++) {
-  console.log(`${arbiters[i]}: ${uris[i]}`);
-}
-```
-
-## Method Reference
-
-| Method | Parameters | Returns | Description |
-|--------|-----------|---------|-------------|
-| `registerArbiter` | `uri: string` | `{ txHash }` | Register with a URI |
-| `updateArbiterUri` | `newUri: string` | `{ txHash }` | Update registered URI |
-| `deregisterArbiter` | (none) | `{ txHash }` | Remove from registry |
-| `getArbiterUri` | `arbiter: Address` | `string` | Get arbiter's URI |
-| `isArbiterRegistered` | `arbiter: Address` | `boolean` | Check registration |
-| `getArbiterCount` | (none) | `bigint` | Total registered count |
-| `listArbiters` | `offset: bigint, count: bigint` | `ArbiterList` | Paginated list |
-
-## ArbiterList Type
-
-```typescript
-interface ArbiterList {
-  arbiters: readonly `0x${string}`[];  // Arbiter addresses
-  uris: readonly string[];             // Corresponding URIs
-  total: bigint;                       // Total registered count
-}
-```
-
-## Complete Example
-
-```typescript
-import { createArbiterClient } from '@x402r/sdk';
-import { getChainConfig } from '@x402r/core';
-
-async function main() {
-  const config = getChainConfig(84532);
-
-  const arbiter = createArbiterClient({
-    publicClient,
-    walletClient,
-    operatorAddress: '0x...',
-  });
-
-  // Register
-  await arbiter.registerArbiter('https://my-arbiter.example.com/api');
-
-  // Verify
-  const isRegistered = await arbiter.isArbiterRegistered(
-    walletClient.account!.address
-  );
-  console.log('Registered:', isRegistered);
-
-  // Browse all arbiters
-  const { arbiters, uris, total } = await arbiter.listArbiters(0n, 100n);
-  console.log(`${total} arbiters registered:`);
-  for (let i = 0; i < arbiters.length; i++) {
-    console.log(`  ${arbiters[i]} → ${uris[i]}`);
-  }
-}
-
-main().catch(console.error);
-```
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
+  <Card title="Decision submission" icon="gavel" href="/sdk/arbiter/decision-submission">
     Approve and deny refund requests.
   </Card>
-  <Card title="AI Integration" icon="robot" href="/sdk/arbiter/ai-integration">
+  <Card title="AI integration" icon="robot" href="/sdk/arbiter/ai-integration">
     Automate dispute resolution with AI.
   </Card>
-  <Card title="Arbiter Quickstart" icon="rocket" href="/sdk/arbiter/quickstart">
+  <Card title="Arbiter quickstart" icon="rocket" href="/sdk/arbiter/quickstart">
     Complete arbiter setup guide.
   </Card>
-  <Card title="Smart Contracts" icon="file-contract" href="/contracts/conditions/overview">
+  <Card title="Smart contracts" icon="file-contract" href="/contracts/conditions/overview">
     Understand arbiter conditions in contracts.
   </Card>
 </CardGroup>
