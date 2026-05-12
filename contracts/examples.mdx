@@ -81,10 +81,10 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
       chargeRecorder: '0x0000000000000000000000000000000000000000',
       releaseCondition: releaseCondition,
       releaseRecorder: '0x0000000000000000000000000000000000000000',
-      refundInEscrowCondition: arbiterCondition.address,
-      refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-      refundPostEscrowCondition: arbiterCondition.address,
-      refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+      voidPreActionCondition: arbiterCondition.address,
+      voidPostActionHook: '0x0000000000000000000000000000000000000000',
+      refundPreActionCondition: arbiterCondition.address,
+      refundPostActionHook: '0x0000000000000000000000000000000000000000'
     };
 
     const operator = await operatorFactory.deployOperator(config);
@@ -143,10 +143,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -164,7 +164,7 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 - ✅ Instant delivery for digital goods
 - ✅ Better UX - seller gets paid immediately
 - ❌ No buyer protection escrow period
-- ❌ Payment immediately moves to post-escrow state
+- ❌ Payment immediately moves to after capture state
 
 ---
 
@@ -209,10 +209,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -246,7 +246,7 @@ sequenceDiagram
     Arbiter->>Arbiter: Investigates
 
     Note over Buyer,Escrow: Day 16 - Resolution
-    Arbiter->>Operator: refundInEscrow(paymentId)
+    Arbiter->>Operator: voidPayment(paymentId)
     Operator->>Escrow: void(paymentId)
     Escrow->>Buyer: Full refund
 ```
@@ -284,10 +284,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -346,10 +346,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: arbiterCondition.address,        // Arbiter releases
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address, // Arbiter refunds
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: arbiterCondition.address, // Arbiter refunds
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -403,10 +403,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: releaseCondition,
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: refundCondition,    // Receiver OR Arbiter
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: RECEIVER_CONDITION, // Only receiver post-escrow
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: refundCondition,    // Receiver OR Arbiter
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: RECEIVER_CONDITION, // Only receiver after capture
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -432,7 +432,7 @@ sequenceDiagram
     Note over Buyer,Escrow: Day 5 - Return Request
     Buyer->>Seller: Requests return
     Note over Seller: Approves return
-    Seller->>Operator: refundInEscrow(paymentId)
+    Seller->>Operator: voidPayment(paymentId)
     Operator->>Escrow: void(paymentId)
     Escrow->>Buyer: Full refund
     Note over Buyer,Escrow: Buyer returns product
@@ -460,10 +460,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: providerCondition.address,// Provider releases
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -532,10 +532,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: daoCondition.address,     // DAO must approve releases
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: daoCondition.address,  // DAO can refund if needed
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-escrow refunds
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: daoCondition.address,  // DAO can refund if needed
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -588,7 +588,7 @@ sequenceDiagram
 // Deploy condition for platform address
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
-// Time-proportional charge condition (custom — not provided out of the box,
+// Time-proportional charge condition (custom, not provided out of the box,
 // this is a hypothetical custom condition you would implement yourself)
 const timeProportionalCondition = await new TimeProportionalCondition();
 
@@ -604,10 +604,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Receiver releases remaining
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: PAYER_CONDITION,   // Payer can cancel stream
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: PAYER_CONDITION,   // Payer can cancel stream
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -673,10 +673,10 @@ const config = {
   chargeRecorder: '0x0000000000000000000000000000000000000000',
   releaseCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
   releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  voidPreActionCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);

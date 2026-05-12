@@ -37,7 +37,7 @@ const unwatch = arbiter.watch.onRefundRequest(async (logs) => {
     if (decision.approve && decision.confidence >= 0.9) {
       const request = await arbiter.refund?.get(paymentInfo)
       if (request && request.status === RefundRequestStatus.Pending) {
-        await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+        await arbiter.payment.voidPayment(paymentInfo)
         console.log('Auto-approved refund')
       }
     } else if (!decision.approve && decision.confidence >= 0.9) {

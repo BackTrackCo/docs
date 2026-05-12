@@ -23,7 +23,7 @@ PaymentState.Expired      // 4 - Payment expired
 stateDiagram-v2
     [*] --> InEscrow: authorize()
     InEscrow --> Released: release()
-    InEscrow --> Settled: refundInEscrow()
+    InEscrow --> Settled: voidPayment()
     InEscrow --> Expired: escrow period passes
     Released --> Settled: settle()
     Expired --> [*]
@@ -61,7 +61,7 @@ The **EscrowPeriod** contract tracks when a payment was authorized and enforces 
 
 - **Payers** can request refunds or freeze the payment
 - **Merchants** can refund but cannot release
-- **After the period** — merchants can release funds to themselves
+- **After the period**: merchants can release funds to themselves
 
 ```typescript
 import { createPayerClient } from '@x402r/sdk'
@@ -100,7 +100,7 @@ RefundRequestStatus.Refused    // 4 - Arbiter declined to rule
 
 ### Refund flow
 
-In v3, RefundRequest is wired as an IRecorder plugin. Refund approval happens automatically when the merchant or arbiter calls `refundInEscrow()` on the operator — no separate approve step is needed.
+In v3, RefundRequest is wired as an IRecorder plugin. Refund approval happens automatically when the merchant or arbiter calls `voidPayment()` on the operator, no separate approve step is needed.
 
 ```mermaid
 sequenceDiagram
@@ -114,13 +114,13 @@ sequenceDiagram
     R-->>M: RefundRequested event
 
     alt Merchant refunds
-        M->>O: refundInEscrow(paymentInfo, amount)
+        M->>O: voidPayment(paymentInfo)
         O->>R: record() auto-approves pending request
         O->>P: Funds returned
     else Merchant denies
         M->>R: denyRefundRequest(paymentInfo)
     else Escalate to arbiter
-        A->>O: refundInEscrow(paymentInfo, amount)
+        A->>O: voidPayment(paymentInfo)
         O->>R: record() auto-approves pending request
         O->>P: Funds returned
     end
@@ -158,8 +158,8 @@ Freezing a payment does not automatically escalate to an arbiter. It pauses the 
 | Role | Can Do |
 |------|--------|
 | **Payer** | Request refunds, freeze payments, cancel requests, query escrow state |
-| **Merchant** | Release payments, charge, refund in escrow (auto-approves requests), deny refunds |
-| **Arbiter** | Deny/refuse disputed refunds, refund in escrow, review evidence |
+| **Merchant** | Release payments, charge, void (auto-approves requests), deny refunds |
+| **Arbiter** | Deny/refuse disputed refunds, void, review evidence |
 
 ## Contract Architecture
 
@@ -170,8 +170,8 @@ flowchart TB
         auth[authorize]
         rel[release]
         chg[charge]
-        ref[refundInEscrow]
-        refp[refundPostEscrow]
+        ref[voidPayment]
+        refp[refund]
     end
 
     subgraph Components[Supporting Contracts]

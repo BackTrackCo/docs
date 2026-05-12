@@ -33,19 +33,13 @@ console.log('Remaining in escrow:', amounts.capturableAmount) // 7000000n
 Always query `payment.getAmounts()` first to determine the available capturable amount.
 </Note>
 
-### payment.refundInEscrow
+### payment.voidPayment
 
-Return escrowed funds to the payer before release.
-
-```typescript
-// Full refund of 10 USDC
-const tx = await merchant.payment.refundInEscrow(paymentInfo, 10_000_000n)
-console.log('Refunded from escrow:', tx)
-```
+Return all escrowed funds to the payer before capture. Void is full-only: it empties the authorization in one transaction. For a partial return, call `payment.capture()` for the part to keep, then void or let the remainder expire.
 
 ```typescript
-// Partial refund: return 2 USDC, keep 8 USDC in escrow
-const tx = await merchant.payment.refundInEscrow(paymentInfo, 2_000_000n)
+const tx = await merchant.payment.voidPayment(paymentInfo)
+console.log('Voided:', tx)
 ```
 
 ### payment.charge
@@ -66,39 +60,45 @@ console.log('Charged:', tx)
 The `charge()` method is designed for recurring payments and session-based billing where funds are not pre-escrowed.
 </Tip>
 
-### payment.refundPostEscrow
+### payment.refund
 
 Refund funds that have already been released. Requires a token collector to source the refund from the merchant's balance.
 
 ```typescript
-const tx = await merchant.payment.refundPostEscrow(
+const tx = await merchant.payment.refund(
   paymentInfo,
   5_000_000n,                               // 5 USDC to refund
   '0xTokenCollector...' as `0x${string}`,   // sources the refund
   '0xSignatureData...' as `0x${string}`,    // authorization data
 )
-console.log('Post-escrow refund:', tx)
+console.log('Refund (after capture):', tx)
 ```
 
 <Warning>
-Post-escrow refunds require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
+Refunds (after capture) require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
 </Warning>
 
-### payment.approvePostEscrowRefund
+### payment.approveRefundAllowance
 
-Approve a post-escrow refund allowance. This sets how much the refund budget contract can pull from the merchant.
+Approve a refund allowance. This sets how much the refund collector can pull from the merchant for a given token.
 
 ```typescript
-const tx = await merchant.payment.approvePostEscrowRefund(paymentInfo, 5_000_000n)
+const tx = await merchant.payment.approveRefundAllowance(
+  '0xTokenAddress...' as `0x${string}`, // ERC-20 token
+  5_000_000n,                            // 5 USDC
+)
 console.log('Allowance approved:', tx)
 ```
 
-### payment.getPostEscrowRefundAllowance
+### payment.getRefundAllowance
 
-Check the current post-escrow refund allowance.
+Check the current refund allowance for a token/owner pair.
 
 ```typescript
-const allowance = await merchant.payment.getPostEscrowRefundAllowance(paymentInfo)
+const allowance = await merchant.payment.getRefundAllowance(
+  '0xTokenAddress...' as `0x${string}`,
+  '0xMerchantAddress...' as `0x${string}`,
+)
 console.log('Allowance:', allowance)
 ```
 
@@ -173,7 +173,7 @@ flowchart TD
     D -->|No| F[Safe to release]
     D -->|Yes| G{Approve refund?}
     F --> H["payment.release(paymentInfo, amount)"]
-    G -->|Yes| I["payment.refundInEscrow(paymentInfo, amount)"]
+    G -->|Yes| I["payment.voidPayment(paymentInfo)"]
     G -->|No| J[Deny request, then release]
     J --> H
 ```

@@ -6,15 +6,15 @@ icon: "database"
 
 ## What Are Recorders?
 
-Recorders are pluggable contracts that update state **after** an action successfully executes on a PaymentOperator. Each operator has **5 recorder slots** — one per action:
+Recorders are pluggable contracts that update state **after** an action successfully executes on a PaymentOperator. Each operator has **5 recorder slots**: one per action:
 
 | Slot | Records After |
 |------|---------------|
 | `AUTHORIZE_RECORDER` | Authorization (e.g., timestamp) |
 | `CHARGE_RECORDER` | Charge event |
 | `RELEASE_RECORDER` | Release from escrow |
-| `REFUND_IN_ESCROW_RECORDER` | In-escrow refund |
-| `REFUND_POST_ESCROW_RECORDER` | Post-escrow refund |
+| `VOID_POST_ACTION_HOOK` | Void |
+| `REFUND_POST_ACTION_HOOK` | Refund (after capture) |
 
 ## IRecorder Interface
 
@@ -29,13 +29,13 @@ interface IRecorder {
 ```
 
 **Parameters:**
-- `paymentInfo` — The payment information struct
-- `amount` — The amount involved in the action
-- `caller` — The address that executed the action (msg.sender on operator)
+- `paymentInfo`, The payment information struct
+- `amount`, The amount involved in the action
+- `caller`, The address that executed the action (msg.sender on operator)
 
 ## Default Behavior
 
-**Recorder slot = `address(0)`** — no-op (does nothing). No state is recorded.
+**Recorder slot = `address(0)`**: no-op (does nothing). No state is recorded.
 
 This means you only need to set recorders for slots where you want state tracking. Leave the rest as `address(0)`.
 
@@ -63,7 +63,7 @@ Index operator events with a subgraph for rich queries (payment history by payer
 
 ### On-Chain Recorders (~20k Gas per Write)
 
-Use recorders when you need **on-chain reads** — other contracts or conditions that depend on recorded state. [EscrowPeriod](/contracts/conditions/escrow-period) is the most common example: it records authorization time so the release condition can check if the escrow window has passed.
+Use recorders when you need **on-chain reads**: other contracts or conditions that depend on recorded state. [EscrowPeriod](/contracts/conditions/escrow-period) is the most common example: it records authorization time so the release condition can check if the escrow window has passed.
 
 **Best for:** Escrow enforcement, dispute evidence, decentralized frontends, on-chain composability.
 

@@ -41,7 +41,7 @@ unwatch()
 
 ## watch.onRefundExecuted
 
-Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted`.
+Watch for refund execution events: `VoidExecuted` and `RefundExecuted`.
 
 ```typescript
 const unwatch = arbiter.watch.onRefundExecuted((logs) => {
@@ -73,7 +73,7 @@ unwatch()
 |--------|---------------|----------|
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
 | `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
-| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>

@@ -20,7 +20,7 @@ icon: "rotate-left"
     1. Payer suspects fraud, requests refund
     2. Arbiter investigates
     3. Arbiter approves or denies request
-    4. If approved, arbiter calls `operator.refundInEscrow()`
+    4. If approved, arbiter calls `operator.void()`
 
     **Use cases:**
     - Buyer remorse
@@ -35,7 +35,7 @@ icon: "rotate-left"
     1. Receiver realizes product defect after release
     2. Receiver requests refund
     3. Arbiter investigates
-    4. If approved, arbiter calls `operator.refundPostEscrow()`
+    4. If approved, arbiter calls `operator.refund()`
 
     **Use cases:**
     - Product defects discovered later
@@ -56,8 +56,8 @@ stateDiagram-v2
 
     note right of Approved
         Arbiter must call
-        operator.refundInEscrow()
-        or operator.refundPostEscrow()
+        operator.void()
+        or operator.refund()
     end note
 ```
 
@@ -103,7 +103,7 @@ function updateStatus(
 - `nonce` - Record index identifying which refund request
 - `newStatus` - The new status (`Approved` or `Denied`)
 
-**Access:** Receiver can always approve/deny. While in escrow, anyone passing the operator's `REFUND_IN_ESCROW_CONDITION` can also approve/deny.
+**Access:** Receiver can always approve/deny. While in escrow, anyone passing the operator's `VOID_PRE_ACTION_CONDITION` can also approve/deny.
 
 **Valid transitions:**
 - `Pending` -> `Approved`
@@ -145,7 +145,7 @@ await refundRequest.updateStatus(
 // Status: Approved
 
 // 3. Execute refund via operator (separate transaction)
-await operator.refundInEscrow(paymentInfo, refundAmount);
+await operator.void(paymentInfo, refundAmount);
 // Funds returned to payer
 ```
 

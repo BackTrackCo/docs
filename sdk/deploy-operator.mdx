@@ -25,12 +25,12 @@ All contracts are deployed via factories using CREATE2, so identical configurati
 
 A complete marketplace operator deployment includes:
 
-1. **EscrowPeriod** — Records authorization time, enforces waiting period before release
-2. **Freeze** — Allows payer to freeze payment during escrow, receiver to unfreeze
-3. **ReceiverCondition** — Gates in-escrow refunds to the merchant (receiver)
-4. **RefundRequest (IRecorder)** — Wired as `refundInEscrowRecorder`, auto-approves pending refund requests during `refundInEscrow()`
-5. **StaticFeeCalculator** — Optional operator fee (basis points)
-6. **PaymentOperator** — The main contract tying everything together
+1. **EscrowPeriod**: Records authorization time, enforces waiting period before release
+2. **Freeze**: Allows payer to freeze payment during escrow, receiver to unfreeze
+3. **ReceiverCondition**: Gates voids to the merchant (receiver)
+4. **RefundRequest (IRecorder)**: Wired as `voidPostActionHook`, auto-approves pending refund requests during `voidPayment()`
+5. **StaticFeeCalculator**: Optional operator fee (basis points)
+6. **PaymentOperator**: The main contract tying everything together
 
 ## Deploy your operator
 
@@ -53,11 +53,11 @@ A complete marketplace operator deployment includes:
     cp .env.example .env
     ```
 
-    Edit `.env` with your values. Only `PRIVATE_KEY` is required — everything else has sensible defaults:
+    Edit `.env` with your values. Only `PRIVATE_KEY` is required, everything else has sensible defaults:
 
     | Variable | Default | Description |
     |----------|---------|-------------|
-    | `PRIVATE_KEY` | — | Deployer wallet (required) |
+    | `PRIVATE_KEY` |, | Deployer wallet (required) |
     | `ARBITER` | deployer address | Dispute resolver |
     | `FEE_RECIPIENT` | deployer address | Receives operator fees |
     | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
@@ -157,7 +157,7 @@ interface MarketplaceOperatorDeployment {
   freezeAddress: Address | null;              // Freeze condition (null if disabled)
   refundRequestAddress: Address;              // RefundRequest contract
   refundRequestEvidenceAddress: Address;      // RefundRequestEvidence contract
-  refundInEscrowConditionAddress: Address;    // OR(Receiver, Arbiter)
+  voidPreActionConditionAddress: Address;    // OR(Receiver, Arbiter)
   feeCalculatorAddress: Address | null;       // null if no fee
   operatorConfig: OperatorConfig;             // Full operator slot configuration
   deployments: DeployResult[];                // Per-contract deploy details
@@ -170,7 +170,7 @@ interface MarketplaceOperatorDeployment {
 ```
 
 <Tip>
-Because all contracts use CREATE3, redeploying with the same parameters is idempotent — it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE3, redeploying with the same parameters is idempotent, it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview addresses (no deploy)
@@ -187,8 +187,8 @@ Because all contracts use CREATE3, redeploying with the same parameters is idemp
     | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
     | `CHARGE_CONDITION` | (none) | No restrictions on charge |
     | `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-    | `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
-    | `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
+    | `VOID_PRE_ACTION_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+    | `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
     | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
     | `FEE_RECIPIENT` | Your address | Receives fees |
   </Accordion>
@@ -218,9 +218,9 @@ The deployed marketplace operator has the following slot configuration:
 | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_CONDITION` | (none) | No restrictions on charge |
 | `RELEASE_CONDITION` | EscrowPeriod (or AND(EscrowPeriod, Freeze) if freeze enabled) | Blocks release during escrow period |
-| `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
-| `REFUND_IN_ESCROW_RECORDER` | RefundRequest | Tracks refund request state |
-| `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
+| `VOID_PRE_ACTION_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+| `VOID_POST_ACTION_HOOK` | RefundRequest | Tracks refund request state |
+| `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
 | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee (if configured) |
 | `FEE_RECIPIENT` | Your address | Receives fees |
 
@@ -230,7 +230,7 @@ The deployed marketplace operator has the following slot configuration:
 
 The delivery protection preset is a simpler operator designed for garbage detection and content verification use cases. An arbiter verifies that content was delivered correctly and releases funds. If the arbiter does nothing, the escrow window expires and anyone can trigger a refund.
 
-This preset has **no freeze, no fees, and no RefundRequest** contracts — making it cheaper to deploy.
+This preset has **no freeze, no fees, and no RefundRequest** contracts, making it cheaper to deploy.
 
 ### Condition layout
 
@@ -238,8 +238,8 @@ This preset has **no freeze, no fees, and no RefundRequest** contracts — makin
 |------|----------|---------|
 | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only the arbiter can release |
 | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
-| `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow window expires |
-| `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
+| `VOID_PRE_ACTION_CONDITION` | EscrowPeriod | Anyone can refund after escrow window expires |
+| `REFUND_PRE_ACTION_CONDITION` | Receiver | Receiver can refund |
 
 ### Deploy a delivery protection operator
 
@@ -409,7 +409,7 @@ console.log('AuthorizeRecorder:', deployment.authorizeRecorderAddress)
       escrowPeriodAddress: Address
       arbiterConditionAddress: Address
       releaseConditionAddress: Address           // OrCondition([arbiter, payer])
-      refundInEscrowConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
+      voidPreActionConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
       authorizeRecorderAddress: Address          // RecorderCombinator([escrowPeriod, paymentIndexRecorder])
       paymentIndexRecorderAddress: Address
       operatorConfig: OperatorConfig
@@ -451,8 +451,8 @@ console.log('AuthorizeRecorder:', deployment.authorizeRecorderAddress)
     |------|----------|---------|
     | `RELEASE_CONDITION` | OrCondition([SAC(arbiter), PayerCondition]) | Arbiter or satisfied payer can release |
     | `AUTHORIZE_RECORDER` | RecorderCombinator([EscrowPeriod, PaymentIndexRecorder]) | Records authorization time and indexes payments on-chain |
-    | `REFUND_IN_ESCROW_CONDITION` | OrCondition([EscrowPeriod, ReceiverCondition, SAC(arbiter)]) | Escrow expiry, receiver voluntary refund, or arbiter immediate refund |
-    | `REFUND_POST_ESCROW_CONDITION` | ReceiverCondition | Only receiver after escrow |
+    | `VOID_PRE_ACTION_CONDITION` | OrCondition([EscrowPeriod, ReceiverCondition, SAC(arbiter)]) | Escrow expiry, receiver voluntary refund, or arbiter immediate refund |
+    | `REFUND_PRE_ACTION_CONDITION` | ReceiverCondition | Only receiver after escrow |
   </Accordion>
 </AccordionGroup>
 

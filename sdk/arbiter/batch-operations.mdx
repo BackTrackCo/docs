@@ -32,7 +32,7 @@ async function batchProcess(
     const shouldApprove = request.amount < 10_000_000n // Auto-approve < 10 USDC
 
     if (shouldApprove) {
-      const tx = await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+      const tx = await arbiter.payment.voidPayment(paymentInfo)
       approved.push(tx)
     } else {
       const tx = await arbiter.refund?.deny(paymentInfo)
@@ -80,7 +80,7 @@ async function triageOperatorCases(
 
     // Make decision
     if (request.amount < 10_000_000n) {
-      await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+      await arbiter.payment.voidPayment(paymentInfo)
     } else {
       await arbiter.refund?.deny(paymentInfo)
     }

@@ -99,11 +99,11 @@ for (const entry of batch!.entries) {
 ### 5. Approve a Refund
 
 <Warning>
-`refundInEscrow()` auto-approves the pending RefundRequest. There is no undo.
+`voidPayment()` auto-approves the pending RefundRequest. There is no undo.
 </Warning>
 
 ```typescript
-const tx = await arbiter.payment.refundInEscrow(paymentInfo, request!.amount)
+const tx = await arbiter.payment.voidPayment(paymentInfo)
 console.log('Refund approved:', tx)
 
 // Verify

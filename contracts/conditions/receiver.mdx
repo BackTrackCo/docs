@@ -24,7 +24,7 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 }
 ```
 
-The condition compares `caller` against `payment.receiver` — pure computation with no storage reads.
+The condition compares `caller` against `payment.receiver`, pure computation with no storage reads.
 
 ## When to Use
 
@@ -32,7 +32,7 @@ The condition compares `caller` against `payment.receiver` — pure computation 
 |------|----------|
 | `RELEASE_CONDITION` | Let receiver release funds after escrow |
 | `CHARGE_CONDITION` | Let receiver charge partial amounts |
-| `REFUND_IN_ESCROW_CONDITION` | Let receiver voluntarily refund |
+| `VOID_PRE_ACTION_CONDITION` | Let receiver voluntarily refund |
 
 <Note>
 For release, ReceiverCondition is often composed with [EscrowPeriod](/contracts/conditions/escrow-period) via [AndCondition](/contracts/conditions/combinators) to ensure the escrow window has passed before the receiver can release.
@@ -40,7 +40,7 @@ For release, ReceiverCondition is often composed with [EscrowPeriod](/contracts/
 
 ## Gas
 
-**Cost:** Minimal — `pure` function with no storage reads.
+**Cost:** Minimal, `pure` function with no storage reads.
 
 ## Next Steps
 

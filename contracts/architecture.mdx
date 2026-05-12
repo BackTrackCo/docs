@@ -24,8 +24,8 @@ flowchart TB
         Auth[authorize]
         Charge[charge]
         Release[release]
-        RefundIE[refundInEscrow]
-        RefundPE[refundPostEscrow]
+        RefundIE[voidPayment]
+        RefundPE[refund]
     end
 
     subgraph Plugins["Conditions & Recorders"]
@@ -86,10 +86,10 @@ For additional visual diagrams, see the [x402r-contracts repository](https://git
 2. **RefundRequest** creates request with status `Pending`
 3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
 4. **Designated address** calls `refundRequest.updateStatus(paymentInfo, nonce, Approved)`
-5. **Designated address** calls `operator.refundInEscrow(paymentInfo, amount)`
-6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (configured per operator)
+5. **Designated address** calls `operator.void(paymentInfo, amount)`
+6. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
 7. **Operator** calls `escrow.partialVoid()` to return funds to payer
-8. **Operator** calls `REFUND_IN_ESCROW_RECORDER`
+8. **Operator** calls `VOID_POST_ACTION_HOOK`
 9. Funds transferred back to payer
 
 <Note>
@@ -224,7 +224,7 @@ Fees accumulate in the operator and are distributed via `distributeFees(token)`.
 |------|-------------|--------------|
 | **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
 | **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
-| **Designated Address** | Any action per conditions (e.g., `refundInEscrow()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
+| **Designated Address** | Any action per conditions (e.g., `voidPayment()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
 | **Protocol Owner** | `queueCalculator()`, `executeCalculator()`, `queueRecipient()`, `executeRecipient()` | 7-day timelock on ProtocolFeeConfig changes |
 
 <Note>
@@ -292,8 +292,8 @@ Ownership transfers use Solady's Ownable pattern:
 event AuthorizationCreated(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
 event ChargeExecuted(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
 event ReleaseExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, uint256 amount, uint256 timestamp);
-event RefundInEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
-event RefundPostEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
+event VoidExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
+event RefundExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
 
 // Fee distribution
 event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 arbiterAmount);

@@ -66,7 +66,7 @@ const unwatch = merchant.watch.onRefundRequest(async (logs) => {
     if (amount && amount < AUTO_APPROVE_THRESHOLD) {
       console.log('Auto-approving small refund request')
       // Look up the paymentInfo from your database and call
-      // merchant.payment.refundInEscrow(paymentInfo, amount)
+      // merchant.payment.voidPayment(paymentInfo)
     } else {
       console.log('Queuing for manual review')
     }
@@ -76,7 +76,7 @@ const unwatch = merchant.watch.onRefundRequest(async (logs) => {
 
 ## watch.onRefundExecuted
 
-Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted`.
+Watch for refund execution events: `VoidExecuted` and `RefundExecuted`.
 
 ```typescript
 const unwatch = merchant.watch.onRefundExecuted((logs) => {
@@ -108,7 +108,7 @@ unwatch()
 |--------|---------------|----------|
 | `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
-| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>

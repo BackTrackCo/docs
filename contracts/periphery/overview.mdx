@@ -15,11 +15,11 @@ Periphery contracts support the [PaymentOperator](/contracts/payment-operator) b
 | [Commerce Payments](/contracts/periphery/auth-capture-escrow) | AuthCaptureEscrow + ERC3009PaymentCollector (base layer) | Singleton |
 | [RefundRequest](/contracts/periphery/refund-request) | Tracks refund request lifecycle and approvals | Singleton |
 | [RefundRequestEvidence](/contracts/periphery/refund-request-evidence) | On-chain evidence submission for disputes | Singleton |
-| [ReceiverRefundCollector](/contracts/periphery/receiver-refund-collector) | Pulls funds from receiver for post-escrow refunds | Singleton |
+| [ReceiverRefundCollector](/contracts/periphery/receiver-refund-collector) | Pulls funds from receiver for refunds | Singleton |
 
 ## Contract Addresses
 
-All periphery contracts use **unified CREATE3 addresses** — the same address on every supported chain.
+All periphery contracts use **unified CREATE3 addresses**: the same address on every supported chain.
 
 | Contract | Address |
 |----------|---------|

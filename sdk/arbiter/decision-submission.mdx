@@ -6,18 +6,18 @@ icon: "gavel"
 
 The arbiter client provides methods for reviewing refund requests, making decisions, and executing refunds through the `refund`, `payment`, and `evidence` action groups.
 
-## Approve a refund (refundInEscrow)
+## Approve a refund (voidPayment)
 
-To approve and execute a refund in one step, call `payment.refundInEscrow()`. This auto-approves the pending RefundRequest and transfers funds back to the payer.
+To approve and execute a refund in one step, call `payment.voidPayment()`. This auto-approves the pending RefundRequest and transfers funds back to the payer.
 
 ```typescript
 const amounts = await arbiter.payment.getAmounts(paymentInfo)
-const tx = await arbiter.payment.refundInEscrow(paymentInfo, amounts.refundableAmount)
+const tx = await arbiter.payment.voidPayment(paymentInfo)
 console.log('Refund approved and executed:', tx)
 ```
 
 <Warning>
-`payment.refundInEscrow()` auto-approves the pending RefundRequest. There is no undo.
+`payment.voidPayment()` auto-approves the pending RefundRequest. There is no undo.
 </Warning>
 
 ## Deny a refund request
@@ -167,7 +167,7 @@ async function processCase(
   const shouldApprove = await evaluateCase(request)
 
   if (shouldApprove) {
-    const tx = await arbiter.payment.refundInEscrow(paymentInfo, request!.amount)
+    const tx = await arbiter.payment.voidPayment(paymentInfo)
     console.log('Refund executed:', tx)
   } else {
     const tx = await arbiter.refund?.deny(paymentInfo)
@@ -185,7 +185,7 @@ flowchart TD
     C -->|No| D[Skip]
     C -->|Yes| E[Review evidence]
     E --> F{Decision}
-    F -->|Approve| G[payment.refundInEscrow]
+    F -->|Approve| G[payment.voidPayment]
     F -->|Deny| H[refund.deny]
     F -->|Decline| I[refund.refuse]
     G --> J[Funds Returned to Payer]

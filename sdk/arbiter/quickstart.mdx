@@ -35,13 +35,13 @@ const arbiter = createArbiterClient({
 
 The arbiter client provides these action groups:
 
-- **`payment`** — `release`, `refundInEscrow`, `refundPostEscrow`, `getAmounts`, `getState` and more
-- **`refund`** — `get`, `getStatus`, `has`, `deny`, `refuse`, `getOperatorRequests` and more
-- **`evidence`** — `submit`, `get`, `getBatch`, `count`
-- **`escrow`** — `isDuringEscrow`, `getAuthorizationTime`, `getDuration`
-- **`freeze`** — `freeze`, `unfreeze`, `isFrozen`
-- **`operator`** — `getConfig`, `calculateFees`, `distributeFees`, `getAccumulatedProtocolFees` and more
-- **`watch`** — `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
+- **`payment`**: `release`, `voidPayment`, `refund`, `getAmounts`, `getState` and more
+- **`refund`**: `get`, `getStatus`, `has`, `deny`, `refuse`, `getOperatorRequests` and more
+- **`evidence`**: `submit`, `get`, `getBatch`, `count`
+- **`escrow`**: `isDuringEscrow`, `getAuthorizationTime`, `getDuration`
+- **`freeze`**: `freeze`, `unfreeze`, `isFrozen`
+- **`operator`**: `getConfig`, `calculateFees`, `distributeFees`, `getAccumulatedProtocolFees` and more
+- **`watch`**: `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
 
 ## Try it now
 

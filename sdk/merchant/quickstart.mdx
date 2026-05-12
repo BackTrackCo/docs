@@ -75,21 +75,18 @@ console.log('Remaining in escrow:', amounts.capturableAmount) // 7000000n
 Always query `payment.getAmounts()` first to determine the available capturable amount.
 </Note>
 
-## Refund while in escrow
+## Void while in escrow
 
-Use `payment.refundInEscrow()` to return escrowed funds to the payer before release.
-
-```typescript
-// Full refund of 10 USDC
-const tx = await merchant.payment.refundInEscrow(paymentInfo, 10_000_000n)
-console.log('Refunded from escrow:', tx)
-```
+Use `payment.voidPayment()` to return all escrowed funds to the payer before capture. Void is full-only: it empties the authorization in one transaction.
 
 ```typescript
-// Partial refund: return 2 USDC, keep 8 USDC in escrow
-const tx = await merchant.payment.refundInEscrow(paymentInfo, 2_000_000n)
-console.log('Partial refund:', tx)
+const tx = await merchant.payment.voidPayment(paymentInfo)
+console.log('Voided:', tx)
 ```
+
+<Note>
+For a partial return (capture some, return the rest), call `payment.capture(paymentInfo, amount)` for the part you want to keep. The unused authorization can then be voided, or it will expire at `captureDeadline` and become reclaimable by the payer.
+</Note>
 
 ## Charge directly
 
@@ -109,22 +106,22 @@ console.log('Charged:', tx)
 The `charge()` method is designed for recurring payments and session-based billing where funds are not pre-escrowed. The token collector contract handles the actual token transfer.
 </Tip>
 
-## Refund after release (post-escrow)
+## Refund after release (after capture)
 
-Use `payment.refundPostEscrow()` to refund funds that have already been released. This requires a token collector to source the refund from the merchant's balance.
+Use `payment.refund()` to refund funds that have already been released. This requires a token collector to source the refund from the merchant's balance.
 
 ```typescript
-const tx = await merchant.payment.refundPostEscrow(
+const tx = await merchant.payment.refund(
   paymentInfo,
   5_000_000n,                               // 5 USDC to refund
   '0xTokenCollector...' as `0x${string}`,   // sources the refund
   '0xSignatureData...' as `0x${string}`,    // authorization data
 )
-console.log('Post-escrow refund:', tx)
+console.log('Refund (after capture):', tx)
 ```
 
 <Warning>
-Post-escrow refunds require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
+Refunds (after capture) require the merchant to have sufficient token balance. The token collector pulls funds from the merchant to return to the payer.
 </Warning>
 
 ## Query methods
@@ -201,7 +198,7 @@ flowchart TD
     D -->|No| F[Safe to release]
     D -->|Yes| G{Approve refund?}
     F --> H["payment.release(paymentInfo, amount)"]
-    G -->|Yes| I["payment.refundInEscrow(paymentInfo, amount)"]
+    G -->|Yes| I["payment.voidPayment(paymentInfo)"]
     G -->|No| J[Deny request, then release]
     J --> H
 ```

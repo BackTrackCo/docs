@@ -78,7 +78,7 @@ app.post('/verify', async (req, res) => {
   } else {
     // Arbiter can refund immediately without waiting for escrow expiry.
     const amounts = await arbiter.payment.getAmounts(paymentInfo)
-    await arbiter.refund.refundInEscrow(paymentInfo, amounts.capturableAmount)
+    await arbiter.refund.voidPayment(paymentInfo)
     res.json({ verdict: 'FAIL' })
   }
 })
@@ -110,7 +110,7 @@ async function evaluate(responseBody: string): Promise<boolean> {
 
 ### 5. What Happens on Failure
 
-With delivery protection v2, the arbiter can call `refundInEscrow()` immediately on a FAIL verdict. You do not need to wait for escrow expiry. The receiver (merchant) can also trigger a voluntary refund at any time.
+With delivery protection v2, the arbiter can call `voidPayment()` immediately on a FAIL verdict. You do not need to wait for escrow expiry. The receiver (merchant) can also trigger a voluntary refund at any time.
 
 <Warning>
 If your service goes down, no payments get evaluated and funds stay in escrow until timeout. The escrow period protects payers, but add uptime monitoring and alerting.

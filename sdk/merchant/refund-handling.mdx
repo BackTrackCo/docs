@@ -116,17 +116,17 @@ console.log('Refund denied:', tx)
 If you deny a request, the payer may escalate to an arbiter for dispute resolution. Consider providing a reason off-chain to reduce escalation risk.
 </Info>
 
-### payment.refundInEscrow
+### payment.voidPayment
 
-To approve and execute a refund, call `payment.refundInEscrow()`. This both auto-approves the pending RefundRequest and transfers funds back to the payer.
+To approve and execute a refund, call `payment.voidPayment()`. This both auto-approves the pending RefundRequest and transfers funds back to the payer.
 
 ```typescript
-const tx = await merchant.payment.refundInEscrow(paymentInfo, request!.amount)
+const tx = await merchant.payment.voidPayment(paymentInfo)
 console.log('Refund approved and executed:', tx)
 ```
 
 <Warning>
-`refundInEscrow()` auto-approves the pending RefundRequest. There is no undo.
+`voidPayment()` auto-approves the pending RefundRequest. There is no undo.
 </Warning>
 
 ## Freeze management
@@ -197,7 +197,7 @@ async function handleRefundWorkflow(
 
   if (shouldApprove) {
     // Execute the refund (auto-approves the request)
-    const tx = await merchant.payment.refundInEscrow(paymentInfo, request.amount)
+    const tx = await merchant.payment.voidPayment(paymentInfo)
     console.log('Refund executed:', tx)
   } else {
     // Deny the request
@@ -227,7 +227,7 @@ sequenceDiagram
     M->>M: Review request (policy check)
 
     alt Approve
-        M->>O: payment.refundInEscrow(paymentInfo, amount)
+        M->>O: payment.voidPayment(paymentInfo)
         O->>P: Funds returned to payer
     else Deny
         M->>R: refund.deny(paymentInfo)

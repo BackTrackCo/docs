@@ -68,8 +68,8 @@ x402r extends commerce-payments with flexible payment capabilities:
 - Fee recipient for protocol and operator fee distribution
 - Configurable authorization via conditions (not hardcoded roles)
 - Refund request states: `Pending` → `Approved`/`Denied`/`Cancelled`
-- In-escrow refunds (during escrow period)
-- Post-escrow refunds (after release)
+- Voids (during escrow period)
+- Refunds (after capture) (after release)
 - Support for marketplace, subscription, streaming, and custom flows
 
 ### 2. Pluggable Condition System
@@ -79,7 +79,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 **Recorders (IRecorder)** - State updates after actions
 
 **10-slot configuration per operator:**
-- 5 condition slots (before action): authorize, charge, release, refundInEscrow, refundPostEscrow
+- 5 condition slots (before action): authorize, charge, release, voidPayment, refund
 - 5 recorder slots (after action): state tracking for each action
 
 **Benefits:**

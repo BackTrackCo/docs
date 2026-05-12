@@ -6,15 +6,15 @@ icon: "filter"
 
 ## What Are Conditions?
 
-Conditions are pluggable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots** — one per action:
+Conditions are pluggable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots**: one per action:
 
 | Slot | Controls |
 |------|----------|
 | `AUTHORIZE_CONDITION` | Who can authorize payments |
 | `CHARGE_CONDITION` | Who can charge partial amounts |
 | `RELEASE_CONDITION` | Who can release from escrow |
-| `REFUND_IN_ESCROW_CONDITION` | Who can refund during escrow |
-| `REFUND_POST_ESCROW_CONDITION` | Who can refund after release |
+| `VOID_PRE_ACTION_CONDITION` | Who can refund during escrow |
+| `REFUND_PRE_ACTION_CONDITION` | Who can refund after release |
 
 ## ICondition Interface
 
@@ -29,15 +29,15 @@ interface ICondition {
 ```
 
 **Parameters:**
-- `paymentInfo` — The payment information struct
-- `amount` — The amount involved in the action (0 for authorization-only checks like refund request status updates)
-- `caller` — The address attempting the action
+- `paymentInfo`, The payment information struct
+- `amount`, The amount involved in the action (0 for authorization-only checks like refund request status updates)
+- `caller`, The address attempting the action
 
 **Return:** `true` if the caller is authorized, `false` otherwise.
 
 ## Default Behavior
 
-**Condition slot = `address(0)`** — always returns `true` (allow). The action is unrestricted.
+**Condition slot = `address(0)`**: always returns `true` (allow). The action is unrestricted.
 
 This means you only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
 
@@ -52,12 +52,12 @@ This means you only need to set conditions for slots you want to restrict. Leave
 ## Security Rules
 
 <Warning>
-**Conditions MUST NOT revert.** Return `false` to deny — never `revert`. The operator converts `false` into a `ConditionNotMet` error.
+**Conditions MUST NOT revert.** Return `false` to deny, never `revert`. The operator converts `false` into a `ConditionNotMet` error.
 </Warning>
 
 - Conditions should be `view` or `pure` to prevent reentrancy attacks
 - Never make external state-changing calls inside a condition
-- Test thoroughly — edge cases in authorization logic can lead to locked funds
+- Test thoroughly, edge cases in authorization logic can lead to locked funds
 
 ## Configuration Patterns
 
@@ -91,8 +91,8 @@ config = {
     authorizeCondition: ARBITER_CONDITION,      // Only arbiter
     chargeCondition: ARBITER_CONDITION,         // Only arbiter
     releaseCondition: ARBITER_CONDITION,        // Only arbiter
-    refundInEscrowCondition: ARBITER_CONDITION, // Only arbiter
-    refundPostEscrowCondition: ARBITER_CONDITION,
+    voidPreActionCondition: ARBITER_CONDITION, // Only arbiter
+    refundPreActionCondition: ARBITER_CONDITION,
     // ...
 };
 ```
@@ -103,7 +103,7 @@ For complete configuration examples, see the [Examples](/contracts/examples) pag
 
 ### Singleton Reuse
 
-Singleton conditions are deployed once and reused by all operators. Reference the existing addresses — don't deploy new instances:
+Singleton conditions are deployed once and reused by all operators. Reference the existing addresses, don't deploy new instances:
 
 ```typescript
 // Good: Reference the singleton address

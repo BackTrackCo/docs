@@ -21,8 +21,8 @@ stateDiagram-v2
     [*] --> NonExistent
     NonExistent --> InEscrow: authorize()
     InEscrow --> Released: release()
-    InEscrow --> Settled: void() / refundInEscrow()
-    Released --> Settled: reclaim() / refundPostEscrow()
+    InEscrow --> Settled: void()
+    Released --> Settled: reclaim() / refund()
     Settled --> [*]
 
     note right of InEscrow
@@ -32,7 +32,7 @@ stateDiagram-v2
 
     note right of Released
         Funds transferred to receiver
-        Can still refund post-escrow
+        Can still refund
     end note
 
     note right of Settled

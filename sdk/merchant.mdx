@@ -97,8 +97,8 @@ if (hasRefund) {
   console.log('Refund amount:', request?.amount)
   console.log('Status:', request?.status)  // 0 = Pending
 
-  // Approve by executing refundInEscrow (recorder auto-approves)
-  const refundTx = await merchant.payment.refundInEscrow(
+  // Approve by executing voidPayment (recorder auto-approves)
+  const refundTx = await merchant.payment.voidPayment(
     paymentInfo,
     request!.amount,
   )

@@ -39,8 +39,8 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 1. **AUTHORIZE_CONDITION** - Who can authorize payments
 2. **CHARGE_CONDITION** - Who can charge partial amounts
 3. **RELEASE_CONDITION** - Who can release from escrow
-4. **REFUND_IN_ESCROW_CONDITION** - Who can refund during escrow
-5. **REFUND_POST_ESCROW_CONDITION** - Who can refund after release
+4. **VOID_PRE_ACTION_CONDITION** - Who can refund during escrow
+5. **REFUND_PRE_ACTION_CONDITION** - Who can refund after release
 
 **Default:** `address(0)` = always allow
 </Accordion>
@@ -49,8 +49,8 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 1. **AUTHORIZE_RECORDER** - Record authorization (e.g., timestamp)
 2. **CHARGE_RECORDER** - Record charge event
 3. **RELEASE_RECORDER** - Record release
-4. **REFUND_IN_ESCROW_RECORDER** - Record in-escrow refund
-5. **REFUND_POST_ESCROW_RECORDER** - Record post-escrow refund
+4. **VOID_POST_ACTION_HOOK** - Record void
+5. **REFUND_POST_ACTION_HOOK** - Record refund
 
 **Default:** `address(0)` = no recording (no-op)
 </Accordion>
@@ -120,7 +120,7 @@ function charge(
 **Access:** Controlled by `CHARGE_CONDITION` (default: anyone)
 
 <Note>
-Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refundPostEscrow()`.
+Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refund()`.
 </Note>
 
 ### release()
@@ -154,12 +154,12 @@ function release(
 **DAO example:** StaticAddressCondition(daoMultisig)
 </Note>
 
-### refundInEscrow()
+### voidPayment()
 
 Refunds payment while still in escrow (partial void).
 
 ```solidity
-function refundInEscrow(
+function voidPayment(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint120 amount
 ) external nonReentrant
@@ -170,12 +170,12 @@ function refundInEscrow(
 - `amount` - Amount to return to payer
 
 **Flow:**
-1. Check `REFUND_IN_ESCROW_CONDITION` (if set)
+1. Check `VOID_PRE_ACTION_CONDITION` (if set)
 2. Call `escrow.partialVoid()` to return funds to payer
-3. Call `REFUND_IN_ESCROW_RECORDER` (if set)
-4. Emit `RefundInEscrowExecuted`
+3. Call `VOID_POST_ACTION_HOOK` (if set)
+4. Emit `VoidExecuted`
 
-**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION`
+**Access:** Controlled by `VOID_PRE_ACTION_CONDITION`
 
 <Note>
 **Marketplace example:** StaticAddressCondition(arbiter) - disputes
@@ -184,12 +184,12 @@ function refundInEscrow(
 **Subscription example:** address(0) - no refunds
 </Note>
 
-### refundPostEscrow()
+### refund()
 
 Refunds payment after it has been released (captured).
 
 ```solidity
-function refundPostEscrow(
+function refund(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256 amount,
     address tokenCollector,
@@ -204,17 +204,17 @@ function refundPostEscrow(
 - `collectorData` - Data to pass to the token collector (e.g., signatures)
 
 **Flow:**
-1. Check `REFUND_POST_ESCROW_CONDITION` (if set)
+1. Check `REFUND_PRE_ACTION_CONDITION` (if set)
 2. Call `escrow.refund()` - token collector enforces permission
-3. Call `REFUND_POST_ESCROW_RECORDER` (if set)
-4. Emit `RefundPostEscrowExecuted`
+3. Call `REFUND_POST_ACTION_HOOK` (if set)
+4. Emit `RefundExecuted`
 
-**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`. Permission is also enforced by the token collector (e.g., receiver must have approved it, or collectorData contains receiver's signature).
+**Access:** Controlled by `REFUND_PRE_ACTION_CONDITION`. Permission is also enforced by the token collector (e.g., receiver must have approved it, or collectorData contains receiver's signature).
 
 <Note>
 **Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
 **Return policy example:** Receiver - voluntary returns
-**Most configurations:** address(0) - no post-escrow refunds
+**Most configurations:** address(0) - no refunds
 </Note>
 
 ## Fee System (Modular, Additive)

@@ -52,7 +52,7 @@ unwatch()
 
 ## watch.onRefundExecuted
 
-Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted` on the PaymentOperator contract.
+Watch for refund execution events: `VoidExecuted` and `RefundExecuted` on the PaymentOperator contract.
 
 ```typescript
 const unwatch = client.watch.onRefundExecuted((logs) => {
@@ -84,7 +84,7 @@ unwatch()
 |--------|---------------|----------|
 | `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
 | `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
-| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onRefundExecuted` | `VoidExecuted`, `RefundExecuted` | PaymentOperator |
 | `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>

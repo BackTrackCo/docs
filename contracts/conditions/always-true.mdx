@@ -6,7 +6,7 @@ icon: "check"
 
 ## Overview
 
-AlwaysTrueCondition allows anyone to call the action — no restrictions applied.
+AlwaysTrueCondition allows anyone to call the action, no restrictions applied.
 
 **Type:** Singleton (deployed once, reused by all operators)
 
@@ -31,7 +31,7 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 | `AUTHORIZE_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
 
 <Warning>
-**Use with caution for release/refund slots.** Setting `RELEASE_CONDITION` or `REFUND_IN_ESCROW_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
+**Use with caution for release/refund slots.** Setting `RELEASE_CONDITION` or `VOID_PRE_ACTION_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
 </Warning>
 
 ## AlwaysTrueCondition vs `address(0)`
@@ -48,7 +48,7 @@ Use `address(0)` when you simply don't need a condition. Use AlwaysTrueCondition
 
 ## Gas
 
-**Cost:** Minimal — `pure` function returning a constant.
+**Cost:** Minimal, `pure` function returning a constant.
 
 ## Next Steps
 

@@ -35,14 +35,14 @@ const client = createPayerClient({
 
 The payer client provides these action groups:
 
-- **`payment`** — `getAmounts`, `getState`, `authorize`, `refundInEscrow` and more
-- **`escrow`** — `isDuringEscrow`, `getAuthorizationTime`, `getDuration`
-- **`refund`** — `request`, `cancel`, `get`, `getStatus`, `has`, `getByKey`, `getPayerRequests` and more
-- **`evidence`** — `submit`, `get`, `getBatch`, `count`
-- **`freeze`** — `freeze`, `unfreeze`, `isFrozen`
-- **`watch`** — `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
-- **`operator`** — `getConfig`, `getFeeAddresses`, `calculateFees` and more
-- **`query`** — `getPayerPayments`, `getReceiverPayments`, `getPayment` (requires `paymentIndexRecorderAddress`)
+- **`payment`**: `getAmounts`, `getState`, `authorize`, `voidPayment` and more
+- **`escrow`**: `isDuringEscrow`, `getAuthorizationTime`, `getDuration`
+- **`refund`**: `request`, `cancel`, `get`, `getStatus`, `has`, `getByKey`, `getPayerRequests` and more
+- **`evidence`**: `submit`, `get`, `getBatch`, `count`
+- **`freeze`**: `freeze`, `unfreeze`, `isFrozen`
+- **`watch`**: `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
+- **`operator`**: `getConfig`, `getFeeAddresses`, `calculateFees` and more
+- **`query`**: `getPayerPayments`, `getReceiverPayments`, `getPayment` (requires `paymentIndexRecorderAddress`)
 
 Optional groups (`escrow`, `refund`, `evidence`, `freeze`, `query`) are `undefined` if you do not pass the corresponding contract address. Use optional chaining when calling them.
 

@@ -62,10 +62,10 @@ struct OperatorConfig {
     address chargeRecorder;
     address releaseCondition;
     address releaseRecorder;
-    address refundInEscrowCondition;
-    address refundInEscrowRecorder;
-    address refundPostEscrowCondition;
-    address refundPostEscrowRecorder;
+    address voidPreActionCondition;
+    address voidPostActionHook;
+    address refundPreActionCondition;
+    address refundPostActionHook;
 }
 ```
 
@@ -79,7 +79,7 @@ function deployOperator(
 
 **Parameters (in config):**
 - `feeRecipient` - Who receives operator fees (arbiter, service provider, treasury, etc.)
-- `authorizeCondition` through `refundPostEscrowRecorder` - 10-slot configuration
+- `authorizeCondition` through `refundPostActionHook` - 10-slot configuration
 
 **Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
 
@@ -158,10 +158,10 @@ const config = {
   chargeRecorder: zeroAddress,   // No recording
   releaseCondition: releaseConditionAddress,
   releaseRecorder: zeroAddress,
-  refundInEscrowCondition: arbiterConditionAddress,
-  refundInEscrowRecorder: zeroAddress,
-  refundPostEscrowCondition: arbiterConditionAddress,
-  refundPostEscrowRecorder: zeroAddress
+  voidPreActionCondition: arbiterConditionAddress,
+  voidPostActionHook: zeroAddress,
+  refundPreActionCondition: arbiterConditionAddress,
+  refundPostActionHook: zeroAddress
 };
 
 // Deploy operator
@@ -186,10 +186,10 @@ const config = {
   chargeRecorder: zeroAddress,
   releaseCondition: providerCondition.address,
   releaseRecorder: zeroAddress,
-  refundInEscrowCondition: zeroAddress,  // No refunds
-  refundInEscrowRecorder: zeroAddress,
-  refundPostEscrowCondition: zeroAddress,
-  refundPostEscrowRecorder: zeroAddress
+  voidPreActionCondition: zeroAddress,  // No refunds
+  voidPostActionHook: zeroAddress,
+  refundPreActionCondition: zeroAddress,
+  refundPostActionHook: zeroAddress
 };
 
 const hash = await factory.write.deployOperator([config]);
@@ -497,10 +497,10 @@ bytes32 key = keccak256(abi.encodePacked(
     config.chargeRecorder,
     config.releaseCondition,
     config.releaseRecorder,
-    config.refundInEscrowCondition,
-    config.refundInEscrowRecorder,
-    config.refundPostEscrowCondition,
-    config.refundPostEscrowRecorder
+    config.voidPreActionCondition,
+    config.voidPostActionHook,
+    config.refundPreActionCondition,
+    config.refundPostActionHook
 ));
 ```
 
