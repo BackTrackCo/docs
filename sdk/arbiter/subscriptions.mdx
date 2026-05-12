@@ -4,65 +4,77 @@ description: "Subscribe to dispute events and build real-time arbiter dashboards
 icon: "bell"
 ---
 
-The arbiter client provides watch methods for monitoring dispute activity in real-time. Each returns an unsubscribe function you call to stop watching.
+The arbiter client provides real-time event subscriptions through the `watch` action group. Each method returns an unsubscribe function for cleanup.
 
-## Watch refund requests
+## watch.onRefundRequest
 
-Subscribe to RefundRequest contract events — these include new requests, status updates, and cancellations:
+Watch for refund request lifecycle events on the RefundRequest contract. This fires for new requests, status updates, and cancellations.
 
 ```typescript
-const unsubscribe = arbiter.watch.onRefundRequest((event) => {
-  console.log('Refund request event:', event);
-});
+const unwatch = arbiter.watch.onRefundRequest((logs) => {
+  for (const log of logs) {
+    console.log('Refund event:', log.eventName)
+  }
+})
 
 // Later: stop watching
-unsubscribe();
+unwatch()
 ```
 
-## Watch refund execution
+<Note>
+This is a no-op if `refundRequestAddress` was not provided in the client config.
+</Note>
 
-Subscribe to `RefundInEscrowExecuted` and `RefundPostEscrowExecuted` events on the operator:
+## watch.onPayment
+
+Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted`.
 
 ```typescript
-const unsubscribe = arbiter.watch.onRefundExecuted((event) => {
-  console.log('Refund executed:', event);
-});
+const unwatch = arbiter.watch.onPayment((logs) => {
+  for (const log of logs) {
+    console.log('Payment event:', log.eventName)
+  }
+})
 
-unsubscribe();
+unwatch()
 ```
 
-## Watch payment events
+## watch.onRefundExecuted
 
-Subscribe to `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` events:
+Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted`.
 
 ```typescript
-const unsubscribe = arbiter.watch.onPayment((event) => {
-  console.log('Payment event:', event);
-});
+const unwatch = arbiter.watch.onRefundExecuted((logs) => {
+  for (const log of logs) {
+    console.log('Refund executed:', log.eventName)
+  }
+})
 
-unsubscribe();
+unwatch()
 ```
 
-## Watch fee distribution
+## watch.onFeeDistribution
 
-Subscribe to `FeesDistributed` events:
+Watch for `FeesDistributed` events on the PaymentOperator contract.
 
 ```typescript
-const unsubscribe = arbiter.watch.onFeeDistribution((event) => {
-  console.log('Fees distributed:', event);
-});
+const unwatch = arbiter.watch.onFeeDistribution((logs) => {
+  for (const log of logs) {
+    console.log('Fees distributed:', log)
+  }
+})
 
-unsubscribe();
+unwatch()
 ```
 
-## Event type reference
+## Event types reference
 
-| Method | Events Watched | Contract | Fires When |
-|--------|---------------|----------|------------|
-| `watch.onRefundRequest` | All RefundRequest events | RefundRequest | Request created, status updated, or cancelled |
-| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator | A refund is executed |
-| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator | Payment lifecycle events |
-| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator | Fees are distributed |
+| Method | Events Watched | Contract |
+|--------|---------------|----------|
+| `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
+| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>
 For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
@@ -81,6 +93,6 @@ For reliable real-time delivery, configure your `publicClient` with a [WebSocket
     Process multiple queued cases efficiently.
   </Card>
   <Card title="Client Subscriptions" icon="user" href="/sdk/client/subscriptions">
-    See how clients subscribe to the same events.
+    See how payers subscribe to the same events.
   </Card>
 </CardGroup>

@@ -1,64 +1,60 @@
 ---
 title: "Client SDK"
-description: "Payer-side SDK for refunds, freezes, and escrow management (experimental)"
+description: "Payer-side SDK for refunds, freezes, and escrow management"
 icon: "rocket"
 ---
 
-<Warning>
-The Client SDK is experimental. APIs will change as the refund and dispute system design evolves.
-</Warning>
-
-The `@x402r/sdk` package provides payer-side methods for interacting with X402r payments: requesting refunds, freezing payments, and querying escrow state.
+The `@x402r/sdk` package provides payer-side methods for interacting with x402r payments: requesting refunds, freezing payments, submitting evidence, and querying escrow state.
 
 ## Setup
 
 ```typescript
-import { createPayerClient } from '@x402r/sdk';
+import { createPayerClient } from '@x402r/sdk'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
 
 const client = createPayerClient({
-  publicClient,
-  walletClient,
-  operatorAddress: '0x...', // Your PaymentOperator address
-  // Optional: enable escrow, freeze, and refund features
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: '0x...',
+  refundRequestAddress: '0x...',
+  refundRequestEvidenceAddress: '0x...',
   escrowPeriodAddress: '0x...',
   freezeAddress: '0x...',
-});
+})
 ```
 
-Refund and evidence addresses are resolved automatically from the chain config.
+## Available action groups
 
-## Available methods
+The payer client provides these action groups:
 
-The payer client exposes action groups:
+- **`payment`** — `getAmounts`, `getState`, `authorize`, `refundInEscrow` and more
+- **`escrow`** — `isDuringEscrow`, `getAuthorizationTime`, `getDuration`
+- **`refund`** — `request`, `cancel`, `get`, `getStatus`, `has`, `getByKey`, `getPayerRequests` and more
+- **`evidence`** — `submit`, `get`, `getBatch`, `count`
+- **`freeze`** — `freeze`, `unfreeze`, `isFrozen`
+- **`watch`** — `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
+- **`operator`** — `getConfig`, `getFeeAddresses`, `calculateFees` and more
+- **`query`** — `getPayerPayments`, `getReceiverPayments`, `getPayment` (requires `paymentIndexRecorderAddress`)
 
-- **`client.payment.getState()`** — Derive the lifecycle state of a payment
-- **`client.payment.getAmounts()`** — Get capturable and refundable amounts
-- **`client.refund.request()`** — Submit a refund request for a payment
-- **`client.refund.cancel()`** — Cancel a pending refund request
-- **`client.refund.getStatus()`** — Check the status of a refund request
-- **`client.refund.has()`** — Check if a refund request exists
-- **`client.refund.get()`** — Get full refund request data
-- **`client.refund.getByKey()`** — Look up by paymentInfoHash
-- **`client.refund.getStoredPaymentInfo()`** — Retrieve stored PaymentInfo
-- **`client.refund.getPayerRequests()`** — List refund requests by payer
-- **`client.freeze.freeze()`** — Freeze a payment to prevent release
-- **`client.freeze.isFrozen()`** — Check if a payment is frozen
-- **`client.escrow.isDuringEscrow()`** — Check if still in escrow window
-- **`client.escrow.getAuthorizationTime()`** — Get when payment was authorized
-- **`client.escrow.getDuration()`** — Get the escrow period duration
-- **`client.evidence.submit()`** — Attach evidence (IPFS CID) to a refund
-- **`client.evidence.get()`** — Retrieve a single evidence entry by index
-- **`client.evidence.getBatch()`** — Retrieve multiple evidence entries
+Optional groups (`escrow`, `refund`, `evidence`, `freeze`, `query`) are `undefined` if you do not pass the corresponding contract address. Use optional chaining when calling them.
 
-## Try It Now
+## Try it now
 
-The easiest way to try client features is with the **client-cli** example, which provides a command-line interface for all client operations:
+The easiest way to try payer features is with the runnable examples in the SDK repo:
 
-<Card title="client-cli" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/dev-tools/client-cli">
-  CLI tool for payers to `pay`, `preview-fee`, request refunds, freeze payments, and check status.
+<Card title="Payer examples" icon="terminal" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer">
+  Request refunds, submit evidence, and freeze payments.
 </Card>
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Examples" icon="code" href="/sdk/examples">

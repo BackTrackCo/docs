@@ -1,28 +1,22 @@
 ---
 title: "Escrow management"
-description: "Manage escrow periods and freeze payments with the Client SDK"
+description: "Manage escrow periods and freeze payments with the payer client"
 icon: "lock"
 ---
 
-The payer client provides methods to interact with the escrow system, including freezing payments during disputes and querying escrow period timing.
+The payer client provides methods to interact with the escrow system through the `freeze` and `escrow` action groups. These let you freeze payments during disputes and query escrow period timing.
 
 ## Freeze operations
 
-Freezing a payment pauses the escrow timer, preventing the merchant from releasing funds while a dispute is being resolved.
+Freezing a payment prevents the merchant from releasing funds while a dispute is being resolved. The `freeze` group requires `freezeAddress` in the client config.
 
-### freeze
+### freeze.freeze
 
-Freeze a payment to pause the escrow timer. Only the payer can freeze a payment.
-
-```typescript
-const txHash = await client.freeze.freeze(paymentInfo);
-console.log(`Payment frozen: ${txHash}`);
-```
-
-#### Signature
+Freeze a payment to block the merchant from releasing. Only the payer can freeze a payment.
 
 ```typescript
-freeze(paymentInfo: PaymentInfo, data?: Hex): Promise<Hash>
+const tx = await client.freeze?.freeze(paymentInfo)
+console.log('Payment frozen:', tx)
 ```
 
 <Note>
@@ -32,95 +26,65 @@ Freezing is useful when:
 - The merchant is unresponsive to your refund request
 </Note>
 
-### unfreeze
+### freeze.unfreeze
 
 Unfreeze a previously frozen payment. The receiver (merchant) or arbiter can unfreeze a payment once the dispute is resolved.
 
 ```typescript
-const txHash = await client.freeze.unfreeze(paymentInfo);
-console.log(`Payment unfrozen: ${txHash}`);
+const tx = await client.freeze?.unfreeze(paymentInfo)
+console.log('Payment unfrozen:', tx)
 ```
 
-#### Signature
-
-```typescript
-unfreeze(paymentInfo: PaymentInfo, data?: Hex): Promise<Hash>
-```
-
-### isFrozen
+### freeze.isFrozen
 
 Check whether a payment is currently frozen.
 
 ```typescript
-const frozen = await client.freeze.isFrozen(paymentInfo);
+const frozen = await client.freeze?.isFrozen(paymentInfo)
 
 if (frozen) {
-  console.log('Payment is frozen - escrow timer paused');
+  console.log('Payment is frozen')
 } else {
-  console.log('Payment is not frozen - escrow timer running');
+  console.log('Payment is not frozen')
 }
-```
-
-#### Signature
-
-```typescript
-isFrozen(paymentInfo: PaymentInfo): Promise<boolean>
 ```
 
 ## Escrow period operations
 
-These methods interact with the `EscrowPeriod` contract to query timing information about a payment's escrow window. You must provide an `escrowPeriodAddress` in your client config to use these methods.
+These methods query timing information about a payment's escrow window. The `escrow` group requires `escrowPeriodAddress` in the client config.
 
-### getAuthorizationTime
+### escrow.getAuthorizationTime
 
 Get the timestamp (in seconds) when a payment was authorized on-chain. This is the starting point of the escrow period.
 
 ```typescript
-const authTime = await client.escrow.getAuthorizationTime(paymentInfo);
-const authDate = new Date(Number(authTime) * 1000);
+const authTime = await client.escrow?.getAuthorizationTime(paymentInfo)
+const authDate = new Date(Number(authTime) * 1000)
 
-console.log(`Payment authorized at: ${authDate.toISOString()}`);
+console.log('Payment authorized at:', authDate.toISOString())
 ```
 
-#### Signature
+### escrow.isDuringEscrow
+
+Check whether a payment is still within its escrow period. Returns `true` if the escrow period is still active (refund window is open).
 
 ```typescript
-getAuthorizationTime(paymentInfo: PaymentInfo): Promise<bigint>
-```
-
-### isDuringEscrow
-
-Check whether a payment is still within its escrow period. Returns `true` if the escrow period has not yet passed, meaning the payment can still be refunded.
-
-```typescript
-const duringEscrow = await client.escrow.isDuringEscrow(paymentInfo);
+const duringEscrow = await client.escrow?.isDuringEscrow(paymentInfo)
 
 if (duringEscrow) {
-  console.log('Still in escrow period - refund is possible');
+  console.log('Still in escrow period, refund is possible')
 } else {
-  console.log('Escrow period has passed - funds can be fully released');
+  console.log('Escrow period has passed, funds can be fully released')
 }
 ```
 
-#### Signature
-
-```typescript
-isDuringEscrow(paymentInfo: PaymentInfo): Promise<boolean>
-```
-
-### getDuration
+### escrow.getDuration
 
 Get the configured escrow period duration in seconds.
 
 ```typescript
-const duration = await client.escrow.getDuration();
-console.log(`Escrow period: ${Number(duration) / 86400} days`);
-```
-
-#### Signature
-
-```typescript
-getDuration(): Promise<bigint>
+const duration = await client.escrow?.getDuration()
+console.log('Escrow period:', duration, 'seconds')
 ```
 
 ## Understanding escrow timing
@@ -132,7 +96,7 @@ getDuration(): Promise<bigint>
 | Escrow period passed (unfrozen) | Stopped | No | Full amount |
 
 <Tip>
-The escrow period length is configured at the contract level when the `EscrowPeriod` condition is deployed. Common values are 7 days, 14 days, or 30 days. You can use `getDuration()` to retrieve the configured period.
+The escrow period length is configured at the contract level when the `EscrowPeriod` condition is deployed. Common values are 7 days, 14 days, or 30 days. You can calculate the remaining time from `escrow.getAuthorizationTime()` and `escrow.getDuration()`.
 </Tip>
 
 ## Example: freeze and request refund
@@ -140,8 +104,8 @@ The escrow period length is configured at the contract level when the `EscrowPer
 A common pattern is to freeze a payment before submitting a refund request, ensuring the merchant cannot release funds while the request is pending.
 
 ```typescript
-import { createPayerClient } from '@x402r/sdk';
-import type { PaymentInfo } from '@x402r/core';
+import { createPayerClient } from '@x402r/sdk'
+import type { PaymentInfo } from '@x402r/sdk'
 
 async function freezeAndRequestRefund(
   client: ReturnType<typeof createPayerClient>,
@@ -149,26 +113,28 @@ async function freezeAndRequestRefund(
   refundAmount: bigint
 ) {
   // Step 1: Check if already frozen
-  const alreadyFrozen = await client.freeze.isFrozen(paymentInfo);
+  const alreadyFrozen = await client.freeze?.isFrozen(paymentInfo)
 
   if (!alreadyFrozen) {
-    const freezeTx = await client.freeze.freeze(paymentInfo);
-    console.log(`Payment frozen: ${freezeTx}`);
+    const tx = await client.freeze?.freeze(paymentInfo)
+    console.log('Payment frozen:', tx)
   }
 
   // Step 2: Check if refund request already exists
-  const hasRequest = await client.refund.has(paymentInfo);
+  const hasRequest = await client.refund?.has(paymentInfo)
 
   if (!hasRequest) {
-    const refundTx = await client.refund.request(paymentInfo, refundAmount);
-    console.log(`Refund requested: ${refundTx}`);
+    const tx = await client.refund?.request(paymentInfo, refundAmount)
+    console.log('Refund requested:', tx)
   }
 
   // Step 3: Watch for resolution
-  const unsubscribe = client.watch.onPayment((event) => {
-    console.log('Payment event received');
-    unsubscribe();
-  });
+  const unwatch = client.watch.onRefundRequest((logs) => {
+    for (const log of logs) {
+      console.log('Refund event:', log.eventName)
+    }
+    unwatch()
+  })
 }
 ```
 
@@ -181,14 +147,14 @@ sequenceDiagram
     participant M as Merchant / Arbiter
 
     Note over F: Escrow timer running
-    P->>F: freeze()
+    P->>F: freeze.freeze()
     Note over F: Timer paused
 
     alt Dispute resolved favorably
-        M->>F: unfreeze()
+        M->>F: freeze.unfreeze()
         Note over F: Timer resumes
     else Payer cancels dispute
-        P->>F: unfreeze()
+        P->>F: freeze.unfreeze()
         Note over F: Timer resumes
     end
 ```
@@ -203,9 +169,9 @@ sequenceDiagram
     Request refunds while payment is in escrow.
   </Card>
   <Card title="Payment Queries" icon="magnifying-glass" href="/sdk/client/payment-queries">
-    Query payment state and details.
+    Query payment state and amounts.
   </Card>
   <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
-    Full setup guide for the Client SDK.
+    Full setup guide for the payer client.
   </Card>
 </CardGroup>

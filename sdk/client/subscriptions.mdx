@@ -1,97 +1,91 @@
 ---
 title: "Client events"
-description: "Subscribe to real-time payment, refund, and freeze events as a payer"
+description: "Subscribe to real-time payment, refund, and fee events"
 icon: "bell"
 ---
 
-The SDK provides methods to subscribe to blockchain events in real-time using viem's `watchContractEvent` under the hood. All watch methods return an unsubscribe function.
+The `watch` action group provides real-time event subscriptions using viem's `watchContractEvent` under the hood. Each method returns an unsubscribe function you should call when you no longer need the watcher.
 
-## onPayment
+The `watch` group is always available on the client (no optional address required).
 
-Watch for payment lifecycle events on the operator contract. This subscribes to `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` events.
+## watch.onPayment
+
+Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` on the PaymentOperator contract.
 
 ```typescript
-const unsubscribe = client.watch.onPayment((event) => {
-  console.log('Payment event received:', event);
-});
+const unwatch = client.watch.onPayment((logs) => {
+  for (const log of logs) {
+    console.log('Payment event:', log.eventName)
+
+    switch (log.eventName) {
+      case 'AuthorizationCreated':
+        console.log('New payment authorized')
+        break
+      case 'ChargeExecuted':
+        console.log('Payment charged')
+        break
+      case 'ReleaseExecuted':
+        console.log('Funds released to merchant')
+        break
+    }
+  }
+})
 
 // Stop watching when done
-unsubscribe();
+unwatch()
 ```
 
-### Signature
+## watch.onRefundRequest
+
+Watch for refund request lifecycle events on the RefundRequest contract. This is a no-op if `refundRequestAddress` was not provided in the client config.
 
 ```typescript
-onPayment(callback: (log: unknown) => void): () => void
-```
-
-## onRefundRequest
-
-Watch for refund request lifecycle events on the RefundRequest contract.
-
-```typescript
-const unsubscribe = client.watch.onRefundRequest((event) => {
-  console.log('Refund request event:', event);
-});
+const unwatch = client.watch.onRefundRequest((logs) => {
+  for (const log of logs) {
+    console.log('Refund event:', log.eventName)
+  }
+})
 
 // Stop watching when done
-unsubscribe();
+unwatch()
 ```
 
-### Signature
+## watch.onRefundExecuted
+
+Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted` on the PaymentOperator contract.
 
 ```typescript
-onRefundRequest(callback: (log: unknown) => void): () => void
+const unwatch = client.watch.onRefundExecuted((logs) => {
+  for (const log of logs) {
+    console.log('Refund executed:', log.eventName)
+  }
+})
+
+unwatch()
 ```
 
-<Note>
-This is a no-op if no `refundRequestAddress` was resolved. The address is auto-resolved from the chain config.
-</Note>
+## watch.onFeeDistribution
 
-## onRefundExecuted
-
-Watch for refund execution events (`RefundInEscrowExecuted`, `RefundPostEscrowExecuted`) on the operator contract.
+Watch for `FeesDistributed` events on the PaymentOperator contract.
 
 ```typescript
-const unsubscribe = client.watch.onRefundExecuted((event) => {
-  console.log('Refund executed:', event);
-});
+const unwatch = client.watch.onFeeDistribution((logs) => {
+  for (const log of logs) {
+    console.log('Fees distributed:', log)
+  }
+})
 
-unsubscribe();
-```
-
-### Signature
-
-```typescript
-onRefundExecuted(callback: (log: unknown) => void): () => void
-```
-
-## onFeeDistribution
-
-Watch for `FeesDistributed` events on the operator contract.
-
-```typescript
-const unsubscribe = client.watch.onFeeDistribution((event) => {
-  console.log('Fees distributed:', event);
-});
-
-unsubscribe();
-```
-
-### Signature
-
-```typescript
-onFeeDistribution(callback: (log: unknown) => void): () => void
+unwatch()
 ```
 
 ## Event types reference
 
-| Method | Events Watched | Contract | Use Case |
-|--------|---------------|----------|----------|
-| `onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator | Track payment lifecycle |
-| `onRefundRequest` | All RefundRequest events | RefundRequest | Monitor refund request workflow |
-| `onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator | Track refund execution |
-| `onFeeDistribution` | `FeesDistributed` | PaymentOperator | Monitor fee distribution |
+| Method | Events Watched | Contract |
+|--------|---------------|----------|
+| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
+| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>
 For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
@@ -109,7 +103,7 @@ For reliable real-time delivery, configure your `publicClient` with a [WebSocket
   <Card title="Escrow Management" icon="lock" href="/sdk/client/escrow-management">
     Freeze payments and check escrow timing.
   </Card>
-  <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
-    Learn about the merchant side of X402r.
+  <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
+    Learn about the merchant side of x402r.
   </Card>
 </CardGroup>

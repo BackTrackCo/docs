@@ -1,195 +1,144 @@
 ---
-title: "AI Integration"
-description: "Automate dispute resolution with AI using the Arbiter SDK's evaluation hooks"
+title: "AI integration"
+description: "Automate dispute resolution with AI using the arbiter client"
 icon: "robot"
 ---
 
-The Arbiter SDK includes built-in support for AI-powered dispute resolution through evaluation hooks and a webhook handler. You can plug in any AI model -- LLMs, rule engines, or hybrid systems -- to automatically evaluate and decide on refund requests.
+You can build AI-powered dispute resolution on top of the arbiter client by combining the `watch`, `refund`, `evidence`, and `payment` action groups. Plug in any AI model (LLMs, rule engines, or hybrid systems) to automatically evaluate and decide on refund requests.
 
-## Core Concepts
+## Watch and auto-evaluate pattern
 
-The AI integration is built around three types:
-
-1. **CaseEvaluationContext** -- the data your AI receives for each case
-2. **DecisionResult** -- the decision your AI returns
-3. **createWebhookHandler** -- wires your AI evaluation function to the arbiter
-
-## Case Evaluation Context
-
-When a case needs evaluation, the handler provides a structured context:
+The most common pattern combines `watch.onRefundRequest` with your evaluation logic to automatically process incoming refund requests:
 
 ```typescript
-interface CaseEvaluationContext {
-  /** The payment information struct */
-  paymentInfo: PaymentInfo;
+import { createArbiterClient, RefundRequestStatus } from '@x402r/sdk'
+import type { PaymentInfo } from '@x402r/sdk'
 
-  /** Current payment state */
-  paymentState: PaymentState;
+const arbiter = createArbiterClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...',
+  refundRequestAddress: '0x...',
+  refundRequestEvidenceAddress: '0x...',
+  escrowPeriodAddress: '0x...',
+})
 
-  /** Current refund request status */
-  refundStatus: number;
+// Watch for new refund requests
+const unwatch = arbiter.watch.onRefundRequest(async (logs) => {
+  for (const log of logs) {
+    console.log('New refund event:', log.eventName)
 
-  /** Unique hash of the payment */
-  paymentInfoHash: `0x${string}`;
+    // Look up the full payment info from your database or the refund contract
+    const paymentInfo = await lookupPaymentInfo(log)
 
-  /** Amount being requested for refund */
-  refundAmount?: bigint;
+    // Evaluate the case
+    const decision = await evaluateWithAI(arbiter, paymentInfo)
 
-  /** Optional evidence/metadata */
-  evidence?: unknown;
-}
-```
-
-## Decision Result
-
-Your AI evaluation function returns a `DecisionResult`:
-
-```typescript
-interface DecisionResult {
-  /** The decision: approve or deny */
-  decision: 'approve' | 'deny';
-
-  /** Optional reasoning for the decision */
-  reasoning?: string;
-
-  /** Optional partial refund amount */
-  refundAmount?: bigint;
-
-  /** Confidence score (0-1) */
-  confidence?: number;
-}
-```
-
-## Create a Webhook Handler
-
-Use `createWebhookHandler` to connect your evaluation function to the arbiter:
-
-```typescript
-import { createWebhookHandler } from '@x402r/sdk';
-import type { CaseEvaluationContext, DecisionResult } from '@x402r/sdk';
-
-const handler = createWebhookHandler({
-  arbiter,
-  evaluationHook: async (context: CaseEvaluationContext): Promise<DecisionResult> => {
-    // Your AI evaluation logic here
-    const result = await myAIModel.evaluate(context);
-
-    return {
-      decision: result.shouldApprove ? 'approve' : 'deny',
-      reasoning: result.explanation,
-      confidence: result.confidence,
-    };
-  },
-  autoSubmitDecision: true,   // Auto-submit approve/deny on-chain
-  confidenceThreshold: 0.9,   // Only auto-submit if confidence >= 0.9
-});
-```
-
-<Note>
-Setting `autoSubmitDecision: true` calls `refundInEscrow` (for approvals) or `denyRefundRequest` on-chain automatically. In v3, `refundInEscrow()` both executes the refund and auto-approves the pending request in one step.
-</Note>
-
-## Webhook Handler Configuration
-
-```typescript
-interface WebhookHandlerConfig {
-  /** Arbiter client instance */
-  arbiter: ReturnType<typeof createArbiterClient>;
-
-  /** Your evaluation function */
-  evaluationHook: ArbiterHook;
-
-  /** Auto-submit decisions on-chain (default: false) */
-  autoSubmitDecision?: boolean;
-
-  /** Minimum confidence for auto-submission (default: 0.8) */
-  confidenceThreshold?: number;
-}
-```
-
-The handler returns a `WebhookResult` that extends `DecisionResult`:
-
-```typescript
-interface WebhookResult extends DecisionResult {
-  /** Transaction hash if auto-submitted */
-  txHash?: `0x${string}`;
-
-  /** Whether the decision was submitted on-chain */
-  executed: boolean;
-}
-```
-
-## Watch and Auto-Evaluate Pattern
-
-The most common pattern combines `watchNewCases` with the webhook handler to automatically evaluate incoming refund requests:
-
-```typescript
-import { createArbiterClient } from '@x402r/sdk';
-import { PaymentState, RequestStatus } from '@x402r/core';
-import type { PaymentInfo } from '@x402r/core';
-
-// Step 1: Create the webhook handler with your AI evaluation
-const handler = createWebhookHandler({
-  arbiter,
-  evaluationHook: async (context: CaseEvaluationContext): Promise<DecisionResult> => {
-    return evaluateWithAI(context);
-  },
-  autoSubmitDecision: true,
-  confidenceThreshold: 0.85,
-});
-
-// Step 2: Watch for new cases and feed them to the handler
-const unsubscribe = arbiter.watch.onRefundRequest(async (event: any) => {
-  const paymentInfoHash = event.args?.paymentInfoHash;
-  if (!paymentInfoHash) return;
-
-  console.log(`[NEW CASE] ${paymentInfoHash}`);
-
-  // Retrieve stored PaymentInfo from RefundRequest contract
-  const paymentInfo = await arbiter.refund.getStoredPaymentInfo(paymentInfoHash);
-
-  const context: CaseEvaluationContext = {
-    paymentInfo,
-    paymentState: PaymentState.InEscrow,
-    refundStatus: RequestStatus.Pending,
-    paymentInfoHash,
-    refundAmount: event.args?.amount,
-  };
-
-  // Evaluate and optionally auto-submit
-  const result = await handler(context);
-
-  console.log(`[DECISION] ${result.decision} (confidence: ${result.confidence})`);
-  console.log(`[REASONING] ${result.reasoning}`);
-
-  if (result.executed) {
-    console.log(`[ON-CHAIN] Decision submitted: ${result.txHash}`);
-    // In v3, refundInEscrow already executes the refund and auto-approves
-  } else {
-    console.log('[SKIPPED] Confidence below threshold, requires manual review');
+    if (decision.approve && decision.confidence >= 0.9) {
+      const request = await arbiter.refund?.get(paymentInfo)
+      if (request && request.status === RefundRequestStatus.Pending) {
+        await arbiter.payment.refundInEscrow(paymentInfo, request.amount)
+        console.log('Auto-approved refund')
+      }
+    } else if (!decision.approve && decision.confidence >= 0.9) {
+      await arbiter.refund?.deny(paymentInfo)
+      console.log('Auto-denied refund')
+    } else {
+      console.log('Low confidence, queuing for manual review')
+    }
   }
-});
+})
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  unsubscribe();
-  process.exit();
-});
+  unwatch()
+  process.exit()
+})
 ```
 
-## Evaluation Patterns
+## Building the evaluation context
 
-The `evaluationHook` function receives a `CaseEvaluationContext` and returns a `DecisionResult`. Three common patterns:
+Gather all available on-chain data before sending to your AI model:
 
-- **LLM-based** — Send the structured context to an LLM (GPT-4, Claude, etc.) with a system prompt that outputs JSON `{decision, reasoning, confidence}`. Sanitize inputs to prevent prompt injection.
-- **Rule-based** — Apply deterministic rules (amount thresholds, blocklists) for predictable, high-confidence decisions. Best for clear-cut cases.
-- **Hybrid** — Apply hard rules first; if no rule matches with high confidence, fall back to LLM evaluation. Deny and flag for manual review when confidence is low.
+```typescript
+async function buildEvaluationContext(
+  arbiter: ReturnType<typeof createArbiterClient>,
+  paymentInfo: PaymentInfo,
+) {
+  // Get payment state and amounts
+  const state = await arbiter.payment.getState(paymentInfo)
+  const amounts = await arbiter.payment.getAmounts(paymentInfo)
+
+  // Get the refund request
+  const request = await arbiter.refund?.get(paymentInfo)
+
+  // Check escrow timing
+  const inEscrow = await arbiter.escrow?.isDuringEscrow(paymentInfo)
+
+  // Get evidence if available
+  const evidenceCount = await arbiter.evidence?.count(paymentInfo)
+  let evidence: Array<{ cid: string; submitter: string }> = []
+
+  if (evidenceCount && evidenceCount > 0n) {
+    const batch = await arbiter.evidence?.getBatch(paymentInfo, 0n, evidenceCount)
+    evidence = (batch?.entries ?? []).map((e) => ({
+      cid: e.cid,
+      submitter: e.submitter,
+    }))
+  }
+
+  return {
+    paymentInfo,
+    state,
+    amounts,
+    request,
+    inEscrow,
+    evidence,
+  }
+}
+```
+
+## Evaluation patterns
+
+Three common approaches for the evaluation function:
+
+- **LLM-based**: send the structured context to an LLM (GPT-4, Claude, etc.) with a system prompt that outputs JSON `{decision, reasoning, confidence}`. Sanitize inputs to prevent prompt injection.
+- **Rule-based**: apply deterministic rules (amount thresholds, blocklists) for predictable, high-confidence decisions. Best for clear-cut cases.
+- **Hybrid**: apply hard rules first; if no rule matches with high confidence, fall back to LLM evaluation. Deny and flag for manual review when confidence is low.
+
+```typescript
+interface DecisionResult {
+  approve: boolean
+  reasoning: string
+  confidence: number
+}
+
+async function evaluateWithAI(
+  arbiter: ReturnType<typeof createArbiterClient>,
+  paymentInfo: PaymentInfo,
+): Promise<DecisionResult> {
+  const context = await buildEvaluationContext(arbiter, paymentInfo)
+
+  // Rule-based: auto-approve small amounts
+  if (context.request && context.request.amount < 5_000_000n) {
+    return { approve: true, reasoning: 'Small amount auto-approved', confidence: 1.0 }
+  }
+
+  // LLM fallback for larger amounts
+  const llmResult = await callYourLLM(context)
+  return {
+    approve: llmResult.decision === 'approve',
+    reasoning: llmResult.explanation,
+    confidence: llmResult.confidence,
+  }
+}
+```
 
 <Warning>
 AI-powered dispute resolution handles financial decisions. Always implement prompt injection protection, input validation, and confidence thresholds before deploying to production.
 </Warning>
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Event Subscriptions" icon="bell" href="/sdk/arbiter/subscriptions">
@@ -201,7 +150,7 @@ AI-powered dispute resolution handles financial decisions. Always implement prom
   <Card title="Decision Submission" icon="gavel" href="/sdk/arbiter/decision-submission">
     Approve/deny individual cases and execute refunds.
   </Card>
-  <Card title="Arbiter Discovery" icon="clipboard-list" href="/sdk/arbiter/registry">
-    How arbiters are discovered by merchants and clients.
+  <Card title="Registry" icon="clipboard-list" href="/sdk/arbiter/registry">
+    Register your arbiter for on-chain discovery.
   </Card>
 </CardGroup>

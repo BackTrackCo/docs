@@ -52,7 +52,7 @@ interface PaymentInfo {
 ```
 
 <Tip>
-Use `computePaymentInfoHash()` from `@x402r/core` to compute the unique hash of a payment. Use `toPaymentInfo()` to deserialize a JSON PaymentInfo back into the typed struct.
+Use `computePaymentInfoHash()` from `@x402r/sdk` to compute the unique hash of a payment.
 </Tip>
 
 ## Escrow Period
@@ -64,15 +64,22 @@ The **EscrowPeriod** contract tracks when a payment was authorized and enforces 
 - **After the period** — merchants can release funds to themselves
 
 ```typescript
-import { createPayerClient } from '@x402r/sdk';
+import { createPayerClient } from '@x402r/sdk'
 
-// Check when payment was authorized (requires escrowPeriodAddress in config)
-const authTime = await client.escrow.getAuthorizationTime(paymentInfo);
+const client = createPayerClient({
+  publicClient,
+  walletClient,
+  operatorAddress: '0x...',
+  escrowPeriodAddress: '0x...',
+})
+
+// Check when payment was authorized
+const authTime = await client.escrow?.getAuthorizationTime(paymentInfo)
 
 // Check if still within escrow period
-const inEscrow = await client.escrow.isDuringEscrow(paymentInfo);
+const inEscrow = await client.escrow?.isDuringEscrow(paymentInfo)
 if (!inEscrow) {
-  console.log('Escrow period has passed - funds can be released');
+  console.log('Escrow period has passed, funds can be released')
 }
 ```
 
@@ -81,13 +88,14 @@ if (!inEscrow) {
 When a payer wants a refund, they create a refund request. Each payment supports one refund request, keyed by its `paymentInfoHash`.
 
 ```typescript
-import { RequestStatus } from '@x402r/core';
+import { RefundRequestStatus } from '@x402r/sdk'
 
-// RequestStatus values:
-RequestStatus.Pending    // 0 - Awaiting decision
-RequestStatus.Approved   // 1 - Auto-approved via refundInEscrow
-RequestStatus.Denied     // 2 - Denied by merchant/arbiter
-RequestStatus.Cancelled  // 3 - Cancelled by payer
+// RefundRequestStatus values:
+RefundRequestStatus.Pending    // 0 - Awaiting decision
+RefundRequestStatus.Approved   // 1 - Approved by merchant/arbiter
+RefundRequestStatus.Denied     // 2 - Denied by merchant/arbiter
+RefundRequestStatus.Cancelled  // 3 - Cancelled by payer
+RefundRequestStatus.Refused    // 4 - Arbiter declined to rule
 ```
 
 ### Refund flow
@@ -131,14 +139,14 @@ const status = await client.refund.getStatus(paymentInfo);
 The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing release until the freeze expires or is lifted:
 
 ```typescript
-// Payer freezes payment (requires freezeAddress in config)
-await client.freeze.freeze(paymentInfo);
+// Payer freezes payment (requires payer authorization)
+await client.freeze?.freeze(paymentInfo)
 
-// Merchant unfreezes payment
-await merchant.freeze.unfreeze(paymentInfo);
+// Merchant unfreezes payment (requires receiver authorization)
+await merchant.freeze?.unfreeze(paymentInfo)
 
 // Check frozen status
-const frozen = await client.freeze.isFrozen(paymentInfo);
+const frozen = await client.freeze?.isFrozen(paymentInfo)
 ```
 
 <Warning>

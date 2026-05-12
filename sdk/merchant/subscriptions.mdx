@@ -1,109 +1,115 @@
 ---
 title: "Merchant events"
-description: "Subscribe to real-time refund, release, and freeze events with the Merchant SDK"
+description: "Subscribe to real-time refund, release, and fee events"
 icon: "bell"
 ---
 
-The merchant client provides watch methods for subscribing to blockchain events in real-time. Each returns an unsubscribe function for cleanup.
+The merchant client provides real-time event subscriptions through the `watch` action group. Each method returns an unsubscribe function for cleanup.
 
-## Watch refund requests
+## watch.onPayment
 
-Use `watch.onRefundRequest()` to subscribe to events emitted by the RefundRequest contract.
-
-```typescript
-const unsubscribe = merchant.watch.onRefundRequest((event) => {
-  console.log('Refund request event:', event);
-});
-
-// Later: stop watching
-unsubscribe();
-```
-
-<Note>
-This is a no-op if no `refundRequestAddress` was resolved. The address is auto-resolved from the chain config.
-</Note>
-
-### Example: auto-respond to small refund requests
+Watch for payment lifecycle events: `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` on the PaymentOperator contract.
 
 ```typescript
-import { createMerchantClient } from '@x402r/sdk';
-
-const AUTO_APPROVE_THRESHOLD = BigInt('5000000'); // 5 USDC
-
-const unsubscribe = merchant.watch.onRefundRequest(async (event: any) => {
-  const amount = event.args?.amount;
-
-  console.log('New refund request event');
-
-  if (amount && amount < AUTO_APPROVE_THRESHOLD) {
-    console.log('Auto-refunding small request');
-    // Look up paymentInfo from your database, then:
-    // await merchant.payment.refundInEscrow(paymentInfo, amount)
-  } else {
-    console.log('Queuing for manual review');
+const unwatch = merchant.watch.onPayment((logs) => {
+  for (const log of logs) {
+    console.log('Payment event:', log.eventName)
   }
-});
-```
-
-## Watch payment events
-
-Use `watch.onPayment()` to subscribe to `AuthorizationCreated`, `ChargeExecuted`, and `ReleaseExecuted` events on the PaymentOperator contract.
-
-```typescript
-const unsubscribe = merchant.watch.onPayment((event) => {
-  console.log('Payment event:', event);
-});
+})
 
 // Later: stop watching
-unsubscribe();
+unwatch()
 ```
 
 ### Example: revenue tracking
 
 ```typescript
-let totalReleased = 0n;
+let totalReleased = 0n
 
-const unsubscribe = merchant.watch.onPayment((event: any) => {
-  if (event.eventName === 'ReleaseExecuted') {
-    const amount = event.args?.amount ?? 0n;
-    totalReleased += amount;
-    console.log(`Release: +${amount} tokens, Total: ${totalReleased}`);
+const unwatch = merchant.watch.onPayment((logs) => {
+  for (const log of logs) {
+    if (log.eventName === 'ReleaseExecuted') {
+      const amount = log.args?.amount ?? 0n
+      totalReleased += amount
+      console.log('Release: +', amount, 'Total:', totalReleased)
+    }
   }
-});
+})
 ```
 
-## Watch refund execution
+## watch.onRefundRequest
 
-Use `watch.onRefundExecuted()` to subscribe to `RefundInEscrowExecuted` and `RefundPostEscrowExecuted` events.
+Watch for refund request lifecycle events on the RefundRequest contract. This is a no-op if `refundRequestAddress` was not provided in the client config.
 
 ```typescript
-const unsubscribe = merchant.watch.onRefundExecuted((event) => {
-  console.log('Refund executed:', event);
-});
+const unwatch = merchant.watch.onRefundRequest((logs) => {
+  for (const log of logs) {
+    console.log('Refund event:', log.eventName)
+  }
+})
 
-unsubscribe();
+unwatch()
 ```
 
-## Watch fee distribution
-
-Use `watch.onFeeDistribution()` to subscribe to `FeesDistributed` events.
+### Example: auto-respond to small refund requests
 
 ```typescript
-const unsubscribe = merchant.watch.onFeeDistribution((event) => {
-  console.log('Fees distributed:', event);
-});
+import { RefundRequestStatus } from '@x402r/sdk'
 
-unsubscribe();
+const AUTO_APPROVE_THRESHOLD = 5_000_000n // 5 USDC
+
+const unwatch = merchant.watch.onRefundRequest(async (logs) => {
+  for (const log of logs) {
+    const amount = log.args?.amount
+    console.log('New refund request, amount:', amount)
+
+    if (amount && amount < AUTO_APPROVE_THRESHOLD) {
+      console.log('Auto-approving small refund request')
+      // Look up the paymentInfo from your database and call
+      // merchant.payment.refundInEscrow(paymentInfo, amount)
+    } else {
+      console.log('Queuing for manual review')
+    }
+  }
+})
+```
+
+## watch.onRefundExecuted
+
+Watch for refund execution events: `RefundInEscrowExecuted` and `RefundPostEscrowExecuted`.
+
+```typescript
+const unwatch = merchant.watch.onRefundExecuted((logs) => {
+  for (const log of logs) {
+    console.log('Refund executed:', log.eventName)
+  }
+})
+
+unwatch()
+```
+
+## watch.onFeeDistribution
+
+Watch for `FeesDistributed` events on the PaymentOperator contract.
+
+```typescript
+const unwatch = merchant.watch.onFeeDistribution((logs) => {
+  for (const log of logs) {
+    console.log('Fees distributed:', log)
+  }
+})
+
+unwatch()
 ```
 
 ## Event types reference
 
-| Method | Events Watched | Contract | Use Case |
-|--------|---------------|----------|----------|
-| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator | Track payment lifecycle |
-| `watch.onRefundRequest` | All RefundRequest events | RefundRequest | Detect incoming refund requests |
-| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator | Track refund execution |
-| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator | Monitor fee distribution |
+| Method | Events Watched | Contract |
+|--------|---------------|----------|
+| `watch.onPayment` | `AuthorizationCreated`, `ChargeExecuted`, `ReleaseExecuted` | PaymentOperator |
+| `watch.onRefundRequest` | All RefundRequest ABI events | RefundRequest |
+| `watch.onRefundExecuted` | `RefundInEscrowExecuted`, `RefundPostEscrowExecuted` | PaymentOperator |
+| `watch.onFeeDistribution` | `FeesDistributed` | PaymentOperator |
 
 <Tip>
 For reliable real-time delivery, configure your `publicClient` with a [WebSocket transport](https://viem.sh/docs/clients/transports/websocket).
@@ -115,13 +121,13 @@ For reliable real-time delivery, configure your `publicClient` with a [WebSocket
   <Card title="Merchant SDK" icon="rocket" href="/sdk/merchant/quickstart">
     Release funds, charge, and query escrow state.
   </Card>
-  <Card title="Arbiter SDK" icon="scale-balanced" href="/sdk/arbiter/quickstart">
+  <Card title="Arbiter Guide" icon="scale-balanced" href="/sdk/arbiter/quickstart">
     Learn about dispute resolution from the arbiter perspective.
   </Card>
   <Card title="Refund Handling" icon="rotate-left" href="/sdk/merchant/refund-handling">
     Process refund requests with deny workflows.
   </Card>
   <Card title="Client Subscriptions" icon="user" href="/sdk/client/subscriptions">
-    See how clients subscribe to the same events.
+    See how payers subscribe to the same events.
   </Card>
 </CardGroup>

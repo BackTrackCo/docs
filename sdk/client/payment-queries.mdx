@@ -1,66 +1,94 @@
 ---
 title: "Payment queries"
-description: "Query payment states and details with the Client SDK"
+description: "Query payment states, amounts, and history with the payer client"
 icon: "magnifying-glass"
 ---
 
-The payer client provides methods for querying payment state and retrieving payment information.
+The payer client provides methods for querying payment state and history across the `payment`, `query`, and `operator` action groups.
 
-## getState
+## payment.getState
 
-Derive the lifecycle state of a payment from the escrow contract (amounts and expiry).
+Derive the lifecycle state of a payment from the operator contract.
 
 ```typescript
-const [hasCollected, capturableAmount, refundableAmount] = await client.payment.getState(paymentInfo);
+const state = await client.payment.getState(paymentInfo)
 
-if (capturableAmount > 0n) {
-  console.log('Payment has funds in escrow');
+// Returns a PaymentState number:
+// 0 = NonExistent  - Payment has never been authorized
+// 1 = InEscrow     - Funds locked, capturableAmount > 0
+// 2 = Released     - Funds released to receiver
+// 3 = Settled      - Payment fully settled
+// 4 = Expired      - Authorization expired
+```
+
+## payment.getAmounts
+
+Query the current capturable and refundable amounts for a payment.
+
+```typescript
+const amounts = await client.payment.getAmounts(paymentInfo)
+
+console.log('Has collected:', amounts.hasCollectedPayment)
+console.log('Capturable:', amounts.capturableAmount)
+console.log('Refundable:', amounts.refundableAmount)
+```
+
+## query.getPayerPayments
+
+List all payments where a given address is the payer. Requires `paymentIndexRecorderAddress` in the client config.
+
+```typescript
+const payments = await client.query?.getPayerPayments(payerAddress)
+
+for (const payment of payments ?? []) {
+  console.log('Payment info:', payment)
 }
 ```
 
-```typescript
-getState(paymentInfo: PaymentInfo): Promise<readonly [boolean, bigint, bigint]>
-```
-
-## getAmounts
-
-Get the capturable and refundable amounts for a payment.
-
-```typescript
-const amounts = await client.payment.getAmounts(paymentInfo);
-
-console.log('Capturable:', amounts.capturableAmount);
-console.log('Refundable:', amounts.refundableAmount);
-```
-
-```typescript
-getAmounts(paymentInfo: PaymentInfo): Promise<PaymentAmounts>
-```
-
-## Query payments
-
-If you configured a `paymentIndexRecorderAddress` or `paymentStore`, you can use the query action group to look up payments.
-
-```typescript
-import { createPayerClient, queryActions } from '@x402r/sdk';
-
-const client = createPayerClient({
-  publicClient,
-  walletClient,
-  operatorAddress: '0x...',
-  paymentIndexRecorderAddress: '0x...',
-}).extend(queryActions('0xRecorderAddress...'));
-
-// Get all payments where you are the payer
-const payments = await client.query.getPayerPayments(payerAddress);
-
-// Get a specific payment by hash
-const payment = await client.query.getPayment(paymentInfoHash);
-```
-
 <Note>
-The query plugin uses a tiered provider stack: in-memory store, on-chain recorder, then event logs (if `eventFromBlock` is configured). The first provider returning results wins.
+The `query` group uses a tiered resolver: it checks the in-memory store first, then the on-chain recorder, then falls back to event log scanning. Pass `eventFromBlock` in the client config to limit the scan range.
 </Note>
+
+## query.getReceiverPayments
+
+List all payments where a given address is the receiver.
+
+```typescript
+const payments = await client.query?.getReceiverPayments(receiverAddress)
+```
+
+## query.getPayment
+
+Look up a single payment by its hash.
+
+```typescript
+const payment = await client.query?.getPayment(paymentInfoHash)
+```
+
+## operator.getConfig
+
+Retrieve all slot addresses from the PaymentOperator contract.
+
+```typescript
+const config = await client.operator.getConfig()
+
+console.log('Release condition:', config.releaseCondition)
+console.log('Fee calculator:', config.feeCalculator)
+console.log('Fee recipient:', config.feeRecipient)
+```
+
+## operator.calculateFees
+
+Calculate the fee breakdown for a given payment amount.
+
+```typescript
+const fees = await client.operator.calculateFees(paymentInfo, 1_000_000n)
+
+console.log('Operator fee:', fees.operatorFee)
+console.log('Protocol fee:', fees.protocolFee)
+console.log('Total fee:', fees.totalFee)
+console.log('Net amount:', fees.netAmount)
+```
 
 ## Next steps
 
@@ -72,7 +100,7 @@ The query plugin uses a tiered provider stack: in-memory store, on-chain recorde
     Freeze payments and query escrow periods.
   </Card>
   <Card title="Client Quickstart" icon="rocket" href="/sdk/client/quickstart">
-    Full setup guide for the Client SDK.
+    Full setup guide for the payer client.
   </Card>
   <Card title="Limitations" icon="circle-info" href="/sdk/limitations">
     Known constraints including event log scanning limits.

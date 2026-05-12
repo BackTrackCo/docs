@@ -1,40 +1,143 @@
 ---
-title: "Arbiter discovery"
-description: "How arbiters are discovered by merchants and clients"
+title: "Identity and discovery"
+description: "Register, discover, and rate arbiters using the ERC-8004 plugin"
 icon: "clipboard-list"
 ---
 
-<Warning>
-The on-chain `ArbiterRegistry` contract has been removed. Arbiter discovery is now handled off-chain. If you were using `arbiterRegistry`, `arbiterRegistryAbi`, or `config.arbiterRegistry`, remove those references from your code.
-</Warning>
+The `@x402r/sdk` includes an ERC-8004 plugin that provides on-chain identity registration, reputation scoring, and service endpoint discovery. Arbiters can register themselves and be discovered by merchants and payers.
 
 ## What changed
 
-The `ArbiterRegistry` contract was deleted from x402r-contracts. ERC-8004 replaces on-chain arbiter discovery with off-chain mechanisms.
-
-The following exports have been removed from `@x402r/core` and `@x402r/helpers`:
-
-- `arbiterRegistry` (constant address)
-- `arbiterRegistryAbi`
-- `X402rChainConfig.arbiterRegistry` field
-
-## Migrating existing code
-
-Remove any references to `arbiterRegistryAddress` from your client setup:
+Add the `erc8004Actions` plugin to your client using `.extend()`:
 
 ```typescript
-import { createArbiterClient } from '@x402r/sdk';
-import { getChainConfig } from '@x402r/core';
-
-const config = getChainConfig(84532);
+import { createArbiterClient, erc8004Actions } from '@x402r/sdk'
 
 const arbiter = createArbiterClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...',
-  refundRequestAddress: config.refundRequest,
-  // arbiterRegistryAddress is no longer needed
-});
+  refundRequestAddress: '0x...',
+})
+
+const extended = arbiter.extend(erc8004Actions())
+```
+
+This adds three action groups: `identity`, `reputation`, and `discovery`.
+
+## Identity actions
+
+### identity.register
+
+Register your address in the on-chain identity registry:
+
+```typescript
+const tx = await extended.identity.register('my-arbiter-id')
+console.log('Registered:', tx)
+```
+
+### identity.isRegistered
+
+Check if an address is registered:
+
+```typescript
+const registered = await extended.identity.isRegistered('0xArbiterAddress...')
+console.log('Is registered:', registered)
+```
+
+### identity.resolveAgent
+
+Look up an agent's registration data:
+
+```typescript
+const agent = await extended.identity.resolveAgent('0xArbiterAddress...')
+console.log('Agent:', agent)
+```
+
+### identity.verifyAgentId
+
+Verify that an agent ID matches an address:
+
+```typescript
+const valid = await extended.identity.verifyAgentId('0xArbiterAddress...', 'my-arbiter-id')
+console.log('Valid:', valid)
+```
+
+## Reputation actions
+
+### reputation.rate
+
+Submit a rating (0-100) for another address:
+
+```typescript
+const tx = await extended.reputation.rate('0xTargetAddress...', 85)
+console.log('Rating submitted:', tx)
+```
+
+### reputation.getSummary
+
+Get the reputation summary for an address:
+
+```typescript
+const summary = await extended.reputation.getSummary('0xArbiterAddress...')
+console.log('Reputation:', summary)
+```
+
+### reputation.giveFeedback
+
+Submit raw feedback with custom tags:
+
+```typescript
+const tx = await extended.reputation.giveFeedback({
+  target: '0xTargetAddress...',
+  score: 90n,
+  tag1: 'starred',
+  tag2: 'x402',
+})
+console.log('Feedback submitted:', tx)
+```
+
+## Discovery actions
+
+### discovery.resolveServiceEndpoint
+
+Look up a service endpoint for an address:
+
+```typescript
+const endpoint = await extended.discovery.resolveServiceEndpoint('0xArbiterAddress...')
+console.log('Service endpoint:', endpoint)
+```
+
+## Complete example
+
+```typescript
+import { createArbiterClient, erc8004Actions } from '@x402r/sdk'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { baseSepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+
+const arbiter = createArbiterClient({
+  publicClient: createPublicClient({ chain: baseSepolia, transport: http() }),
+  walletClient: createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(),
+  }),
+  operatorAddress: '0x...',
+}).extend(erc8004Actions())
+
+// Register
+await arbiter.identity.register('my-dispute-resolver')
+
+// Verify
+const isRegistered = await arbiter.identity.isRegistered(account.address)
+console.log('Registered:', isRegistered)
+
+// Check reputation
+const summary = await arbiter.reputation.getSummary(account.address)
+console.log('Reputation:', summary)
 ```
 
 ## Next steps
