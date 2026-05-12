@@ -75,10 +75,10 @@ x402r consists of these core components:
 
 | Component | Purpose |
 |-----------|---------|
-| **PaymentOperator** | Manages payment authorization, release, charge, and refunds with pluggable conditions |
+| **PaymentOperator** | Manages payment authorization, capture, charge, void, and refunds with pluggable conditions |
 | **AuthCaptureEscrow** | Holds ERC-20 tokens during the payment lifecycle (from commerce-payments) |
 | **Conditions & Recorders** | Pluggable authorization checks (before action) and state updates (after action) |
-| **EscrowPeriod & Freeze** | Time-based release and freeze policies for buyer protection |
+| **EscrowPeriod & Freeze** | Time-based capture and freeze policies for buyer protection |
 | **RefundRequest** | Handles refund request lifecycle and approvals |
 
 All protocol contracts use universal CREATE2 addresses, same address on every supported chain.
@@ -91,7 +91,6 @@ Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. 
 |---|---|---|
 | Base | 8453 | Supported |
 | Base Sepolia | 84532 | Testnet |
-| Ethereum Sepolia | 11155111 | Testnet |
 
 ## Resources
 

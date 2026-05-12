@@ -14,10 +14,10 @@ Deploy via RecorderCombinatorFactory:
 
 ```typescript
 const comboAddress = await recorderCombinatorFactory.write.deploy([
-  [escrowPeriodAddress, paymentIndexRecorderAddress]  // Records auth time + payment index
+  [escrowPeriodAddress, paymentIndexRecorderHookAddress]  // Records auth time + payment index
 ]);
 
-config.authorizePostActionHook = comboAddress;
+config.authorizeHook = comboAddress;
 ```
 
 ## Behavior

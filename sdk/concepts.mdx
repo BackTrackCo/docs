@@ -6,27 +6,24 @@ icon: "lightbulb"
 
 ## Payment States
 
-Every payment in X402r goes through a defined lifecycle represented by the `PaymentState` enum:
+`getPaymentState()` returns a tuple, not an enum. There is no exported `PaymentState` symbol; derive lifecycle position from the returned values.
 
 ```typescript
-import { PaymentState } from '@x402r/core';
-
-// PaymentState values:
-PaymentState.NonExistent  // 0 - Payment doesn't exist
-PaymentState.InEscrow     // 1 - Funds held in escrow
-PaymentState.Released     // 2 - Funds released to merchant
-PaymentState.Settled      // 3 - Payment fully settled
-PaymentState.Expired      // 4 - Payment expired
+// getPaymentState() return type:
+// readonly [hasCollectedPayment: boolean, capturableAmount: bigint, refundableAmount: bigint]
+const [collected, capturable, refundable] = await client.payment.getState(paymentInfo)
 ```
+
+Conceptually, every payment moves through this lifecycle:
 
 ```mermaid
 stateDiagram-v2
     [*] --> InEscrow: authorize()
-    InEscrow --> Released: release()
+    InEscrow --> Captured: capture()
     InEscrow --> Settled: voidPayment()
-    InEscrow --> Expired: escrow period passes
-    Released --> Settled: settle()
-    Expired --> [*]
+    InEscrow --> Reclaimable: captureDeadline passes
+    Captured --> Settled: refund()
+    Reclaimable --> Settled: reclaim()
     Settled --> [*]
 ```
 
@@ -57,11 +54,11 @@ Use `computePaymentInfoHash()` from `@x402r/sdk` to compute the unique hash of a
 
 ## Escrow Period
 
-The **EscrowPeriod** contract tracks when a payment was authorized and enforces a configurable waiting period before funds can be released. During the escrow period:
+The **EscrowPeriod** contract tracks when a payment was authorized and enforces a configurable waiting period before funds can be captured. During the escrow period:
 
 - **Payers** can request refunds or freeze the payment
-- **Merchants** can refund but cannot release
-- **After the period**: merchants can release funds to themselves
+- **Merchants** can void (return funds) but cannot capture
+- **After the period**: merchants can capture funds
 
 ```typescript
 import { createPayerClient } from '@x402r/sdk'
@@ -136,7 +133,7 @@ const status = await client.refund.getStatus(paymentInfo);
 
 ## Freeze / Unfreeze
 
-The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing release until the freeze expires or is lifted:
+The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing capture until the freeze expires or is lifted:
 
 ```typescript
 // Payer freezes payment (requires payer authorization)
@@ -150,15 +147,15 @@ const frozen = await client.freeze?.isFrozen(paymentInfo)
 ```
 
 <Warning>
-Freezing a payment does not automatically escalate to an arbiter. It pauses the release condition to allow time for dispute resolution.
+Freezing a payment does not automatically escalate to an arbiter. It pauses the capture condition to allow time for dispute resolution.
 </Warning>
 
 ## Roles and Permissions
 
 | Role | Can Do |
-|------|--------|
+|---|---|
 | **Payer** | Request refunds, freeze payments, cancel requests, query escrow state |
-| **Merchant** | Release payments, charge, void (auto-approves requests), deny refunds |
+| **Merchant** | Capture payments, charge, void (auto-approves requests), deny refunds |
 | **Arbiter** | Deny/refuse disputed refunds, void, review evidence |
 
 ## Contract Architecture
@@ -168,9 +165,9 @@ flowchart TB
     subgraph PO[PaymentOperator]
         direction LR
         auth[authorize]
-        rel[release]
+        cap[capture]
         chg[charge]
-        ref[voidPayment]
+        v[void]
         refp[refund]
     end
 

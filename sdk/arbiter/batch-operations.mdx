@@ -4,7 +4,7 @@ description: "Process multiple refund decisions efficiently as an arbiter"
 icon: "layer-group"
 ---
 
-The arbiter client can process multiple refund requests by iterating over cases and calling refund/payment methods individually. There is no built-in batch method, but you can build batch workflows on top of the action groups.
+The arbiter client can process multiple refund requests by iterating over cases and calling refund/payment methods individually. There is no batch method, but you can build batch workflows on top of the action groups.
 
 <Warning>
 Each refund decision is a separate on-chain transaction. If one fails mid-batch, previously processed items are not rolled back. Design your error handling accordingly.

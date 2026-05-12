@@ -59,7 +59,7 @@ A complete marketplace operator deployment includes:
     |----------|---------|-------------|
     | `PRIVATE_KEY` |, | Deployer wallet (required) |
     | `ARBITER` | deployer address | Dispute resolver |
-    | `FEE_RECIPIENT` | deployer address | Receives operator fees |
+    | `FEE_RECEIVER` | deployer address | Receives operator fees |
     | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
     | `FREEZE_DURATION` | `259200` (3 days) | Freeze duration in seconds |
     | `FEE_BPS` | `100` (1%) | Operator fee in basis points |
@@ -118,7 +118,7 @@ const result = await deployMarketplaceOperator(
   publicClient,
   {
     chainId: 84532,                        // Base Sepolia
-    feeRecipient: account.address,         // receives operator fees
+    feeReceiver: account.address,         // receives operator fees
     arbiter: '0xArbiterAddress...',         // dispute resolver
     escrowPeriodSeconds: 604800n,           // 7 days
     freezeDurationSeconds: 259200n,         // 3 days max freeze
@@ -138,7 +138,7 @@ console.log('Existing (reused):', result.summary.existingCount);
 | Option | Type | Description |
 |--------|------|-------------|
 | `chainId` | `number` | Target chain ID (e.g., `84532` for Base Sepolia) |
-| `feeRecipient` | `Address` | Address that receives operator fees |
+| `feeReceiver` | `Address` | Address that receives operator fees |
 | `arbiter` | `Address` | Arbiter address for dispute resolution |
 | `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
 | `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
@@ -154,7 +154,7 @@ interface MarketplaceOperatorDeployment {
   freezeAddress: Address | null               // Freeze condition (null if disabled)
   refundRequestAddress: Address               // RefundRequest contract
   refundRequestEvidenceAddress: Address       // RefundRequestEvidence contract
-  voidPreActionConditionAddress: Address      // OR(Receiver, Arbiter)
+  voidConditionAddress: Address      // OR(Receiver, Arbiter)
   feeCalculatorAddress: Address | null        // null if no fee
   operatorConfig: OperatorConfig              // Full operator slot configuration
   deployments: DeployResult[]                 // Per-contract deploy details
@@ -177,7 +177,7 @@ import { previewMarketplaceOperator } from '@x402r/core'
 
 const preview = await previewMarketplaceOperator(publicClient, {
   chainId: 84532,
-  feeRecipient: '0xYourAddress...',
+  feeReceiver: '0xYourAddress...',
   arbiter: '0xArbiterAddress...',
   escrowPeriodSeconds: 604800n,
 })
@@ -200,7 +200,7 @@ The deployed marketplace operator has the following slot configuration:
 | `VOID_POST_ACTION_HOOK` | RefundRequest | Tracks refund request state |
 | `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
 | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee (if configured) |
-| `FEE_RECIPIENT` | Your address | Receives fees |
+| `FEE_RECEIVER` | Your address | Receives fees |
 
 ---
 
@@ -247,7 +247,7 @@ const deployment = await deployDeliveryProtectionOperator(
   {
     chainId: 84532,
     arbiter: '0xArbiterServiceAddress',
-    feeRecipient: account.address,
+    feeReceiver: account.address,
     escrowPeriodSeconds: 300n,           // 5 minutes
   },
 )
@@ -255,19 +255,19 @@ const deployment = await deployDeliveryProtectionOperator(
 console.log('Operator:', deployment.operatorAddress)
 console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
 console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
-console.log('ReleaseCondition:', deployment.capturePreActionConditionAddress)
-console.log('AuthorizeRecorder:', deployment.authorizePostActionHookAddress)
+console.log('ReleaseCondition:', deployment.captureConditionAddress)
+console.log('AuthorizeRecorder:', deployment.authorizeHookAddress)
 ```
 
 | Option | Type | Description |
 |--------|------|-------------|
 | `chainId` | `number` | Target chain |
 | `arbiter` | `Address` | Arbiter address for release and refund decisions |
-| `feeRecipient` | `Address` | Receives protocol fees |
+| `feeReceiver` | `Address` | Receives protocol fees |
 | `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
 | `authorizedCodehash` | `Hex` | Override the default `recorderCombinatorCodehash`. Optional |
-| `paymentIndexRecorderAddress` | `Address` | Override the default PaymentIndexRecorder. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
-| `allowArbiterRefund` | `boolean` | Allow arbiter to refund immediately during escrow. Default: `true` |
+| `paymentIndexRecorderHookAddress` | `Address` | Override the default PaymentIndexRecorder. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
+| `allowArbiterRefund` | `boolean` | Allow arbiter to refund immediately during escrow. Default: `false` |
 
 <AccordionGroup>
   <Accordion title="Deployment Result Type">
@@ -276,10 +276,10 @@ console.log('AuthorizeRecorder:', deployment.authorizePostActionHookAddress)
       operatorAddress: Address
       escrowPeriodAddress: Address
       arbiterConditionAddress: Address
-      capturePreActionConditionAddress: Address           // OrCondition([arbiter, payer])
-      voidPreActionConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
-      authorizePostActionHookAddress: Address          // RecorderCombinator([escrowPeriod, paymentIndexRecorder])
-      paymentIndexRecorderAddress: Address
+      captureConditionAddress: Address           // OrCondition([arbiter, payer])
+      voidConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
+      authorizeHookAddress: Address          // RecorderCombinator([escrowPeriod, paymentIndexRecorder])
+      paymentIndexRecorderHookAddress: Address
       operatorConfig: OperatorConfig
       deployments: DeployResult[]
       summary: {
@@ -290,7 +290,7 @@ console.log('AuthorizeRecorder:', deployment.authorizePostActionHookAddress)
     }
     ```
 
-    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), RecorderCombinator, and the Operator. If you pass `paymentIndexRecorderAddress: zeroAddress`, the RecorderCombinator is skipped (5 contracts).
+    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), RecorderCombinator, and the Operator. If you pass `paymentIndexRecorderHookAddress: zeroAddress`, the RecorderCombinator is skipped (5 contracts).
 
     Redeploying with the same parameters is idempotent (CREATE2). It detects existing contracts and skips them.
   </Accordion>
@@ -304,13 +304,13 @@ console.log('AuthorizeRecorder:', deployment.authorizePostActionHookAddress)
     const preview = await previewDeliveryProtectionOperator(publicClient, {
       chainId: 84532,
       arbiter: '0xArbiterServiceAddress',
-      feeRecipient: account.address,
+      feeReceiver: account.address,
       escrowPeriodSeconds: 300n,
     })
 
     console.log('Operator will be at:', preview.operatorAddress)
     console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
-    console.log('AuthorizeRecorder will be at:', preview.authorizePostActionHookAddress)
+    console.log('AuthorizeRecorder will be at:', preview.authorizeHookAddress)
     ```
   </Accordion>
 

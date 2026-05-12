@@ -8,17 +8,18 @@ The payer client provides methods for querying payment state and history across 
 
 ## payment.getState
 
-Derive the lifecycle state of a payment from the operator contract.
+Returns the lifecycle position of a payment as a tuple.
 
 ```typescript
-const state = await client.payment.getState(paymentInfo)
+const [hasCollectedPayment, capturableAmount, refundableAmount] =
+  await client.payment.getState(paymentInfo)
 
-// Returns a PaymentState number:
-// 0 = NonExistent  - Payment has never been authorized
-// 1 = InEscrow     - Funds locked, capturableAmount > 0
-// 2 = Released     - Funds released to receiver
-// 3 = Settled      - Payment fully settled
-// 4 = Expired      - Authorization expired
+// Interpret:
+//   !hasCollectedPayment                    → not yet authorized
+//   hasCollectedPayment && capturableAmount > 0n  → in escrow, still capturable
+//   hasCollectedPayment && capturableAmount === 0n && refundableAmount > 0n
+//                                            → captured, still refundable
+//   refundableAmount === 0n                 → fully settled
 ```
 
 ## payment.getAmounts
@@ -35,7 +36,7 @@ console.log('Refundable:', amounts.refundableAmount)
 
 ## query.getPayerPayments
 
-List all payments where a given address is the payer. Requires `paymentIndexRecorderAddress` in the client config.
+List all payments where a given address is the payer. Requires `paymentIndexRecorderHookAddress` in the client config.
 
 ```typescript
 const payments = await client.query?.getPayerPayments(payerAddress)
@@ -72,9 +73,9 @@ Retrieve all slot addresses from the PaymentOperator contract.
 ```typescript
 const config = await client.operator.getConfig()
 
-console.log('Release condition:', config.capturePreActionCondition)
+console.log('Release condition:', config.captureCondition)
 console.log('Fee calculator:', config.feeCalculator)
-console.log('Fee recipient:', config.feeRecipient)
+console.log('Fee recipient:', config.feeReceiver)
 ```
 
 ## operator.calculateFees
@@ -84,10 +85,10 @@ Calculate the fee breakdown for a given payment amount.
 ```typescript
 const fees = await client.operator.calculateFees(paymentInfo, 1_000_000n)
 
-console.log('Operator fee:', fees.operatorFee)
-console.log('Protocol fee:', fees.protocolFee)
-console.log('Total fee:', fees.totalFee)
-console.log('Net amount:', fees.netAmount)
+console.log('Operator fee:', fees.operatorFeeAmount)
+console.log('Protocol fee:', fees.protocolFeeAmount)
+console.log('Total fee:',    fees.totalFeeAmount)
+console.log('Net amount:',   fees.netAmount)
 ```
 
 ## Next steps

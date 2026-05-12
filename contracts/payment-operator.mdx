@@ -18,7 +18,7 @@ The main payment operator contract with pluggable conditions for flexible author
 
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
-address public immutable FEE_RECIPIENT;       // Operator fee recipient
+address public immutable FEE_RECEIVER;       // Operator fee recipient
 ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG; // Shared protocol fee config
 IFeeCalculator public immutable FEE_CALCULATOR; // Operator fee calculator
 ```
@@ -235,7 +235,7 @@ ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG;
 IFeeCalculator public immutable FEE_CALCULATOR;
 
 // Fee recipients
-address public immutable FEE_RECIPIENT;  // Operator fee recipient
+address public immutable FEE_RECEIVER;  // Operator fee recipient
 // Protocol fee recipient is on ProtocolFeeConfig
 
 // Fee tracking for accurate distribution
@@ -246,7 +246,7 @@ mapping(address token => uint256) public accumulatedProtocolFees;
 
 For a 1000 USDC payment:
 - **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC -> goes to `protocolFeeRecipient`
-- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC -> goes to `FEE_RECIPIENT`
+- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC -> goes to `FEE_RECEIVER`
 - **Total Fee:** 5 bps (0.05%) = 0.50 USDC
 - **Receiver Gets:** 999.50 USDC
 
@@ -261,7 +261,7 @@ struct AuthorizedFees {
 mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ```
 
-**FEE_RECIPIENT** can be:
+**FEE_RECEIVER** can be:
 - Arbiter (marketplace with disputes)
 - Service Provider (subscriptions)
 - Platform Treasury (platform-controlled)
@@ -275,7 +275,7 @@ Fees accumulate in the operator contract and are distributed via `distributeFees
 // Anyone can call to distribute fees for a token
 operator.distributeFees(usdcAddress);
 // Protocol share -> protocolFeeRecipient
-// Operator share -> FEE_RECIPIENT
+// Operator share -> FEE_RECEIVER
 ```
 
 ### Protocol Fee Changes (7-day Timelock)

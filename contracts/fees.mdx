@@ -26,7 +26,7 @@ flowchart TD
     ACC --> DIST["distributeFees()"]
     DIST --> PR["protocolFeeRecipient
     (on ProtocolFeeConfig)"]
-    DIST --> FR["FEE_RECIPIENT
+    DIST --> FR["FEE_RECEIVER
     (on Operator)"]
 ```
 
@@ -35,7 +35,7 @@ flowchart TD
 | Layer | Configured By | Mutability | Recipient |
 |-------|--------------|------------|-----------|
 | **Protocol Fee** | `ProtocolFeeConfig` (shared) | Swappable calculator with 7-day timelock | `protocolFeeRecipient` on ProtocolFeeConfig |
-| **Operator Fee** | `FEE_CALCULATOR` (per-operator) | Immutable — set at deploy time | `FEE_RECIPIENT` on operator |
+| **Operator Fee** | `FEE_CALCULATOR` (per-operator) | Immutable: set at deploy time | `FEE_RECEIVER` on operator |
 
 ### Example Calculation
 
@@ -44,7 +44,7 @@ For a 1000 USDC payment with 50 bps protocol fee + 250 bps operator fee:
 | Component | Rate | Amount | Goes To |
 |-----------|------|--------|---------|
 | Protocol Fee | 50 bps (0.5%) | 5.00 USDC | `protocolFeeRecipient` |
-| Operator Fee | 250 bps (2.5%) | 25.00 USDC | `FEE_RECIPIENT` |
+| Operator Fee | 250 bps (2.5%) | 25.00 USDC | `FEE_RECEIVER` |
 | **Total Fee** | **300 bps (3%)** | **30.00 USDC** | |
 | **Receiver Gets** | | **970.00 USDC** | Payment receiver |
 
@@ -67,11 +67,11 @@ interface IFeeCalculator {
 }
 ```
 
-This enables flexible fee models — static rates, volume-based tiers, per-token pricing, or any custom logic.
+This enables flexible fee models, static rates, volume-based tiers, per-token pricing, or any custom logic.
 
 ## StaticFeeCalculator
 
-The simplest implementation — returns a fixed basis points value for every payment:
+The simplest implementation, returns a fixed basis points value for every payment:
 
 ```solidity
 contract StaticFeeCalculator is IFeeCalculator {
@@ -117,11 +117,11 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 
 **Flow:**
 1. `authorize()` calculates fees and stores them in `authorizedFees[hash]`
-2. `release()` uses the stored fees — not the current calculator rates
+2. `release()` uses the stored fees, not the current calculator rates
 3. Protocol fee timelocks can't break already-authorized payments
 
 <Note>
-`charge()` calculates fees inline since it authorizes and captures atomically — there's no gap where fees could change.
+`charge()` calculates fees inline since it authorizes and captures atomically, there's no gap where fees could change.
 </Note>
 
 ## Fee Bounds Validation
@@ -145,7 +145,7 @@ Fees accumulate in the operator contract and are distributed via `distributeFees
 // Anyone can call to distribute fees for a token
 operator.distributeFees(usdcAddress);
 // Protocol share → protocolFeeRecipient
-// Operator share → FEE_RECIPIENT
+// Operator share → FEE_RECEIVER
 ```
 
 **How it works:**
@@ -153,11 +153,11 @@ operator.distributeFees(usdcAddress);
 2. Protocol share = `accumulatedProtocolFees[token]` (tracked per-token)
 3. Operator share = remaining balance
 4. Transfer protocol share to `protocolFeeRecipient`
-5. Transfer operator share to `FEE_RECIPIENT`
+5. Transfer operator share to `FEE_RECEIVER`
 6. Reset accumulated tracking to 0
 
 <Tip>
-`distributeFees()` is permissionless — anyone can trigger distribution. This prevents fees from being stuck in the operator.
+`distributeFees()` is permissionless, anyone can trigger distribution. This prevents fees from being stuck in the operator.
 </Tip>
 
 ## ProtocolFeeConfig
@@ -201,18 +201,18 @@ await protocolFeeConfig.executeRecipient();
 ```
 
 <Warning>
-Operator fees are **immutable** — set at deploy time via `IFeeCalculator` and `FEE_RECIPIENT`. Only protocol fees can be changed (with 7-day timelock). Already-authorized payments use locked fee rates regardless.
+Operator fees are **immutable**: set at deploy time via `IFeeCalculator` and `FEE_RECEIVER`. Only protocol fees can be changed (with 7-day timelock). Already-authorized payments use locked fee rates regardless.
 </Warning>
 
 ### Disabling Protocol Fees
 
 Set the protocol fee calculator to `address(0)` to disable protocol fees entirely. The operator will calculate 0 bps for the protocol layer.
 
-## FEE_RECIPIENT Roles
+## FEE_RECEIVER Roles
 
-The operator's `FEE_RECIPIENT` varies by use case:
+The operator's `FEE_RECEIVER` varies by use case:
 
-| Use Case | FEE_RECIPIENT | Description |
+| Use Case | FEE_RECEIVER | Description |
 |----------|---------------|-------------|
 | Marketplace | Arbiter address | Arbiter earns fees for dispute resolution |
 | Subscription | Service provider | Provider earns fees for service delivery |

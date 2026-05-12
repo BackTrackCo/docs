@@ -8,7 +8,7 @@ icon: "file-contract"
 
 The **`authCapture` scheme** for x402 v2 uses the audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) (`AuthCaptureEscrow` + token collectors) directly, no fork. The client signs a single signature (ERC-3009 or Permit2). The facilitator submits it, either locking funds in escrow for later capture (two-phase) or sending them directly to the receiver with refund capability (single-shot).
 
-Unlike `exact`, which has no built-in mechanism for returning funds, `authCapture` supports returning funds to the client through void, refund, and reclaim.
+Unlike `exact`, which has no mechanism for returning funds, `authCapture` supports returning funds to the client through void, refund, and reclaim.
 
 ## Settlement Paths
 
@@ -338,7 +338,7 @@ The contract enforces: `preApprovalExpiry <= authorizationExpiry <= refundExpiry
 | Expiry | Wire field | Enforced At | Effect |
 |---|---|---|---|
 | `preApprovalExpiry` | derived | `authorize()` / `charge()` | Blocks settlement after this time |
-| `authorizationExpiry` | `captureDeadline` | `capture()` | Blocks capture; enables `reclaim()` |
+| `authorizationExpiry` | `captureDeadline` | `capture()` | Blocks capture; allows `reclaim()` |
 | `refundExpiry` | `refundDeadline` | `refund()` | Blocks refund requests |
 
 ## Safety Guarantees

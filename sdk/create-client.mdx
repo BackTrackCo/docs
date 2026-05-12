@@ -57,7 +57,7 @@ Type narrowing is a DX convenience, not a security boundary. On-chain [condition
 | `refundRequestAddress` | `Address` | No | Activates `refund` group |
 | `refundRequestEvidenceAddress` | `Address` | No | Activates `evidence` group (requires `refundRequestAddress`) |
 | `freezeAddress` | `Address` | No | Activates `freeze` group |
-| `paymentIndexRecorderAddress` | `Address` | No | Activates `query` group |
+| `paymentIndexRecorderHookAddress` | `Address` | No | Activates `query` group |
 | `paymentStore` | `PaymentStore` | No | Pluggable storage for payment lookups |
 | `eventFromBlock` | `bigint` | No | Starting block for event-based payment lookups |
 
@@ -72,7 +72,7 @@ Type narrowing is a DX convenience, not a security boundary. On-chain [condition
 | `refund` | 14 | `refundRequestAddress` |
 | `evidence` | 4 | `refundRequestEvidenceAddress` |
 | `freeze` | 3 | `freezeAddress` |
-| `query` | 3 | `paymentIndexRecorderAddress` |
+| `query` | 3 | `paymentIndexRecorderHookAddress` |
 
 Groups without their required address are `undefined` on the client. Use optional chaining:
 

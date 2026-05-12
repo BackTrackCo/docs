@@ -73,7 +73,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
   <Step title="Deploy Operator">
     ```typescript
     const config = {
-      feeRecipient: arbiterAddress,         // Arbiter earns fees for dispute resolution
+      feeReceiver: arbiterAddress,         // Arbiter earns fees for dispute resolution
       feeCalculator: feeCalculatorAddress,  // Operator fee calculator
       authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
       authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
@@ -135,7 +135,7 @@ sequenceDiagram
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -201,7 +201,7 @@ const capturePreActionCondition = await new AndCondition([
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,         // Arbiter earns fees
+  feeReceiver: arbiterAddress,         // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,  // Operator fee calculator
   authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
@@ -276,7 +276,7 @@ const capturePreActionCondition = await new AndCondition([
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: PAYER_CONDITION,        // Only payer authorizes
   authorizePostActionHook: escrowPeriod,            // Record auth time
@@ -338,7 +338,7 @@ sequenceDiagram
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns all fees
+  feeReceiver: arbiterAddress,               // Arbiter earns all fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: arbiterCondition.address,      // Arbiter creates payments
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -395,7 +395,7 @@ const refundCondition = await new OrCondition([
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   authorizePostActionHook: escrowPeriod,            // Record auth time
@@ -452,7 +452,7 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 
 // Receiver can charge immediately (no escrow)
 const config = {
-  feeRecipient: serviceProviderAddress,       // Service provider earns fees
+  feeReceiver: serviceProviderAddress,       // Service provider earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: PAYER_CONDITION,        // Payer sets up subscription
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -524,7 +524,7 @@ sequenceDiagram
 const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
 
 const config = {
-  feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
+  feeReceiver: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: daoCondition.address,   // DAO authorizes grants
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -588,12 +588,12 @@ sequenceDiagram
 // Deploy condition for platform address
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
-// Time-proportional charge condition (custom, not provided out of the box,
+// Time-proportional charge condition (custom, not provided shipped with the SDK,
 // this is a hypothetical custom condition you would implement yourself)
 const timeProportionalCondition = await new TimeProportionalCondition();
 
 const config = {
-  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeReceiver: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: PAYER_CONDITION,        // Payer authorizes stream
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -665,7 +665,7 @@ sequenceDiagram
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
 const config = {
-  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeReceiver: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
   authorizePreActionCondition: PAYER_CONDITION,        // Payer creates invoice payment
   authorizePostActionHook: '0x0000000000000000000000000000000000000000',
@@ -754,7 +754,7 @@ Before deploying, verify:
 ```typescript
 import { createTestClient, http, parseUnits, keccak256, toHex } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { PaymentOperatorABI } from '@x402r/core/abis';
+import { paymentOperatorAbi } from '@x402r/core';
 
 // Deploy on Base Sepolia first
 const operatorAddress = await factory.write.deployOperator([config]);
@@ -768,7 +768,7 @@ const testClient = createTestClient({
 // 1. Authorize
 await walletClient.writeContract({
   address: operatorAddress,
-  abi: PaymentOperatorABI,
+  abi: paymentOperatorAbi,
   functionName: 'authorize',
   args: [paymentInfo, parseUnits('100', 6), tokenCollectorAddress, collectorData],
 });
@@ -778,7 +778,7 @@ await walletClient.writeContract({
 try {
   await walletClient.writeContract({
     address: operatorAddress,
-    abi: PaymentOperatorABI,
+    abi: paymentOperatorAbi,
     functionName: 'release',
     args: [paymentInfo, parseUnits('100', 6)],
   });
@@ -793,7 +793,7 @@ await testClient.mine({ blocks: 1 });
 // 4. Release after escrow
 await walletClient.writeContract({
   address: operatorAddress,
-  abi: PaymentOperatorABI,
+  abi: paymentOperatorAbi,
   functionName: 'release',
   args: [paymentInfo, parseUnits('100', 6)],
 });

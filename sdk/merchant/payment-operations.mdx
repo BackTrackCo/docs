@@ -118,35 +118,37 @@ console.log('Refundable:', amounts.refundableAmount)
 
 ### payment.getState
 
-Derive the lifecycle state of a payment from the operator contract.
+Returns a tuple of the payment's lifecycle position.
 
 ```typescript
-const state = await merchant.payment.getState(paymentInfo)
-// 0 = NonExistent, 1 = InEscrow, 2 = Released, 3 = Settled, 4 = Expired
+const [hasCollectedPayment, capturableAmount, refundableAmount] =
+  await merchant.payment.getState(paymentInfo)
 ```
 
 ### operator.getConfig
 
-Retrieve all slot addresses from the PaymentOperator contract, including conditions and recorders.
+Retrieve all slot addresses from the PaymentOperator contract.
 
 ```typescript
 const config = await merchant.operator.getConfig()
 
-console.log('Fee recipient:', config.feeRecipient)
-console.log('Fee calculator:', config.feeCalculator)
-console.log('Release condition:', config.capturePreActionCondition)
+console.log('Fee receiver:',      config.feeReceiver)
+console.log('Fee calculator:',    config.feeCalculator)
+console.log('Capture condition:', config.captureCondition)
 ```
 
 ### operator.getFeeAddresses
 
-Get just the fee-related addresses.
+Get the fee-related addresses.
 
 ```typescript
 const fees = await merchant.operator.getFeeAddresses()
 
-console.log('Fee calculator:', fees.feeCalculator)
-console.log('Protocol fee config:', fees.protocolFeeConfig)
-console.log('Fee recipient:', fees.feeRecipient)
+console.log('Operator fee calculator:', fees.operatorFeeCalculator)
+console.log('Protocol fee config:',     fees.protocolFeeConfig)
+console.log('Protocol fee calculator:', fees.protocolFeeCalculator)
+console.log('Operator fee recipient:',  fees.operatorFeeRecipient)
+console.log('Protocol fee recipient:',  fees.protocolFeeRecipient)
 ```
 
 ### operator.calculateFees
@@ -156,10 +158,13 @@ Calculate the full fee breakdown for a payment amount.
 ```typescript
 const fees = await merchant.operator.calculateFees(paymentInfo, 1_000_000n)
 
-console.log('Operator fee:', fees.operatorFee)
-console.log('Protocol fee:', fees.protocolFee)
-console.log('Total fee:', fees.totalFee)
-console.log('Net amount:', fees.netAmount)
+console.log('Operator fee bps:', fees.operatorFeeBps)
+console.log('Protocol fee bps:', fees.protocolFeeBps)
+console.log('Total fee bps:',    fees.totalFeeBps)
+console.log('Operator fee:',     fees.operatorFeeAmount)
+console.log('Protocol fee:',     fees.protocolFeeAmount)
+console.log('Total fee:',        fees.totalFeeAmount)
+console.log('Net amount:',       fees.netAmount)
 ```
 
 ## Release vs refund decision flow

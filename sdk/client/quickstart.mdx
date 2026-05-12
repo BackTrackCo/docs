@@ -42,7 +42,7 @@ The payer client provides these action groups:
 - **`freeze`**: `freeze`, `unfreeze`, `isFrozen`
 - **`watch`**: `onPayment`, `onRefundRequest`, `onRefundExecuted`, `onFeeDistribution`
 - **`operator`**: `getConfig`, `getFeeAddresses`, `calculateFees` and more
-- **`query`**: `getPayerPayments`, `getReceiverPayments`, `getPayment` (requires `paymentIndexRecorderAddress`)
+- **`query`**: `getPayerPayments`, `getReceiverPayments`, `getPayment` (requires `paymentIndexRecorderHookAddress`)
 
 Optional groups (`escrow`, `refund`, `evidence`, `freeze`, `query`) are `undefined` if you do not pass the corresponding contract address. Use optional chaining when calling them.
 

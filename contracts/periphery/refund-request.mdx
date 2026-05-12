@@ -44,113 +44,101 @@ icon: "rotate-left"
   </Tab>
 </Tabs>
 
-## Request Status States
+## Request status states
+
+Each payment supports one refund request, keyed by `paymentInfoHash`. Requesting again is only allowed after the prior request was cancelled.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending
-    Pending --> Approved: Arbiter approves
-    Pending --> Denied: Arbiter denies
-    Pending --> Cancelled: Requester cancels
-    Approved --> [*]: Arbiter executes refund via operator
+    [*] --> Pending: payer requestRefund()
+    Pending --> Approved: arbiter (via operator hook on capture/void/refund)
+    Pending --> Denied: arbiter deny()
+    Pending --> Refused: arbiter refuse()
+    Pending --> Cancelled: payer cancelRefundRequest()
+    Cancelled --> Pending: payer requestRefund() again
 
     note right of Approved
-        Arbiter must call
-        operator.void()
-        or operator.refund()
+        Status flips to Approved automatically
+        when the arbiter executes the refund
+        via operator.void() / operator.refund()
+        (wired through VOID_POST_ACTION_HOOK).
     end note
 ```
 
-## Key Methods
+## Key methods
 
 ### requestRefund()
 
-Creates a new refund request.
+Creates a refund request for this payment. Only the payer can call.
 
 ```solidity
 function requestRefund(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint120 amount,
-    uint256 nonce
+    uint120 amount
 ) external
 ```
 
 **Parameters:**
-- `paymentInfo` - Payment info struct
-- `amount` - Amount being requested for refund
-- `nonce` - Record index (from PaymentIndexRecorder) identifying which charge/action
+- `paymentInfo`: PaymentInfo struct
+- `amount`: amount being requested for refund (uint120)
 
-**Access Control:** Only the payer who made the authorization can request
-
-<Note>
-Each refund request is keyed by `(paymentInfoHash, nonce)` where nonce is the record index. This allows multiple refund requests per payment (one per charge/action).
-</Note>
-
-### updateStatus()
-
-Approve or deny a refund request.
-
-```solidity
-function updateStatus(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 nonce,
-    RequestStatus newStatus
-) external
-```
-
-**Parameters:**
-- `paymentInfo` - Payment info struct
-- `nonce` - Record index identifying which refund request
-- `newStatus` - The new status (`Approved` or `Denied`)
-
-**Access:** Receiver can always approve/deny. While in escrow, anyone passing the operator's `VOID_PRE_ACTION_CONDITION` can also approve/deny.
-
-**Valid transitions:**
-- `Pending` -> `Approved`
-- `Pending` -> `Denied`
+**Reverts** if a non-cancelled request already exists, if the payment is unknown to the canonical escrow, or if `amount == 0`.
 
 ### cancelRefundRequest()
 
-Payer cancels their own request.
+Payer cancels their own pending request, freeing the slot to request again.
 
 ```solidity
-function cancelRefundRequest(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 nonce
-) external
+function cancelRefundRequest(AuthCaptureEscrow.PaymentInfo calldata paymentInfo) external
 ```
 
-**Parameters:**
-- `paymentInfo` - Payment info struct
-- `nonce` - Record index identifying which refund request
+**Access:** only the payer.
 
-**Access:** Only the payer who created the request
+### deny()
 
-**Valid transition:**
-- `Pending` -> `Cancelled`
+Arbiter rejects the claim after reviewing evidence. Terminal state.
 
-## Usage Example
+```solidity
+function deny(AuthCaptureEscrow.PaymentInfo calldata paymentInfo) external
+```
+
+### refuse()
+
+Arbiter refuses to consider the request (spam, out of jurisdiction, invalid). Terminal state.
+
+```solidity
+function refuse(AuthCaptureEscrow.PaymentInfo calldata paymentInfo) external
+```
+
+### Approval
+
+There is no `updateStatus` / explicit `approve` entrypoint. Approval happens automatically when the arbiter executes the refund through the operator (`operator.void()` or `operator.refund()`), which fires `VOID_POST_ACTION_HOOK` / `REFUND_POST_ACTION_HOOK` and flips status to `Approved`.
+
+### Query helpers
+
+- `getRefundRequest(paymentInfo)`: full `RefundRequestData` for this payment
+- `hasRefundRequest(paymentInfo)`: boolean
+- `getRefundRequestStatus(paymentInfo)`: just the `RequestStatus`
+- `getPayerRefundRequests(payer, offset, count)` / `getReceiverRefundRequests(...)` / `getOperatorRefundRequests(...)`: paginated index lookups
+
+## Usage example
 
 ```typescript
-// 1. Payer requests refund (nonce 0 = first action on this payment)
-await refundRequest.requestRefund(paymentInfo, requestedAmount, 0);
+// 1. Payer files refund request
+await refundRequest.write.requestRefund([paymentInfo, requestedAmount])
 // Status: Pending
 
-// 2. Receiver (or arbiter) reviews and approves
-await refundRequest.updateStatus(
-  paymentInfo,
-  0,  // nonce
-  RequestStatus.Approved
-);
-// Status: Approved
+// 2a. Arbiter denies (terminal):
+await refundRequest.write.deny([paymentInfo])
 
-// 3. Execute refund via operator (separate transaction)
-// For pre-capture: operator.void() empties the auth (full only).
-// For post-capture: operator.refund(paymentInfo, amount, tokenCollector, collectorData).
-await operator.void(paymentInfo);
-// Funds returned to payer
+// 2b. Arbiter approves by executing the refund via the operator.
+//     The post-action hook auto-flips the request to Approved.
+//     Before capture:
+await operator.write.void([paymentInfo, '0x'])
+//     After capture:
+await operator.write.refund([paymentInfo, amount, tokenCollector, collectorData])
 ```
 
 <Note>
-RefundRequest is **advisory only**. Approval does not automatically execute refunds - the authorized party must call the operator's refund function.
+RefundRequest is the request-tracking layer. Executing the refund is always a separate call into the operator/escrow.
 </Note>

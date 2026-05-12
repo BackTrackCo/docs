@@ -206,13 +206,13 @@ Fees are **additive**: `totalFee = protocolFee + operatorFee`
 
 For a 1000 USDC payment with 3 bps protocol fee + 2 bps operator fee:
 - **Protocol Fee:** 0.30 USDC (3 bps) → `protocolFeeRecipient` on ProtocolFeeConfig
-- **Operator Fee:** 0.20 USDC (2 bps) → `FEE_RECIPIENT` on operator
+- **Operator Fee:** 0.20 USDC (2 bps) → `FEE_RECEIVER` on operator
 - **Total Fee:** 0.50 USDC (5 bps)
 - **Receiver Gets:** 999.50 USDC
 
 Fees accumulate in the operator and are distributed via `distributeFees(token)`.
 
-**FEE_RECIPIENT** can be:
+**FEE_RECEIVER** can be:
 - Arbiter address (marketplace with disputes)
 - Service provider address (subscriptions, APIs)
 - Platform treasury (platform-controlled)
@@ -297,7 +297,7 @@ event RefundExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed 
 
 // Fee distribution
 event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 arbiterAmount);
-event OperatorDeployed(address indexed operator, address indexed feeRecipient, address indexed capturePreActionCondition);
+event OperatorDeployed(address indexed operator, address indexed deployer, address indexed feeReceiver);
 
 // Freeze state (Freeze contract events)
 event PaymentFrozen(bytes32 indexed paymentInfoHash, uint40 frozenAt);

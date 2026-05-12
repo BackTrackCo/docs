@@ -40,7 +40,7 @@ Never commit private keys to source control. Use environment variables or a secr
   </Step>
 
   <Step title="Create the facilitator server">
-    Create `index.ts`. This is identical to a standard x402 facilitator, with two additions: the `@x402r/evm` import and the `registerEscrowScheme()` call.
+    Create `index.ts`. This is identical to a standard x402 facilitator, with two additions: the `@x402r/evm` import and the `registerAuthCaptureEvmScheme()` call.
 
     ```typescript
     import "dotenv/config";
@@ -48,7 +48,7 @@ Never commit private keys to source control. Use environment variables or a secr
     import { x402Facilitator } from "@x402/core/facilitator";
     import { PaymentPayload, PaymentRequirements } from "@x402/core/types";
     import { toFacilitatorEvmSigner } from "@x402/evm";
-    import { registerEscrowScheme } from "@x402r/evm/authCapture/facilitator";
+    import { registerAuthCaptureEvmScheme } from "@x402r/evm/authCapture/facilitator";
     import { createWalletClient, http, publicActions } from "viem";
     import { privateKeyToAccount } from "viem/accounts";
     import { baseSepolia } from "viem/chains";
@@ -76,7 +76,7 @@ Never commit private keys to source control. Use environment variables or a secr
     const facilitator = new x402Facilitator();
 
     // x402r: Register the escrow scheme to handle refundable payments
-    registerEscrowScheme(facilitator, {
+    registerAuthCaptureEvmScheme(facilitator, {
       signer: evmSigner,
       networks: "eip155:84532",
     });
@@ -127,7 +127,7 @@ Never commit private keys to source control. Use environment variables or a secr
 ## How it works
 
 - **`x402Facilitator`** is the core facilitator class from `@x402/core` that routes verify and settle requests to registered scheme handlers.
-- **`registerEscrowScheme`** adds x402r escrow support to the facilitator, enabling it to verify escrow payment signatures and settle them on-chain.
+- **`registerAuthCaptureEvmScheme`** adds x402r escrow support to the facilitator, enabling it to verify escrow payment signatures and settle them on-chain.
 - **`toFacilitatorEvmSigner`** adapts a viem wallet client into the signer interface the facilitator expects for on-chain interactions.
 - The three endpoints (`/verify`, `/settle`, `/supported`) match the interface that `HTTPFacilitatorClient` on the merchant side expects.
 

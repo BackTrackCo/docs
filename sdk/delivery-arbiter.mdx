@@ -53,20 +53,25 @@ const arbiter = createArbiterClient({
 
 ### 3. Handle the Verify Endpoint
 
-The merchant's `forwardToArbiter()` hook POSTs to `/verify`. Use `parseForwardedPayload()` to extract typed `PaymentInfo` with BigInt fields restored:
+The merchant's `forwardToArbiter()` hook POSTs `{ responseBody, transaction, paymentPayload }` to `/verify`. The payload does not contain `PaymentInfo` directly. Reconstruct it from `paymentPayload.accepted.extra` + `paymentPayload.payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), or run the payload back through your own facilitator's verify step to recover it.
 
 ```typescript
-import { parseForwardedPayload } from '@x402r/helpers'
+import { isAuthCapturePayload } from '@x402r/helpers'
 import express from 'express'
 
 const app = express()
 app.use(express.json())
 
 app.post('/verify', async (req, res) => {
-  const { responseBody, paymentInfo, network, transaction } =
-    parseForwardedPayload(req.body)
+  const { responseBody, transaction, paymentPayload } = req.body
 
-  const chainId = fromNetworkId(network) // "eip155:84532" -> 84532
+  if (!isAuthCapturePayload(paymentPayload?.payload)) {
+    res.status(400).json({ error: 'unsupported_payload' })
+    return
+  }
+
+  // Reconstruct PaymentInfo from the wire payload (see forwardToArbiter docs).
+  const paymentInfo = reconstructPaymentInfo(paymentPayload)
 
   // Your evaluation logic
   const passed = await evaluate(responseBody)
@@ -77,8 +82,7 @@ app.post('/verify', async (req, res) => {
     res.json({ verdict: 'PASS' })
   } else {
     // Arbiter can refund immediately without waiting for escrow expiry.
-    const amounts = await arbiter.payment.getAmounts(paymentInfo)
-    await arbiter.refund.voidPayment(paymentInfo)
+    await arbiter.payment.voidPayment(paymentInfo)
     res.json({ verdict: 'FAIL' })
   }
 })

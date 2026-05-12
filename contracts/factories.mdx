@@ -48,13 +48,13 @@ Deploys PaymentOperator instances with deterministic addresses.
 
 All factories use universal CREATE2 addresses (same on every chain).
 
-**PaymentOperatorFactory:** `0x4D9BC2Ba2D0d9AFb6B63E3afBbfC95143E6E8Da9`
+**PaymentOperatorFactory:** `0xa0d4734842df1690a5B33Cb21828c946e39D55a2`
 
 ### Configuration Structure
 
 ```solidity
 struct OperatorConfig {
-    address feeRecipient;             // Who receives operator fees
+    address feeReceiver;             // Who receives operator fees
     address feeCalculator;            // Operator fee calculator (IFeeCalculator)
     address authorizePreActionCondition;
     address authorizePostActionHook;
@@ -78,7 +78,7 @@ function deployOperator(
 ```
 
 **Parameters (in config):**
-- `feeRecipient` - Who receives operator fees (arbiter, service provider, treasury, etc.)
+- `feeReceiver` - Who receives operator fees (arbiter, service provider, treasury, etc.)
 - `authorizePreActionCondition` through `refundPostActionHook` - 10-slot configuration
 
 **Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
@@ -98,7 +98,7 @@ function computeAddress(
 **Usage:**
 ```typescript
 const config = {
-  feeRecipient: arbiterAddress,
+  feeReceiver: arbiterAddress,
   authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   // ... rest of config
 };
@@ -121,7 +121,7 @@ assert(deployedAddress === predictedAddress);
 import { createWalletClient, http, getContract, zeroAddress } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { PaymentOperatorABI } from '@x402r/core/abis';
+import { paymentOperatorAbi } from '@x402r/core';
 
 const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
 
@@ -134,7 +134,7 @@ const walletClient = createWalletClient({
 
 const factory = getContract({
   address: FACTORY_ADDRESS,
-  abi: PaymentOperatorABI,
+  abi: paymentOperatorAbi,
   client: walletClient
 });
 
@@ -146,17 +146,17 @@ const arbiterConditionAddress = /* get from receipt */;
 const capturePreActionConditionHash = await andConditionFactory.write.deploy([
   [arbiterConditionAddress, escrowPeriodAddress]
 ]);
-const capturePreActionConditionAddress = /* get from receipt */;
+const captureConditionAddress = /* get from receipt */;
 
 // Define configuration
 const config = {
-  feeRecipient: arbiterAddress,  // Arbiter earns fees
+  feeReceiver: arbiterAddress,  // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,
   authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   authorizePostActionHook: escrowPeriodAddress,
   chargePreActionCondition: zeroAddress,  // Default allow
   chargePostActionHook: zeroAddress,   // No recording
-  capturePreActionCondition: capturePreActionConditionAddress,
+  capturePreActionCondition: captureConditionAddress,
   capturePostActionHook: zeroAddress,
   voidPreActionCondition: arbiterConditionAddress,
   voidPostActionHook: zeroAddress,
@@ -179,7 +179,7 @@ console.log("Deployed marketplace operator at:", operatorAddress);
 const providerCondition = await new StaticAddressCondition(serviceProviderAddress);
 
 const config = {
-  feeRecipient: serviceProviderAddress,  // Provider earns fees
+  feeReceiver: serviceProviderAddress,  // Provider earns fees
   authorizePreActionCondition: PAYER_CONDITION,
   authorizePostActionHook: zeroAddress,
   chargePreActionCondition: providerCondition.address,
@@ -208,7 +208,7 @@ Deploys `EscrowPeriod` contracts - combined recorder and condition for time-base
 
 ### Contract Address
 
-**EscrowPeriodFactory:** `0x15DB06aADEB3a39D47756Bf864a173cc48bafe24`
+**EscrowPeriodFactory:** `0xe72D2014ebC48F1d92521e8629574918E8030548`
 
 ### Deployment Method
 
@@ -297,7 +297,7 @@ Deploys `Freeze` condition contracts that block release when a payment is frozen
 
 ### Contract Address
 
-**FreezeFactory:** `0xdf129EFFE040c3403aca597c0F0bb704859a78Fd`
+**FreezeFactory:** `0xeC092cf1215DB44af0Abe87c1157E304FEa5d0Eb`
 
 ### Deployment Method
 
@@ -354,9 +354,9 @@ Use these pre-deployed condition contracts:
 
 | Condition | Address (all chains) | Description |
 |-----------|---------------------|-------------|
-| PayerCondition | `0x33F5F1154A02d0839266EFd23Fd3b85a3505bB4B` | Only payer can call |
-| ReceiverCondition | `0xF41974A853940Ff4c18d46B6565f973c1180E171` | Only receiver can call |
-| AlwaysTrueCondition | `0xb295df7E7f786fd84D614AB26b1f2e86026C3483` | Anyone can call |
+| PayerCondition | `0x586486394C38A2a7d36B16a3FDaF366cd202d823` | Only payer can call |
+| ReceiverCondition | `0x321651df4593DA57C413579c5b611D1A90168a3A` | Only receiver can call |
+| AlwaysTrueCondition | `0x2ef2A6162aEF9Df1022ff51c011af94D99AB4904` | Anyone can call |
 
 ### Example Deployments
 
@@ -489,18 +489,18 @@ Each factory uses different salt strategies:
 **PaymentOperatorFactory:**
 ```solidity
 bytes32 key = keccak256(abi.encodePacked(
-    config.feeRecipient,
+    config.feeReceiver,
     config.feeCalculator,
-    config.authorizePreActionCondition,
-    config.authorizePostActionHook,
-    config.chargePreActionCondition,
-    config.chargePostActionHook,
-    config.capturePreActionCondition,
-    config.capturePostActionHook,
-    config.voidPreActionCondition,
-    config.voidPostActionHook,
-    config.refundPreActionCondition,
-    config.refundPostActionHook
+    config.authorizeCondition,
+    config.authorizeHook,
+    config.chargeCondition,
+    config.chargeHook,
+    config.captureCondition,
+    config.captureHook,
+    config.voidCondition,
+    config.voidHook,
+    config.refundCondition,
+    config.refundHook
 ));
 ```
 

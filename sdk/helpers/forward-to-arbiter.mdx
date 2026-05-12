@@ -6,20 +6,20 @@ icon: "arrow-right"
 
 The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and payment payload to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
 
-- Only fires for successful **commerce** scheme settlements
+- Only fires for successful **`authCapture`** scheme settlements
 - POSTs `{ responseBody, transaction, paymentPayload }` to `{arbiterUrl}/verify`
 - Errors are silently caught so an unavailable arbiter cannot break the payment flow
 
 ## Usage
 
 ```typescript
-import { forwardToArbiter } from '@x402r/helpers';
+import { forwardToArbiter } from '@x402r/helpers'
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
   .register(networkId, new AuthCaptureServerScheme())
   .onAfterSettle(
-    forwardToArbiter('http://arbiter:3001')
-  );
+    forwardToArbiter('http://arbiter:3001'),
+  )
 ```
 
 ## Function signature
@@ -27,14 +27,14 @@ const resourceServer = new x402ResourceServer(facilitatorClient)
 ```typescript
 function forwardToArbiter(
   arbiterUrl: string,
-  options?: ForwardToArbiterOptions
+  options?: ForwardToArbiterOptions,
 ): (context: SettleResultContext) => Promise<void>
 ```
 
 ### Parameters
 
 | Parameter | Type | Description |
-|-----------|------|-------------|
+|---|---|---|
 | `arbiterUrl` | `string` | Base URL of your arbiter service (e.g. `http://arbiter:3001`) |
 | `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
 
@@ -43,39 +43,40 @@ function forwardToArbiter(
 ```typescript
 interface ForwardToArbiterOptions {
   /** Custom error handler. Defaults to `console.warn`. */
-  onError?: (error: unknown) => void;
+  onError?: (error: unknown) => void
 }
 ```
 
 ## Payload shape
 
-When a commerce settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
+When an `authCapture` settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
 
 ```typescript
 {
-  responseBody: string;       // UTF-8 encoded response body
-  transaction: string;        // Settlement transaction hash
+  responseBody: string         // UTF-8 encoded response body
+  transaction: string          // Settlement transaction hash
   paymentPayload: {
-    x402Version: number;
+    x402Version: number
     accepted: {
-      scheme: string;         // e.g. "commerce"
-      network: string;        // e.g. "eip155:84532"
-      // ...other accepted fields
-    };
-    payload: {
-      paymentInfo: {
-        operator: string;
-        payer: string;
-        receiver: string;
-        // ...full PaymentInfo
-      };
-    };
-  };
+      scheme: 'authCapture'
+      network: string          // e.g. "eip155:84532"
+      amount: string
+      asset: `0x${string}`
+      payTo: `0x${string}`
+      maxTimeoutSeconds: number
+      extra: AuthCaptureExtra  // captureAuthorizer, captureDeadline, refundDeadline, ...
+    }
+    payload:
+      | { authorization: { from, to, value, validAfter, validBefore, nonce }; signature; salt }     // EIP-3009
+      | { permit2Authorization: { from, permitted, spender, nonce, deadline }; signature; salt }    // Permit2
+  }
 }
 ```
 
+There is no nested `paymentInfo` in the payload. The arbiter reconstructs `PaymentInfo` from `accepted.extra` + `payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), the same way the facilitator does at settlement.
+
 <Tip>
-Arbiters that need `paymentInfo` for `capture()` can read it directly from `paymentPayload.payload.paymentInfo`, no extra RPC call needed.
+The arbiter can also resolve the `PaymentInfo` indirectly: derive `paymentInfoHash` from the wire data, then read the on-chain `PaymentInfo` from the escrow if it stores it, or simply forward the wire payload back into your own facilitator to verify.
 </Tip>
 
 ## Error handling
@@ -83,15 +84,15 @@ Arbiters that need `paymentInfo` for `capture()` can read it directly from `paym
 By default, fetch errors are logged with `console.warn`. You can override this with a custom handler:
 
 ```typescript
-import { forwardToArbiter } from '@x402r/helpers';
+import { forwardToArbiter } from '@x402r/helpers'
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
   .register(networkId, new AuthCaptureServerScheme())
   .onAfterSettle(
     forwardToArbiter('http://arbiter:3001', {
       onError: (err) => sentry.captureException(err),
-    })
-  );
+    }),
+  )
 ```
 
 Errors are wrapped in an `X402rError` with the arbiter URL and request details for easier debugging.
@@ -101,7 +102,7 @@ Errors are wrapped in an `X402rError` with the arbiter URL and request details f
 The hook silently returns without making a request when:
 
 - The settlement was not successful (`context.result.success === false`)
-- The scheme is not `commerce` (e.g. direct or other custom schemes)
+- The scheme is not `authCapture`
 - No response body is available in the transport context
 
 ## Address re-exports
@@ -113,17 +114,29 @@ import {
   authCaptureEscrow,
   tokenCollector,
   protocolFeeConfig,
-  arbiterRegistry,
   receiverRefundCollector,
-  usdcTvlLimit,
   factories,
   conditions,
   getChainConfig,
   supportedChainIds,
-} from '@x402r/helpers';
+} from '@x402r/helpers'
 ```
 
-These are the same CREATE2 addresses available from `@x402r/core`. You can import from either package depending on which you already have installed.
+Plus the `@x402r/evm` wire-format types and guards:
+
+```typescript
+import {
+  type AuthCaptureExtra,
+  type AuthCapturePayload,
+  type Eip3009Payload,
+  type Permit2Payload,
+  type PaymentInfoStruct,
+  isAuthCaptureExtra,
+  isAuthCapturePayload,
+  isEip3009Payload,
+  isPermit2Payload,
+} from '@x402r/helpers'
+```
 
 ## Next steps
 
