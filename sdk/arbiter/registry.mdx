@@ -12,6 +12,9 @@ To use registry methods, provide the `arbiterRegistryAddress` when creating the 
 
 ```typescript
 import { createArbiterClient } from '@x402r/sdk';
+import { getChainConfig } from '@x402r/core';
+
+const config = getChainConfig(84532);
 
 const arbiter = createArbiterClient({
   publicClient,
@@ -19,6 +22,10 @@ const arbiter = createArbiterClient({
   operatorAddress: '0x...',
 });
 ```
+
+<Note>
+The arbiter registry address is resolved automatically from the chain config. Registry methods are not currently exposed on the preset client — use `createX402r()` for direct access if needed.
+</Note>
 
 ## Register as an Arbiter
 
@@ -116,8 +123,11 @@ interface ArbiterList {
 
 ```typescript
 import { createArbiterClient } from '@x402r/sdk';
+import { getChainConfig } from '@x402r/core';
 
 async function main() {
+  const config = getChainConfig(84532);
+
   const arbiter = createArbiterClient({
     publicClient,
     walletClient,

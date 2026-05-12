@@ -23,9 +23,6 @@ interface CaseEvaluationContext {
   /** The payment information struct */
   paymentInfo: PaymentInfo;
 
-  /** The record index (nonce) identifying which charge */
-  nonce: bigint;
-
   /** Current payment state */
   paymentState: PaymentState;
 
@@ -89,7 +86,7 @@ const handler = createWebhookHandler({
 ```
 
 <Note>
-Setting `autoSubmitDecision: true` calls `approveRefundRequest` or `denyRefundRequest` on-chain automatically. This submits the decision only -- executing the actual refund transfer via `executeRefundInEscrow` is a separate step you handle after approval.
+Setting `autoSubmitDecision: true` calls `refundInEscrow` (for approvals) or `denyRefundRequest` on-chain automatically. In v3, `refundInEscrow()` both executes the refund and auto-approves the pending request in one step.
 </Note>
 
 ## Webhook Handler Configuration
@@ -97,7 +94,7 @@ Setting `autoSubmitDecision: true` calls `approveRefundRequest` or `denyRefundRe
 ```typescript
 interface WebhookHandlerConfig {
   /** Arbiter client instance */
-  arbiter: ArbiterClient;
+  arbiter: ReturnType<typeof createArbiterClient>;
 
   /** Your evaluation function */
   evaluationHook: ArbiterHook;
@@ -127,8 +124,7 @@ interface WebhookResult extends DecisionResult {
 The most common pattern combines `watchNewCases` with the webhook handler to automatically evaluate incoming refund requests:
 
 ```typescript
-import { createArbiterClient, createWebhookHandler } from '@x402r/sdk';
-import type { CaseEvaluationContext, DecisionResult } from '@x402r/sdk';
+import { createArbiterClient } from '@x402r/sdk';
 import { PaymentState, RequestStatus } from '@x402r/core';
 import type { PaymentInfo } from '@x402r/core';
 
@@ -143,23 +139,21 @@ const handler = createWebhookHandler({
 });
 
 // Step 2: Watch for new cases and feed them to the handler
-const { unsubscribe } = arbiter.watchNewCases(async (event: RefundRequestEventLog) => {
-  const paymentInfoHash = event.args.paymentInfoHash!;
-  const nonce = event.args.nonce ?? 0n;
+const unsubscribe = arbiter.watch.onRefundRequest(async (event: any) => {
+  const paymentInfoHash = event.args?.paymentInfoHash;
+  if (!paymentInfoHash) return;
 
-  console.log(`[NEW CASE] ${paymentInfoHash} (nonce: ${nonce})`);
+  console.log(`[NEW CASE] ${paymentInfoHash}`);
 
-  // Build the evaluation context
-  // NOTE: You need to reconstruct the full PaymentInfo from your database or event logs
-  const paymentInfo = await lookupPaymentInfo(paymentInfoHash);
+  // Retrieve stored PaymentInfo from RefundRequest contract
+  const paymentInfo = await arbiter.refund.getStoredPaymentInfo(paymentInfoHash);
 
   const context: CaseEvaluationContext = {
     paymentInfo,
-    nonce,
     paymentState: PaymentState.InEscrow,
     refundStatus: RequestStatus.Pending,
     paymentInfoHash,
-    refundAmount: event.args.amount,
+    refundAmount: event.args?.amount,
   };
 
   // Evaluate and optionally auto-submit
@@ -170,15 +164,7 @@ const { unsubscribe } = arbiter.watchNewCases(async (event: RefundRequestEventLo
 
   if (result.executed) {
     console.log(`[ON-CHAIN] Decision submitted: ${result.txHash}`);
-
-    // If approved, execute the refund transfer
-    if (result.decision === 'approve') {
-      const { txHash } = await arbiter.executeRefundInEscrow(
-        paymentInfo,
-        result.refundAmount // partial refund if specified
-      );
-      console.log(`[REFUND] Executed: ${txHash}`);
-    }
+    // In v3, refundInEscrow already executes the refund and auto-approves
   } else {
     console.log('[SKIPPED] Confidence below threshold, requires manual review');
   }

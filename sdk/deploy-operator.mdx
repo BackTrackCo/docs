@@ -6,7 +6,85 @@ icon: "rocket"
 
 ## Marketplace Operator
 
-A marketplace operator deployment includes: EscrowPeriod, Freeze, StaticAddressCondition (arbiter), OrCondition (receiver OR arbiter for refunds), optional StaticFeeCalculator, and the PaymentOperator itself. All deployed via CREATE3 factories.
+<Card title="Run the example on GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator" horizontal>
+  Clone the deploy-operator example and deploy your own operator in minutes.
+</Card>
+
+## Overview
+
+A complete marketplace operator deployment includes:
+
+1. **EscrowPeriod** — Records authorization time, enforces waiting period before release
+2. **Freeze** — Allows payer to freeze payment during escrow, receiver to unfreeze
+3. **ReceiverCondition** — Gates in-escrow refunds to the merchant (receiver)
+4. **RefundRequest (IRecorder)** — Wired as `refundInEscrowRecorder`, auto-approves pending refund requests during `refundInEscrow()`
+5. **StaticFeeCalculator** — Optional operator fee (basis points)
+6. **PaymentOperator** — The main contract tying everything together
+
+All contracts are deployed via factories using CREATE3, so identical configurations produce identical addresses across all supported chains.
+
+## Deploy Your Operator
+
+**Prerequisites:**
+- Node.js 20+, pnpm 9.15+
+- A private key with Base Sepolia ETH ([get testnet ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
+
+<Steps>
+  <Step title="Clone and build the SDK">
+    ```bash
+    git clone https://github.com/BackTrackCo/x402r-sdk.git
+    cd x402r-sdk
+    pnpm install && pnpm build
+    ```
+  </Step>
+  <Step title="Configure your deployment">
+    Copy the example env file and set your private key:
+    ```bash
+    cd examples/deploy-operator
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your values. Only `PRIVATE_KEY` is required — everything else has sensible defaults:
+
+    | Variable | Default | Description |
+    |----------|---------|-------------|
+    | `PRIVATE_KEY` | — | Deployer wallet (required) |
+    | `ARBITER` | deployer address | Dispute resolver |
+    | `FEE_RECIPIENT` | deployer address | Receives operator fees |
+    | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
+    | `FREEZE_DURATION` | `259200` (3 days) | Freeze duration in seconds |
+    | `FEE_BPS` | `100` (1%) | Operator fee in basis points |
+    | `NETWORK_ID` | `eip155:84532` | Chain identifier |
+    | `RPC_URL` | `https://sepolia.base.org` | RPC endpoint |
+  </Step>
+  <Step title="Run the deployment">
+    ```bash
+    pnpm start
+    ```
+
+    Or pass env vars inline from the SDK root:
+    ```bash
+    PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/index.ts
+    ```
+  </Step>
+  <Step title="Use your operator address">
+    The script outputs all deployed contract addresses and BaseScan links. Use the `PaymentOperator` address in your payment payloads:
+    ```typescript
+    operator: "0xYourOperatorAddress..."
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+For quick E2E testing with short timers (5-minute escrow, 3-minute freeze), use the short-escrow variant instead:
+```bash
+PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/deploy-short-escrow.ts
+```
+</Tip>
+
+## Using the SDK Directly
+
+If you want to integrate deployment into your own code:
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -77,11 +155,25 @@ console.log('Existing (reused):', result.summary.existingCount)
     Redeploying with the same parameters is idempotent (CREATE3). It detects existing contracts and skips them. Check `summary` for what was new vs reused.
   </Accordion>
 
-  <Accordion title="Preview Addresses (No Deploy)">
-    Compute addresses without deploying:
+```typescript
+interface MarketplaceOperatorDeployment {
+  operatorAddress: Address;           // The PaymentOperator
+  escrowPeriodAddress: Address;       // EscrowPeriod recorder/condition
+  freezeAddress: Address;             // Freeze condition
+  refundInEscrowCondition: Address;   // ReceiverCondition (merchant-gated)
+  refundInEscrowRecorder: Address;    // RefundRequest (auto-approve on refund)
+  feeCalculatorAddress: Address | null; // null if no fee
+  txHashes: Hash[];                   // All deployment tx hashes
+  summary: {
+    newDeployments: number;           // Newly deployed contracts
+    existingContracts: number;        // Reused existing contracts
+  };
+}
+```
 
-    ```typescript
-    import { previewMarketplaceOperator } from '@x402r/core'
+<Tip>
+Because all contracts use CREATE3, redeploying with the same parameters is idempotent — it will detect existing contracts and skip them. The `summary` tells you what was new vs reused.
+</Tip>
 
     const preview = await previewMarketplaceOperator(publicClient, {
       chainId: 84532,
@@ -133,7 +225,8 @@ The deployed operator has the following slot configuration:
 | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
 | `CHARGE_CONDITION` | (none) | No restrictions on charge |
 | `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-| `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+| `REFUND_IN_ESCROW_CONDITION` | ReceiverCondition | Only the receiver (merchant) can call |
+| `REFUND_IN_ESCROW_RECORDER` | RefundRequest | Auto-approves pending requests during refund |
 | `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
 | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
 | `FEE_RECIPIENT` | Your address | Receives fees |
@@ -145,16 +238,17 @@ Deployment is supported on all configured networks:
 | Network | Chain ID | EIP-155 ID |
 |---------|----------|------------|
 | Base Sepolia | 84532 | `eip155:84532` |
-| Base Mainnet | 8453 | `eip155:8453` |
+| Base | 8453 | `eip155:8453` |
 | Ethereum | 1 | `eip155:1` |
 | Ethereum Sepolia | 11155111 | `eip155:11155111` |
-| Polygon | 137 | `eip155:137` |
 | Arbitrum | 42161 | `eip155:42161` |
+| Arbitrum Sepolia | 421614 | `eip155:421614` |
 | Optimism | 10 | `eip155:10` |
-| Avalanche | 43114 | `eip155:43114` |
+| Polygon | 137 | `eip155:137` |
 | Celo | 42220 | `eip155:42220` |
-| Monad | 143 | `eip155:143` |
+| Avalanche | 43114 | `eip155:43114` |
 | Linea | 59144 | `eip155:59144` |
+| Monad | 143 | `eip155:143` |
 | SKALE Base | 1187947933 | `eip155:1187947933` |
 
 <Warning>

@@ -66,9 +66,7 @@ The **EscrowPeriod** contract tracks when a payment was authorized and enforces 
 ```typescript
 import { createPayerClient } from '@x402r/sdk';
 
-const client = createPayerClient({ publicClient, walletClient, operatorAddress });
-
-// Check when payment was authorized (requires escrow plugin)
+// Check when payment was authorized (requires escrowPeriodAddress in config)
 const authTime = await client.escrow.getAuthorizationTime(paymentInfo);
 
 // Check if still within escrow period
@@ -78,53 +76,54 @@ if (!inEscrow) {
 }
 ```
 
-## Refund Requests
+## Refund requests
 
-When a payer wants a refund, they create a refund request that goes through approval:
+When a payer wants a refund, they create a refund request. Each payment supports one refund request, keyed by its `paymentInfoHash`.
 
 ```typescript
 import { RequestStatus } from '@x402r/core';
 
 // RequestStatus values:
 RequestStatus.Pending    // 0 - Awaiting decision
-RequestStatus.Approved   // 1 - Approved by merchant/arbiter
+RequestStatus.Approved   // 1 - Auto-approved via refundInEscrow
 RequestStatus.Denied     // 2 - Denied by merchant/arbiter
 RequestStatus.Cancelled  // 3 - Cancelled by payer
 ```
 
-### Refund Flow
+### Refund flow
+
+In v3, RefundRequest is wired as an IRecorder plugin. Refund approval happens automatically when the merchant or arbiter calls `refundInEscrow()` on the operator — no separate approve step is needed.
 
 ```mermaid
 sequenceDiagram
     participant P as Payer
-    participant R as RefundRequest Contract
+    participant R as RefundRequest (IRecorder)
     participant M as Merchant
+    participant O as PaymentOperator
     participant A as Arbiter
 
-    P->>R: requestRefund(paymentInfo, amount, nonce)
+    P->>R: requestRefund(paymentInfo, amount)
     R-->>M: RefundRequested event
 
-    alt Merchant approves
-        M->>R: approveRefundRequest(paymentInfo, nonce)
-        M->>R: refundInEscrow(paymentInfo, amount)
+    alt Merchant refunds
+        M->>O: refundInEscrow(paymentInfo, amount)
+        O->>R: record() auto-approves pending request
+        O->>P: Funds returned
     else Merchant denies
-        M->>R: denyRefundRequest(paymentInfo, nonce)
+        M->>R: denyRefundRequest(paymentInfo)
     else Escalate to arbiter
-        A->>R: approveRefundRequest(paymentInfo, nonce)
-        A->>R: executeRefundInEscrow(paymentInfo, amount)
+        A->>O: refundInEscrow(paymentInfo, amount)
+        O->>R: record() auto-approves pending request
+        O->>P: Funds returned
     end
 ```
 
-### The Nonce Parameter
-
-All refund methods require a `nonce` parameter. This is the record index from the PaymentIndexRecorder that identifies which charge the refund request applies to. For the first charge, use `0n`.
-
 ```typescript
-// Request refund for the first charge
-await client.requestRefund(paymentInfo, amount, 0n);
+// Request a refund (one per payment)
+await client.refund.request(paymentInfo, amount);
 
-// Check status for the first charge
-const status = await client.getRefundStatus(paymentInfo, 0n);
+// Check status
+const status = await client.refund.getStatus(paymentInfo);
 ```
 
 ## Freeze / Unfreeze
@@ -132,10 +131,10 @@ const status = await client.getRefundStatus(paymentInfo, 0n);
 The **Freeze** contract allows payers to freeze a payment during the escrow period, preventing release until the freeze expires or is lifted:
 
 ```typescript
-// Payer freezes payment (requires freeze plugin)
+// Payer freezes payment (requires freezeAddress in config)
 await client.freeze.freeze(paymentInfo);
 
-// Merchant unfreezes payment (requires freeze plugin)
+// Merchant unfreezes payment
 await merchant.freeze.unfreeze(paymentInfo);
 
 // Check frozen status
@@ -151,8 +150,8 @@ Freezing a payment does not automatically escalate to an arbiter. It pauses the 
 | Role | Can Do |
 |------|--------|
 | **Payer** | Request refunds, freeze payments, cancel requests, query escrow state |
-| **Merchant** | Release payments, charge, approve/deny refunds, unfreeze payments |
-| **Arbiter** | Approve/deny disputed refunds, execute refunds, batch operations, registry |
+| **Merchant** | Release payments, charge, refund in escrow (auto-approves requests), deny refunds |
+| **Arbiter** | Deny/refuse disputed refunds, refund in escrow, review evidence |
 
 ## Contract Architecture
 
@@ -169,9 +168,10 @@ flowchart TB
 
     subgraph Components[Supporting Contracts]
         direction LR
-        subgraph RR[RefundRequest]
+        subgraph RR[RefundRequest IRecorder]
             rr1[Request/Cancel]
-            rr2[Approve/Deny]
+            rr2[Deny/Refuse]
+            rr3[Auto-approve on refund]
         end
         subgraph EP[EscrowPeriod]
             ep1[Track auth time]

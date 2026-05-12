@@ -14,46 +14,41 @@ The `@x402r/sdk` package provides payer-side methods for interacting with X402r 
 
 ```typescript
 import { createPayerClient } from '@x402r/sdk';
-import { getChainConfig } from '@x402r/core';
-
-const chainConfig = getChainConfig(84532); // Base Sepolia
 
 const client = createPayerClient({
   publicClient,
   walletClient,
   operatorAddress: '0x...', // Your PaymentOperator address
+  // Optional: enable escrow, freeze, and refund features
+  escrowPeriodAddress: '0x...',
+  freezeAddress: '0x...',
 });
 ```
 
-## Available Methods
+Refund and evidence addresses are resolved automatically from the chain config.
 
-The Client SDK currently supports:
+## Available methods
 
-**Payment actions:**
-- **`authorize()`** — Authorize a payment with escrow
-- **`charge()`** — Charge a payment directly
-- **`release()`** — Release escrowed funds
-- **`refundInEscrow()`** — Refund funds while in escrow
-- **`getState()`** — Derive the lifecycle state of a payment
-- **`getAmounts()`** — Get capturable and refundable amounts
+The payer client exposes action groups:
 
-**Refund actions** (requires `refundRequestAddress` in config):
-- **`refund.request()`** — Submit a refund request
-- **`refund.cancel()`** — Cancel a pending refund request
-- **`refund.get()`** — Get full refund request data
-- **`refund.getStatus()`** — Check refund request status
-- **`refund.has()`** — Check if a refund request exists
-- **`refund.getPayerRequests()`** — List refund requests by payer
-
-**Escrow actions** (requires `escrowPeriodAddress` via extend or config):
-- **`escrow.isDuringEscrow()`** — Check if payment is in escrow window
-- **`escrow.getAuthorizationTime()`** — Get when a payment was authorized
-- **`escrow.getDuration()`** — Get the escrow period duration
-
-**Watch actions:**
-- **`watch.onPayment()`** — Watch for payment events
-- **`watch.onRefundRequest()`** — Watch for refund request events
-- **`watch.onRefundExecuted()`** — Watch for refund execution events
+- **`client.payment.getState()`** — Derive the lifecycle state of a payment
+- **`client.payment.getAmounts()`** — Get capturable and refundable amounts
+- **`client.refund.request()`** — Submit a refund request for a payment
+- **`client.refund.cancel()`** — Cancel a pending refund request
+- **`client.refund.getStatus()`** — Check the status of a refund request
+- **`client.refund.has()`** — Check if a refund request exists
+- **`client.refund.get()`** — Get full refund request data
+- **`client.refund.getByKey()`** — Look up by paymentInfoHash
+- **`client.refund.getStoredPaymentInfo()`** — Retrieve stored PaymentInfo
+- **`client.refund.getPayerRequests()`** — List refund requests by payer
+- **`client.freeze.freeze()`** — Freeze a payment to prevent release
+- **`client.freeze.isFrozen()`** — Check if a payment is frozen
+- **`client.escrow.isDuringEscrow()`** — Check if still in escrow window
+- **`client.escrow.getAuthorizationTime()`** — Get when payment was authorized
+- **`client.escrow.getDuration()`** — Get the escrow period duration
+- **`client.evidence.submit()`** — Attach evidence (IPFS CID) to a refund
+- **`client.evidence.get()`** — Retrieve a single evidence entry by index
+- **`client.evidence.getBatch()`** — Retrieve multiple evidence entries
 
 ## Try It Now
 

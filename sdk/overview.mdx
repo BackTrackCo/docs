@@ -4,7 +4,9 @@ description: "TypeScript SDK for adding escrow, refunds, and dispute resolution 
 icon: "cube"
 ---
 
-x402 payments are instant and irreversible. x402r adds escrow holds, refund windows, and dispute resolution on top.
+<Warning>
+The X402r SDK is in active development. APIs may change between releases. Always test on Base Sepolia before using real funds on mainnet.
+</Warning>
 
 Three roles interact with the protocol:
 
@@ -78,17 +80,20 @@ bun add @x402r/helpers
 
 ## Network support
 
+All v3 contracts are deployed to the same address on every chain via CREATE3.
+
 | Network | Chain ID | Status |
 |---------|----------|--------|
 | Base Sepolia | 84532 | Tested |
-| Base Mainnet | 8453 | Deployed, not yet tested |
-| Ethereum | 1 | Deployed, not yet tested |
-| Ethereum Sepolia | 11155111 | Deployed, not yet tested |
-| Polygon | 137 | Deployed, not yet tested |
-| Arbitrum | 42161 | Deployed, not yet tested |
-| Optimism | 10 | Deployed, not yet tested |
-| Avalanche | 43114 | Deployed, not yet tested |
-| Celo | 42220 | Deployed, not yet tested |
-| Monad | 143 | Deployed, not yet tested |
-| Linea | 59144 | Deployed, not yet tested |
-| SKALE Base | 1187947933 | Deployed, not yet tested |
+| Base | 8453 | Deployed |
+| Ethereum | 1 | Deployed |
+| Ethereum Sepolia | 11155111 | Deployed |
+| Arbitrum | 42161 | Deployed |
+| Arbitrum Sepolia | 421614 | Deployed |
+| Optimism | 10 | Deployed |
+| Polygon | 137 | Deployed |
+| Celo | 42220 | Deployed |
+| Avalanche | 43114 | Deployed |
+| Linea | 59144 | Deployed |
+| Monad | 143 | Deployed |
+| SKALE Base | 1187947933 | Deployed (Shanghai EVM) |
