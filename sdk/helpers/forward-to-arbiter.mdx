@@ -1,19 +1,14 @@
 ---
 title: "forwardToArbiter()"
-description: "Forward escrow settlement responses to an arbiter service for dispute evaluation"
-icon: "wrench"
+description: "Forward settlement data to an arbiter service for quality evaluation"
+icon: "arrow-right"
 ---
 
-The `@x402r/helpers` package provides `forwardToArbiter()` — an `onAfterSettle` hook that forwards the response body to an arbiter service after successful escrow settlements. It is fire-and-forget and does not block the client response.
+The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and payment payload to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
 
-<Note>
-This function lives in `@x402r/helpers`. Install it separately:
-```bash
-npm install @x402r/helpers
-```
-
-Peer dependency: `@x402/core >=2.5.0`
-</Note>
+- Only fires for successful **commerce** scheme settlements
+- POSTs `{ responseBody, transaction, paymentPayload }` to `{arbiterUrl}/verify`
+- Errors are silently caught so an unavailable arbiter cannot break the payment flow
 
 ## Usage
 
@@ -26,8 +21,6 @@ const resourceServer = new x402ResourceServer(facilitatorClient)
     forwardToArbiter('http://arbiter:3001')
   );
 ```
-
-After a successful escrow settlement, the hook POSTs `{ responseBody, network, transaction, scheme }` to `{arbiterUrl}/verify`. Non-escrow schemes, failed settlements, and missing response bodies are silently skipped.
 
 ## Function signature
 
@@ -42,7 +35,7 @@ function forwardToArbiter(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `arbiterUrl` | `string` | Base URL of your arbiter service (e.g., `http://arbiter:3001`) |
+| `arbiterUrl` | `string` | Base URL of your arbiter service (e.g. `http://arbiter:3001`) |
 | `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
 
 ### Options
@@ -54,35 +47,40 @@ interface ForwardToArbiterOptions {
 }
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `onError` | `console.warn` | Called when the POST to the arbiter fails. Use this to integrate with your error tracking (e.g., Sentry). |
+## Payload shape
 
-### Return value
-
-Returns an async callback compatible with `onAfterSettle`. The callback:
-
-1. Skips if the settlement failed (`context.result.success === false`)
-2. Skips if the scheme is not `escrow`
-3. Skips if there is no response body in the transport context
-4. POSTs to `{arbiterUrl}/verify` with the settlement data
-5. Catches errors via the `onError` handler (default: `console.warn`)
-
-## Examples
-
-### Basic usage
+When a commerce settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
 
 ```typescript
-import { forwardToArbiter } from '@x402r/helpers';
-
-const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register(networkId, new EscrowServerScheme())
-  .onAfterSettle(
-    forwardToArbiter('http://arbiter:3001')
-  );
+{
+  responseBody: string;       // UTF-8 encoded response body
+  transaction: string;        // Settlement transaction hash
+  paymentPayload: {
+    x402Version: number;
+    accepted: {
+      scheme: string;         // e.g. "commerce"
+      network: string;        // e.g. "eip155:84532"
+      // ...other accepted fields
+    };
+    payload: {
+      paymentInfo: {
+        operator: string;
+        payer: string;
+        receiver: string;
+        // ...full PaymentInfo
+      };
+    };
+  };
+}
 ```
 
-### Custom error handling
+<Tip>
+Arbiters that need `paymentInfo` for `release()` can read it directly from `paymentPayload.payload.paymentInfo` — no extra RPC call needed.
+</Tip>
+
+## Error handling
+
+By default, fetch errors are logged with `console.warn`. You can override this with a custom handler:
 
 ```typescript
 import { forwardToArbiter } from '@x402r/helpers';
@@ -96,66 +94,47 @@ const resourceServer = new x402ResourceServer(facilitatorClient)
   );
 ```
 
-<Tip>
-You should always provide an `onError` handler in production. The x402 `onAfterSettle` runner does not catch errors internally — without a handler, an unreachable arbiter could break your post-settlement flow.
-</Tip>
+Errors are wrapped in an `X402rError` with the arbiter URL and request details for easier debugging.
 
-### POST payload
+## Skipped scenarios
 
-The hook sends a JSON POST to `{arbiterUrl}/verify` with this shape:
+The hook silently returns without making a request when:
 
-```json
-{
-  "responseBody": "<utf-8 string of the HTTP response body>",
-  "network": "eip155:84532",
-  "transaction": "0xabc...",
-  "scheme": "escrow"
-}
-```
+- The settlement was not successful (`context.result.success === false`)
+- The scheme is not `commerce` (e.g. direct or other custom schemes)
+- No response body is available in the transport context
 
-## Behavior details
+## Address re-exports
 
-- **Escrow-only** — Only fires for `scheme: "escrow"` settlements. Non-escrow schemes (e.g., `exact`) are silently skipped.
-- **Fire-and-forget** — The POST happens asynchronously and does not block the HTTP response to the client.
-- **Trailing slash safe** — `forwardToArbiter('http://arbiter:3001/')` resolves to `http://arbiter:3001/verify`.
-
-## Migration from refundable()
-
-The `refundable()` helper has been removed. If you were using it to wrap payment options with escrow configuration, you should now inline the escrow `extra` config directly:
+The `@x402r/helpers` package re-exports chain-invariant address constants from `@x402r/core` for convenience:
 
 ```typescript
-// Before (removed)
-import { refundable } from '@x402r/helpers';
-const option = refundable(
-  { scheme: 'escrow', price: '$0.01', network: 'eip155:84532', payTo: address },
-  operatorAddress
-);
-
-// After — inline the extra config
-const option = {
-  scheme: 'escrow',
-  network: 'eip155:84532',
-  price: '$0.01',
-  payTo: address,
-  extra: {
-    escrowAddress: authCaptureEscrow,  // from getChainConfig()
-    operatorAddress,
-    feeReceiver: operatorAddress,
-    maxFeeBps: 500,
-  },
-};
+import {
+  authCaptureEscrow,
+  tokenCollector,
+  protocolFeeConfig,
+  arbiterRegistry,
+  receiverRefundCollector,
+  usdcTvlLimit,
+  factories,
+  conditions,
+  getChainConfig,
+  supportedChainIds,
+} from '@x402r/helpers';
 ```
+
+These are the same CREATE3 addresses available from `@x402r/core`. You can import from either package depending on which you already have installed.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Arbiter quickstart" icon="gavel" href="/sdk/arbiter/quickstart">
-    Build an arbiter service that receives forwarded settlements.
+  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
+    Configure escrow options and fee bounds.
   </Card>
-  <Card title="Deploy operator" icon="rocket" href="/sdk/deploy-operator">
-    Deploy a PaymentOperator for escrow payments.
+  <Card title="Arbiter SDK" icon="gavel" href="/sdk/arbiter/quickstart">
+    Build an arbiter that processes forwarded settlements.
   </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">
-    See merchant and arbiter examples.
+    See working merchant server examples.
   </Card>
 </CardGroup>

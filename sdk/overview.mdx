@@ -73,8 +73,14 @@ bun add @x402r/helpers
   <Card title="@x402r/sdk" icon="code" href="/sdk/client/quickstart">
     High-level SDK with role-scoped clients (`createPayerClient`, `createMerchantClient`, `createArbiterClient`) and the generic `createX402r` factory.
   </Card>
-  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
-    `onAfterSettle` hook to forward escrow settlement responses to an arbiter service.
+  <Card title="@x402r/merchant" icon="store" href="/sdk/merchant/quickstart">
+    SDK for merchants to release payments, charge, and handle refunds.
+  </Card>
+  <Card title="@x402r/arbiter" icon="gavel" href="/sdk/arbiter/quickstart">
+    SDK for arbiters to resolve disputes and manage refund decisions.
+  </Card>
+  <Card title="@x402r/helpers" icon="wrench" href="/sdk/helpers/refundable">
+    Framework-agnostic helpers: `refundable()` for escrow configuration, `forwardToArbiter()` for arbiter integration, and re-exported address constants.
   </Card>
 </CardGroup>
 
