@@ -97,7 +97,6 @@
             "group": "Marketplace",
             "pages": [
               "sdk/merchant/getting-started",
-              "sdk/helpers/refundable",
               "sdk/helpers/forward-to-arbiter",
               "sdk/merchant/quickstart",
               "sdk/merchant/refund-handling"
