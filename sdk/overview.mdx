@@ -81,7 +81,7 @@ bunx @x402r/cli pay <url> [options]
 ### Guides
 
 <CardGroup cols={2}>
-  <Card title="Merchants" icon="store" href="/sdk/merchant">
+  <Card title="Merchants" icon="store" href="/sdk/merchant/quickstart">
     Deploy an operator, accept a payment, capture funds from escrow.
   </Card>
   <Card title="Merchant guide" icon="store" href="/sdk/merchant/quickstart">
@@ -118,17 +118,12 @@ Salt namespace: `commerce-payments::v1::<ContractName>`.
 Import the addresses from `@x402r/core`:
 
 ```ts
-import {
-  commercePaymentsAddresses,
-  commercePaymentsAuthCaptureEscrow,
-  commercePaymentsErc3009PaymentCollector,
-  commercePaymentsPermit2PaymentCollector,
-} from '@x402r/core';
+import { authCaptureEscrow, tokenCollector } from '@x402r/core';
 
-// Convenience bundle
-commercePaymentsAddresses.authCaptureEscrow;
-commercePaymentsAddresses.erc3009PaymentCollector;
-commercePaymentsAddresses.permit2PaymentCollector;
+// AuthCaptureEscrow, canonical across every supported chain.
+authCaptureEscrow;
+// Primary token collector (currently aliases ERC3009PaymentCollector).
+tokenCollector;
 ```
 
 The primitives are exposed to SDK consumers on the chains listed in `@x402r/core`'s `x402rChains` (Base + Base Sepolia today). The CREATE2 addresses themselves have been prepositioned via CreateX on additional chains and will be enabled in the registry as canonical `base/commerce-payments@v1.0.0` coverage extends.

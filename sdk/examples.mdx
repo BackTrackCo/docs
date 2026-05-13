@@ -10,7 +10,7 @@ The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples
 
 <CardGroup cols={2}>
   <Card title="payer" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer">
-    Request a refund, freeze a payment, submit IPFS evidence. Three TypeScript scripts.
+    Request a refund, freeze a payment, submit on-chain evidence (a placeholder CID; IPFS pinning is the integrator's responsibility). Three TypeScript scripts.
   </Card>
   <Card title="merchant" icon="store" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant">
     Capture from escrow and charge directly. TypeScript scripts plus README.
@@ -19,7 +19,7 @@ The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples
     Approve a refund, review on-chain evidence, distribute protocol fees.
   </Card>
   <Card title="scenarios" icon="route" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios">
-    End-to-end runners: happy-path capture, dispute resolution. Wires payer + merchant + arbiter together against a local Anvil fork.
+    End-to-end runners: happy-path capture, dispute resolution, atomic charge, partial refund flow. Wires payer + merchant + arbiter together against a local Anvil fork.
   </Card>
   <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
     Shared setup utilities: Anvil-fork bootstrap, constants, common types.
@@ -28,16 +28,11 @@ The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples
 
 ## Running examples
 
-<Warning>
-Mainnet runs require funded wallets on Base. The scenario runners use a local Anvil fork and seed accounts automatically.
-</Warning>
+<Info>
+All examples run against a local Anvil fork seeded by `shared/anvil-setup.ts`. No mainnet wallet or funding is required.
+</Info>
 
 <CodeGroup>
-```bash npm
-git clone https://github.com/BackTrackCo/x402r-sdk.git
-cd x402r-sdk
-npm install && npm run build
-```
 ```bash pnpm
 git clone https://github.com/BackTrackCo/x402r-sdk.git
 cd x402r-sdk
@@ -49,6 +44,8 @@ cd x402r-sdk
 bun install && bun run build
 ```
 </CodeGroup>
+
+The SDK uses pnpm workspaces (`pnpm@10.23.0`). The `npm` runtime is fine for application code that consumes published `@x402r/*` packages, but the workspace clone above expects pnpm or a workspace-aware install.
 
 See each example directory's README on GitHub for the exact run command for that script.
 

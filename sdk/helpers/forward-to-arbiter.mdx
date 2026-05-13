@@ -139,6 +139,14 @@ import {
 } from '@x402r/helpers'
 ```
 
+And the `x402rDefaults` builder for hand-constructing `extra` in `PaymentRequirements`:
+
+```typescript
+import { type X402rDefaultsInput, x402rDefaults } from '@x402r/helpers'
+```
+
+`x402rDefaults(input)` returns an `AuthCaptureExtra` populated with sensible defaults, useful when you want to build `PaymentRequirements` outside the merchant client.
+
 ## Next steps
 
 <CardGroup cols={2}>

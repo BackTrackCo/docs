@@ -6,10 +6,6 @@ icon: "rocket"
 
 The `@x402r/core` package includes deployment presets that handle the full lifecycle of deploying a PaymentOperator and all its supporting contracts.
 
-<Card title="Run the example on GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/deploy-operator" horizontal>
-  Clone the deploy-operator example and deploy your own operator in minutes.
-</Card>
-
 ## Presets
 
 The SDK ships two deployment presets. Pick the one that matches your use case:
@@ -38,62 +34,7 @@ A complete marketplace operator deployment includes:
 - Node.js 20+, pnpm 9.15+
 - A private key with Base Sepolia ETH ([get testnet ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
 
-<Steps>
-  <Step title="Clone and build the SDK">
-    ```bash
-    git clone https://github.com/BackTrackCo/x402r-sdk.git
-    cd x402r-sdk
-    pnpm install && pnpm build
-    ```
-  </Step>
-  <Step title="Configure your deployment">
-    Copy the example env file and set your private key:
-    ```bash
-    cd examples/deploy-operator
-    cp .env.example .env
-    ```
-
-    Edit `.env` with your values. Only `PRIVATE_KEY` is required, everything else has sensible defaults:
-
-    | Variable | Default | Description |
-    |----------|---------|-------------|
-    | `PRIVATE_KEY` | (none) | Deployer wallet (required) |
-    | `ARBITER` | deployer address | Dispute resolver |
-    | `FEE_RECEIVER` | deployer address | Receives operator fees |
-    | `ESCROW_PERIOD` | `604800` (7 days) | Escrow period in seconds |
-    | `FREEZE_DURATION` | `259200` (3 days) | Freeze duration in seconds |
-    | `FEE_BPS` | `100` (1%) | Operator fee in basis points |
-    | `NETWORK_ID` | `eip155:84532` | Chain identifier |
-    | `RPC_URL` | `https://sepolia.base.org` | RPC endpoint |
-  </Step>
-  <Step title="Run the deployment">
-    ```bash
-    pnpm start
-    ```
-
-    Or pass env vars inline from the SDK root:
-    ```bash
-    PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/index.ts
-    ```
-  </Step>
-  <Step title="Use your operator address">
-    The script outputs all deployed contract addresses and BaseScan links. Use the `PaymentOperator` address in your payment payloads:
-    ```typescript
-    operator: "0xYourOperatorAddress..."
-    ```
-  </Step>
-</Steps>
-
-<Tip>
-For quick E2E testing with short timers (5-minute escrow, 3-minute freeze), use the short-escrow variant instead:
-```bash
-PRIVATE_KEY=0x... pnpm tsx examples/deploy-operator/deploy-short-escrow.ts
-```
-</Tip>
-
-## Using the SDK directly
-
-If you want to integrate deployment into your own code:
+Call `deployMarketplaceOperator` from `@x402r/core` with a viem wallet client. Because every contract uses CREATE2, deploys are idempotent: re-running with the same parameters detects existing contracts and skips them.
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -327,7 +268,7 @@ console.log('AuthorizeHook:', deployment.authorizeHookAddress)
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
+  <Card title="Merchant Guide" icon="store" href="/sdk/merchant/quickstart">
     Accept payments, capture funds from escrow.
   </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">

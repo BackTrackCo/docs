@@ -6,7 +6,7 @@ icon: "rotate-left"
 
 The merchant client exposes a read-mostly slice of refund actions plus `freeze.isFrozen`. Writes that change refund-request status (`deny`, `refuse`) and writes that lift a freeze (`unfreeze`) live on `createArbiterClient` or on the full `createX402r()` client.
 
-Use `createMerchantClient` for queries below; for executing a refund, see [Capture vs void](/sdk/merchant/quickstart#payment-voidpayment), the merchant client's `payment.voidPayment()` auto-flips the request to `Approved` through the `VOID_POST_ACTION_HOOK`.
+Use `createMerchantClient` for queries below; for executing a refund, see [Capture vs refund decision flow](/sdk/merchant/quickstart#capture-vs-refund-decision-flow). The merchant client's `payment.voidPayment()` auto-flips the request to `Approved` through the `VOID_POST_ACTION_HOOK`.
 
 ## Refund request queries
 
@@ -254,7 +254,10 @@ sequenceDiagram
 | `refund.getStatus` | `paymentInfo` | `RefundRequestStatus` |
 | `refund.get` | `paymentInfo` | `RefundRequestData` |
 | `refund.getByKey` | `paymentInfoHash` | `RefundRequestData` |
+| `refund.getStoredPaymentInfo` | `paymentInfoHash` | `PaymentInfo` |
 | `refund.getReceiverRequests` | `receiver, offset, count` | `{ keys: readonly Hex[]; total: bigint }` |
+| `refund.getCancelCount` | `paymentInfo` | `bigint` (number of cancellations on this RefundRequest) |
+| `refund.getCancelledAmount` | `paymentInfo, cancelIndex` | `bigint` (amount cancelled at the given index) |
 | `freeze.isFrozen` | `paymentInfo` | `boolean` |
 | `payment.voidPayment` | `paymentInfo, data?` | `Hash` (auto-approves the pending RefundRequest) |
 
