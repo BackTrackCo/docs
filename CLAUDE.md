@@ -27,4 +27,4 @@ npx mint dev  # Preview at localhost:3000
 
 Style rules (anti-slop, voice, structure) live in:
 - `.vale.ini` + `styles/x402r/` — deterministic enforcement (runs in CI and via PostToolUse hook on `.mdx` edits)
-- `.claude/skills/writing-docs/references/style-guide.md` — full prose style guide (loaded by the skill)
+- The `writing-docs` skill (installed at the monorepo workspace level) — full prose style guide, per-page briefs, quality gates, source-files map
