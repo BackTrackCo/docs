@@ -51,3 +51,17 @@ SDKs?
 [Mm]ainnet
 [Pp]roxying
 [Pp]roxy
+
+# --- Chain names ---
+# Source of truth: `x402rChains` in
+# `x402r-sdk/packages/core/src/config/index.ts`. Only chains with deployed
+# contracts. When chains are added/removed in core, regenerate via:
+#
+#   awk '/export const x402rChains/,/^} as const/' \
+#     ../x402r-sdk/packages/core/src/config/index.ts \
+#     | grep -oE "'[A-Z][a-zA-Z ]+'" | sort -u
+#
+# Chain names referenced in marketing/roadmap docs but NOT in x402rChains
+# (e.g. Ethereum, Polygon, Arbitrum, Optimism) will fire as Vale warnings.
+# That is intentional signal — those mentions document unshipped support.
+Base
