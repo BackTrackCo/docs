@@ -52,6 +52,86 @@ SDKs?
 [Pp]roxying
 [Pp]roxy
 
+# --- Contract interfaces ---
+# Solidity interface names referenced across the contracts docs.
+IHook
+ICondition
+IRecorder
+IPaymentOperator
+
+# --- Protocol concepts ---
+# Domain vocabulary that appears in prose, not just code.
+authCapture
+captureAuthorizer
+[Cc]apturable
+[Cc]ombinators?
+[Ee]scrowed
+[Pp]ermissionless
+[Pp]luggable
+[Cc]omposability
+[Mm]icropayments?
+[Gg]asless
+[Tt]erminalize
+[Rr]eentrancy
+[Rr]efundability
+[Tt]imelock
+[Mm]ultisig
+[Mm]empool
+[Cc]alldata
+
+# --- SDK identifiers ---
+# CamelCase identifiers that appear inline without code formatting.
+operatorConfig
+maxAmount
+responseBody
+paymentPayload
+newCount
+existingCount
+escrowPeriod
+txHashes
+codehashes?
+
+# --- Tooling and runtime ---
+npm
+npx
+pnpm
+bunx
+dlx
+mkdir
+tsx
+dotenv
+stdout
+stderr
+[Bb]oolean
+[Nn]amespace
+[Tt]estnet
+[Dd]evnet
+[Mm]intlify
+[Ss]ubgraph
+gwei
+txns?
+const
+
+# --- Standards and acronyms ---
+APIs?
+ABIs?
+UIs?
+EVMs?
+dApps?
+CIDs?
+
+# --- Ecosystem ---
+# Third-party projects/orgs referenced in the docs.
+Uniswap
+[Cc]oinbase
+[Ff]ireblocks
+[Ff]lashbots
+[Ss]olana
+Solady
+Spearbit
+Ownable
+Aave
+
 # --- Chain names ---
 # Source of truth: `x402rChains` in
 # `x402r-sdk/packages/core/src/config/index.ts`. Only chains with deployed
