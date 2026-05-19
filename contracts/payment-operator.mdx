@@ -10,7 +10,7 @@ The main payment operator contract with pluggable conditions for flexible author
 
 - **Type:** Operator instance (one per fee recipient + configuration)
 - **Deployment:** Via PaymentOperatorFactory
-- **Immutability:** Cannot be paused or upgraded
+- **Immutability:** No pause switch, no upgrade path
 - **Configuration:** 10 slots for conditions and hooks
 - **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
@@ -46,7 +46,7 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 </Accordion>
 
 <Accordion title="Hook Slots (After Actions)">
-1. **AUTHORIZE_POST_ACTION_HOOK** - Record authorization (e.g., timestamp)
+1. **AUTHORIZE_POST_ACTION_HOOK** - Record authorization (for example, timestamp)
 2. **CHARGE_POST_ACTION_HOOK** - Record charge event
 3. **CAPTURE_POST_ACTION_HOOK** - Record capture
 4. **VOID_POST_ACTION_HOOK** - Record void
@@ -78,7 +78,7 @@ function authorize(
 
 **Flow:**
 1. Check `AUTHORIZE_PRE_ACTION_CONDITION` (if set)
-2. Validate fee bounds compatibility
+2. Check fee bounds compatibility
 3. Store fees at authorization time (prevents protocol fee changes from breaking capture)
 4. Call `escrow.authorize()`
 5. Call `AUTHORIZE_POST_ACTION_HOOK` (if set)
@@ -87,7 +87,7 @@ function authorize(
 **Access:** Controlled by `AUTHORIZE_PRE_ACTION_CONDITION` (default: anyone)
 
 <Tip>
-**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
+**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to let the payer reclaim funds after expiry. Subscription-based payments use this to bound the authorization window.
 </Tip>
 
 ### charge()
@@ -111,7 +111,7 @@ function charge(
 
 **Flow:**
 1. Check `CHARGE_PRE_ACTION_CONDITION` (if set)
-2. Validate fee bounds compatibility
+2. Check fee bounds compatibility
 3. Call `escrow.charge()` - funds go directly to receiver
 4. Accumulate protocol fees for later distribution
 5. Call `CHARGE_POST_ACTION_HOOK` (if set)
@@ -185,12 +185,12 @@ function void(
 </Note>
 
 <Tip>
-For a partial return, call `capture()` for the portion to keep. The unused authorization can then be voided, or it will become reclaimable by the payer after `captureDeadline`.
+For a partial return, call `capture()` for the amount to keep. Then `void()` the unused authorization, or let the payer reclaim it after `captureDeadline`.
 </Tip>
 
 ### refund()
 
-Refunds payment after it has been released (captured).
+Refunds a payment after capture (after the receiver has the funds).
 
 ```solidity
 function refund(
@@ -205,7 +205,7 @@ function refund(
 - `paymentInfo` - Payment info struct
 - `amount` - Amount to refund to payer
 - `tokenCollector` - Address of the token collector that will source the refund
-- `collectorData` - Data to pass to the token collector (e.g., signatures)
+- `collectorData` - Data to pass to the token collector (for example, signatures)
 
 **Flow:**
 1. Check `REFUND_PRE_ACTION_CONDITION` (if set)
@@ -213,7 +213,7 @@ function refund(
 3. Call `REFUND_POST_ACTION_HOOK` (if set)
 4. Emit `RefundExecuted`
 
-**Access:** Controlled by `REFUND_PRE_ACTION_CONDITION`. Permission is also enforced by the token collector (e.g., receiver must have approved it, or collectorData contains receiver's signature).
+**Access:** Controlled by `REFUND_PRE_ACTION_CONDITION`. The token collector also enforces permission (for example, the receiver must have approved it, or `collectorData` contains the receiver's signature).
 
 <Note>
 **Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
@@ -251,7 +251,7 @@ For a 1000 USDC payment:
 - **Receiver Gets:** 999.50 USDC
 
 **Fee Locking:**
-Fees are calculated and stored at `authorize()` time in `authorizedFees[hash]`. This prevents protocol fee changes from breaking capture of already-authorized payments.
+The operator calculates fees at `authorize()` time and stores them in `authorizedFees[hash]`. This stops later protocol fee changes from breaking capture of already-authorized payments.
 
 ```solidity
 struct AuthorizedFees {
@@ -269,7 +269,7 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 
 ### Fee Distribution
 
-Fees accumulate in the operator contract and are distributed via `distributeFees(token)`:
+Fees accumulate in the operator contract. Call `distributeFees(token)` to disburse them:
 
 ```solidity
 // Anyone can call to distribute fees for a token
@@ -301,7 +301,7 @@ Protocol fee changes require 7-day timelock. Operator fees are immutable (set at
 - **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
 - **Ownership** - Solady's Ownable with 2-step transfer
 - **Timelock** - 7-day delay on protocol fee changes (operator fees are immutable)
-- **Immutable Core** - Escrow, conditions, and fee configuration cannot be changed
+- **Immutable Core** - Escrow, conditions, and fee configuration stay fixed after deployment
 
 ## Next Steps
 

@@ -30,7 +30,7 @@ The condition compares `caller` against `payment.receiver`, pure computation wit
 |------|----------|
 | `CAPTURE_PRE_ACTION_CONDITION` | Let receiver capture funds after escrow |
 | `CHARGE_PRE_ACTION_CONDITION` | Let receiver charge partial amounts |
-| `VOID_PRE_ACTION_CONDITION` | Let receiver voluntarily refund |
+| `VOID_PRE_ACTION_CONDITION` | Let receiver issue refunds at their discretion |
 
 <Note>
 For capture, ReceiverCondition is often composed with [EscrowPeriod](/contracts/conditions/escrow-period) via [AndCondition](/contracts/conditions/combinators) to ensure the escrow window has passed before the receiver can capture.

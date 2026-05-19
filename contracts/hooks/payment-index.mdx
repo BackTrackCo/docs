@@ -1,20 +1,20 @@
 ---
 title: "PaymentIndexRecorderHook"
-description: "Index payments by sequential count for on-chain queries and multiple refund requests"
+description: "Index payments by sequential count for on-chain queries and repeated refund requests"
 icon: "list-ol"
 ---
 
 ## Overview
 
-PaymentIndexRecorderHook records a sequential index for each payment action, enabling multiple refund requests per payment. Each time `record()` is called, the index increments by 1.
+PaymentIndexRecorderHook records a sequential index for each payment action, so one payment can support more than one refund request. Every `record()` call increments the index by 1.
 
-## When to Use
+## When to use
 
 - You need on-chain payment lookups **without a subgraph**
-- You need to support **multiple refund requests** per payment (each keyed by nonce)
+- You need to support **more than one refund request** per payment (each keyed by nonce)
 - Other contracts need to read the payment index on-chain
 
-**Skip when:** You're using a subgraph for payment queries, the subgraph can derive indexes from events without the on-chain gas cost.
+**Skip when:** you're using a subgraph for payment queries, since the subgraph can derive indexes from events without the on-chain gas cost.
 
 ## State
 

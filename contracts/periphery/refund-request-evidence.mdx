@@ -13,12 +13,12 @@ icon: "file-lines"
 ## Features
 
 - **IPFS CID storage** - Stores content hashes on-chain for evidence trails
-- **EIP-712 signature approval** - Arbiter can approve refunds via off-chain signatures (gas-free for arbiters)
-- **Evidence indexing** - Evidence is indexed by payment and submitting party
+- **EIP-712 signature approval** - Arbiter approves refunds with off-chain signatures (gas-free for arbiters)
+- **Evidence indexing** - The contract indexes evidence by payment and submitting party
 - **Multi-party submission** - Both payer and receiver can submit evidence
 
-## How It Works
+## How it works
 
-When a refund is disputed, parties submit evidence (documents, screenshots, logs) to IPFS and record the CID on-chain. The arbiter reviews evidence off-chain and submits an EIP-712 approval signature that anyone can relay.
+When a payer or receiver disputes a refund, each side submits evidence (documents, screenshots, logs) to IPFS and records the CID on-chain. The arbiter reviews evidence off-chain and produces an EIP-712 approval signature that anyone can relay.
 
-This keeps dispute resolution costs low, the arbiter never needs to submit an on-chain transaction.
+This keeps dispute resolution costs low, since the arbiter never has to submit an on-chain transaction.

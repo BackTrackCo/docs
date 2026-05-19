@@ -1,12 +1,12 @@
 ---
 title: "HookCombinator"
-description: "Chain multiple hooks into a single operator slot for composite state tracking"
+description: "Chain hooks into a single operator slot for composite state tracking"
 icon: "layer-group"
 ---
 
 ## Overview
 
-HookCombinator chains multiple hooks into one, calling each in sequence. Since each operator slot accepts only one hook address, use HookCombinator when you need multiple hooks for the same action.
+HookCombinator chains hooks into one, invoking each in sequence. Each operator slot accepts only one hook address, so use HookCombinator when you need more than one hook on the same action.
 
 ## Deployment
 
@@ -22,14 +22,14 @@ config.authorizePostActionHook = comboAddress;
 
 ## Behavior
 
-- Hooks are called in the order provided
+- The combinator invokes hooks in the order provided
 - **If any hook reverts, all revert**: the entire recording is atomic
 - Each hook receives the same `paymentInfo`, `amount`, and `caller` parameters
 
 ## Limits
 
 <Warning>
-**Max 10 hooks per combinator.** Each additional hook adds ~1k gas overhead for the delegation call.
+**Max 10 hooks per combinator.** Each extra hook adds ~1k gas overhead for the delegation call.
 </Warning>
 
 ## Gas

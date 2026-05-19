@@ -29,10 +29,11 @@ This guide walks you through setting up an Express server that accepts x402r esc
     Create a `.env` file in the project root:
 
     ```bash
-    ADDRESS=0xYourMerchantAddress
-    OPERATOR_ADDRESS=0xYourPaymentOperatorAddress
+    # Replace ADDRESS with your merchant address.
+    ADDRESS=0x321651df4593DA57C413579c5b611D1A90168a3A
+    # Replace OPERATOR_ADDRESS with the operator you deployed.
+    OPERATOR_ADDRESS=0xa0d4734842df1690a5B33Cb21828c946e39D55a2
     FACILITATOR_URL=http://localhost:4022
-    
     ```
   </Step>
 
@@ -160,9 +161,9 @@ This guide walks you through setting up an Express server that accepts x402r esc
 
 ## How it works
 
-- **`extra` config** declares the captureAuthorizer, capture/refund deadlines, fee recipient, and fee bounds. The canonical `AuthCaptureEscrow` and token collector addresses are universal CREATE2 deploys, so they do not need to be repeated per-route.
-- **`AuthCaptureServerScheme`** registers the authCapture payment scheme with the x402 resource server so it can validate authCapture-backed payments.
-- **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 if no payment is provided.
+- **`extra` config** declares the captureAuthorizer, capture/refund deadlines, fee recipient, and fee bounds. The canonical `AuthCaptureEscrow` and token collector addresses are universal CREATE2 deploys, so routes do not need to repeat them.
+- **`AuthCaptureServerScheme`** registers the authCapture payment scheme with the x402 resource server so it can verify authCapture-backed payments.
+- **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 when the caller has not provided one.
 - **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
 
 ## Next Steps

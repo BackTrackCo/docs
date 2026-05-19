@@ -4,13 +4,13 @@ description: "Runnable examples for every SDK operation."
 icon: "code"
 ---
 
-The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) ships runnable example scripts organized by role plus end-to-end scenarios.
+The [x402r-sdk repository](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) ships runnable example scripts organized by role plus end-to-end scenarios.
 
 ## Examples
 
 <CardGroup cols={2}>
   <Card title="payer" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer">
-    Request a refund, freeze a payment, submit on-chain evidence (a placeholder CID; IPFS pinning is the integrator's responsibility). Three TypeScript scripts.
+    Request a refund, freeze a payment, submit on-chain evidence (a placeholder CID; the integrator owns IPFS pinning). Three TypeScript scripts.
   </Card>
   <Card title="merchant" icon="store" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant">
     Capture from escrow and charge directly. TypeScript scripts plus README.
@@ -29,7 +29,7 @@ The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples
 ## Running examples
 
 <Info>
-All examples run against a local Anvil fork seeded by `shared/anvil-setup.ts`. No mainnet wallet or funding is required.
+All examples run against a local Anvil fork seeded by `shared/anvil-setup.ts`. You do not need a mainnet wallet or funding.
 </Info>
 
 <CodeGroup>

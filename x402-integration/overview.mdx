@@ -12,23 +12,23 @@ Think of it as "Stripe for the programmable internet" - agents, robots, and auto
 
 ## Payment Schemes
 
-X402 v2 supports multiple payment schemes:
+X402 v2 supports two payment schemes:
 
 <CardGroup cols={2}>
   <Card title="exact" icon="bolt">
-    Immediate settlement - payment happens instantly when request is made.
+    Immediate settlement - payment clears the moment the client sends the request.
 
     **Best for:** Simple purchases, low-value transactions, trusted services
   </Card>
 
   <Card title="escrow" icon="lock">
-    Deferred settlement - funds locked until conditions are met.
+    Deferred settlement - funds stay locked until conditions clear.
 
     **Best for:** High-value transactions, usage-based billing, long-running tasks
   </Card>
 </CardGroup>
 
-## Why Escrow?
+## Why Escrow
 
 The `exact` scheme works well for immediate-delivery payments, but creates friction for:
 
@@ -39,7 +39,7 @@ The `exact` scheme works well for immediate-delivery payments, but creates frict
 Client pays $500 → Server crashes → Money lost
 ```
 
-**Escrow Solution:** Funds held until work is verified
+**Escrow Solution:** Escrow holds funds until the captureAuthorizer verifies the work
 
 ```
 Client authorizes $500 → Work completes → Operator releases → Server receives
@@ -53,7 +53,7 @@ Consider an LLM agent making API calls:
 - Can't pay exact amount in advance
 - Server needs guarantee of payment
 
-**Escrow Solution:** Authorize max amount, capture actual usage
+**Escrow Solution:** Lock a max amount, capture actual usage
 
 ```
 Client authorizes $10 → Uses $6.50 → Operator captures $6.50 → Refund $3.50
@@ -80,10 +80,10 @@ Agent makes 1,000 API calls at $0.01 each
 = 1,000 signatures + 1,000 on-chain transactions
 ```
 
-**Escrow Solution:** One authorization, multiple captures
+**Escrow Solution:** One authorization, many captures
 
 ```
-Client authorizes $10 once → Server tracks usage → Periodic batch capture
+Client authorizes $10 once → Server tracks usage → Server batches captures on a schedule
 ```
 
 ## How x402r Extends X402

@@ -4,9 +4,9 @@ description: "Process, approve, deny, and manage refund requests as a merchant"
 icon: "rotate-left"
 ---
 
-The merchant client exposes a read-mostly slice of refund actions plus `freeze.isFrozen`. Writes that change refund-request status (`deny`, `refuse`) and writes that lift a freeze (`unfreeze`) live on `createArbiterClient` or on the full `createX402r()` client.
+The merchant client exposes a read-heavy slice of refund actions plus `freeze.isFrozen`. Writes that change refund-request status (`deny`, `refuse`) and writes that lift a freeze (`unfreeze`) live on `createArbiterClient` or on the full `createX402r()` client.
 
-Use `createMerchantClient` for queries below; for executing a refund, see [Capture vs refund decision flow](/sdk/merchant/quickstart#capture-vs-refund-decision-flow). The merchant client's `payment.voidPayment()` auto-flips the request to `Approved` through the `VOID_POST_ACTION_HOOK`.
+Use `createMerchantClient` for queries below; for executing a refund, see [Capture vs refund decision flow](/sdk/merchant/quickstart#capture-vs-refund-decision-flow). The merchant client's `payment.voidPayment()` flips the request to `Approved` through the `VOID_POST_ACTION_HOOK`.
 
 ## Refund request queries
 
@@ -118,11 +118,11 @@ for (const hash of keys) {
 
 ## Refund request actions
 
-Approving or denying a request through the operator hook is what the merchant does. Terminal `deny` / `refuse` calls on the RefundRequest contract are scoped to the arbiter role; from a merchant, execute the refund through `payment.voidPayment()` (auto-approves) or signal a refusal off-chain and let the arbiter terminalize.
+Approving or denying a request through the operator hook is what the merchant does. Terminal `deny` and `refuse` calls on the RefundRequest contract belong to the arbiter role; from a merchant, execute the refund through `payment.voidPayment()` (which flips the request to `Approved`) or signal a refusal off-chain and let the arbiter terminalize it.
 
 ### payment.voidPayment
 
-To approve and execute a refund, call `payment.voidPayment()`. The operator's `VOID_POST_ACTION_HOOK` (RefundRequest) auto-flips the request status to `Approved`.
+To approve and execute a refund, call `payment.voidPayment()`. The operator's `VOID_POST_ACTION_HOOK` (RefundRequest) flips the request status to `Approved`.
 
 ```typescript
 const tx = await merchant.payment.voidPayment(paymentInfo)
@@ -138,14 +138,14 @@ const tx = await merchant.payment.voidPayment(paymentInfo)
 **Returns** `Promise<Hash>`.
 
 <Warning>
-`voidPayment()` auto-approves the pending RefundRequest. There is no undo.
+`voidPayment()` flips the pending RefundRequest to `Approved`. This action cannot be undone.
 </Warning>
 
 ## Freeze management
 
 ### freeze.isFrozen
 
-Check whether a payment is frozen. Frozen payments cannot be captured until unfrozen.
+Check whether a freeze currently holds a payment. The escrow blocks capture on a frozen payment until the arbiter unfreezes it.
 
 ```typescript
 const frozen = await merchant.freeze?.isFrozen(paymentInfo)
@@ -165,7 +165,7 @@ The merchant client exposes `freeze.isFrozen` only. Lifting a freeze (`unfreeze`
 
 ## Complete refund workflow
 
-Here is a full workflow showing how to detect a refund request, review it, make a decision, and execute the refund if approved.
+A full workflow that detects a refund request, reviews it, makes a decision, and executes the refund when approved.
 
 ```typescript
 import { createMerchantClient, RefundRequestStatus } from '@x402r/sdk'
@@ -207,7 +207,7 @@ async function handleRefundWorkflow(
   const shouldApprove = request.amount <= amounts.refundableAmount
 
   if (shouldApprove) {
-    // Execute the refund (auto-approves the request via VOID_POST_ACTION_HOOK)
+    // Execute the refund (the VOID_POST_ACTION_HOOK flips the request to Approved)
     const tx = await merchant.payment.voidPayment(paymentInfo)
     console.log('Refund executed:', tx)
   } else {
@@ -259,7 +259,7 @@ sequenceDiagram
 | `refund.getCancelCount` | `paymentInfo` | `bigint` (number of cancellations on this RefundRequest) |
 | `refund.getCancelledAmount` | `paymentInfo, cancelIndex` | `bigint` (amount cancelled at the given index) |
 | `freeze.isFrozen` | `paymentInfo` | `boolean` |
-| `payment.voidPayment` | `paymentInfo, data?` | `Hash` (auto-approves the pending RefundRequest) |
+| `payment.voidPayment` | `paymentInfo, data?` | `Hash` (flips the pending RefundRequest to `Approved`) |
 
 ## Next steps
 

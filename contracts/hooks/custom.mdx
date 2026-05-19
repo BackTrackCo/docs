@@ -6,9 +6,9 @@ icon: "wrench"
 
 ## Overview
 
-You can create custom hooks for specialized tracking beyond what the built-in hooks provide. Implement the `IHook` interface and extend `BaseHook` for operator access control.
+You can build custom hooks for specialized tracking beyond what the built-in hooks provide. Use the `IHook` interface and extend `BaseHook` for operator access control.
 
-## IHook Interface
+## `IHook` interface
 
 ```solidity
 interface IHook {
@@ -105,10 +105,10 @@ contract ReleaseCountHookTest is Test {
 - [ ] Extends `BaseHook` for operator access control
 - [ ] Handles edge cases (zero amounts, duplicate records)
 - [ ] Gas-efficient storage layout
-- [ ] Comprehensive test coverage
+- [ ] Full test coverage across the public surface
 
 <Warning>
-Unlike conditions, hooks **do modify state**. Ensure proper access control via `BaseHook` to prevent unauthorized writes.
+Unlike conditions, hooks **do mutate state**. Use `BaseHook` for access control to keep unauthorized writes out.
 </Warning>
 
 ## Next Steps

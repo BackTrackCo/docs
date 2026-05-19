@@ -12,18 +12,18 @@ icon: "arrow-rotate-left"
 
 ## Features
 
-- **Refunds (after capture)** - Pulls funds from the receiver's wallet after funds have already been released
-- **Receiver approval required** - The receiver must have approved the collector contract or provided a signature
-- **Operator integration** - Called by `operator.refund()` via the token collector interface
+- **Refunds (after capture)** - Pulls funds from the receiver's wallet after the escrow has already released them
+- **Receiver approval required** - The receiver must approve the collector contract or supply a signature
+- **Operator integration** - `operator.refund()` invokes the collector through the token collector interface
 
-## How It Works
+## How it works
 
-After funds have been released to the receiver (state: `Captured`), refunds require pulling tokens back from the receiver's wallet. The `ReceiverRefundCollector` handles this by:
+Once the escrow has released funds to the receiver (state: `Captured`), refunding the payer requires pulling tokens back out of the receiver's wallet. The `ReceiverRefundCollector` handles that flow:
 
 1. Operator calls `refund(paymentInfo, amount, receiverRefundCollector, collectorData)`
 2. The collector transfers tokens from the receiver to the escrow contract
 3. The escrow contract returns tokens to the payer
 
 <Note>
-The receiver must have pre-approved the `ReceiverRefundCollector` for token transfers, or the `collectorData` must contain a valid receiver signature authorizing the refund.
+The receiver must pre-approve the `ReceiverRefundCollector` for token transfers, or `collectorData` must carry a valid receiver signature authorizing the refund.
 </Note>

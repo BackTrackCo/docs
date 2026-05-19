@@ -4,7 +4,7 @@ description: "Introduction to x402r smart contracts and their relationship to co
 icon: "circle-info"
 ---
 
-## What is x402r?
+## What is x402r
 
 x402r is a smart contract extension for HTTP-native refundable payments. It builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) to add dispute resolution, escrow periods, and refund capabilities.
 
@@ -79,7 +79,7 @@ x402r extends commerce-payments with flexible payment capabilities:
 **Hooks (IHook)** - State updates after actions
 
 **10-slot configuration per operator:**
-- 5 condition slots (before action): authorize, charge, capture, void, refund
+- 5 condition slots (before action): `authorize`, `charge`, `capture`, `void`, `refund`
 - 5 hook slots (after action): state tracking for each action
 
 **Benefits:**
@@ -92,12 +92,12 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 **EscrowPeriod** - Combined hook and condition that tracks authorization time and enforces escrow period
 
-**Freeze** - Standalone condition that blocks capture when payment is frozen (with configurable freeze/unfreeze authorization)
+**Freeze** - Standalone condition that blocks capture while a freeze remains active (with configurable freeze/unfreeze authorization)
 
 **Key features:**
-- Configurable escrow periods (e.g., 7 days, 14 days)
+- Configurable escrow periods (for example, 7 days or 14 days)
 - Payer-initiated freezes to stop suspicious releases
-- Time-limited freeze durations (e.g., 3 days)
+- Time-limited freeze durations (for example, 3 days)
 - MEV protection via private mempool support
 - Composable via `AndCondition([escrowPeriod, freeze])`
 
@@ -158,7 +158,7 @@ All factories use **universal CREATE2 addresses**: same address on every support
 <Accordion title="Immutability by Default">
 Most contracts are immutable to prevent rug pulls and ensure trustlessness:
 - **PaymentOperator** - Cannot pause or upgrade
-- **EscrowPeriod** - Cannot modify escrow period
+- **EscrowPeriod** - Cannot change escrow period
 - **Freeze** - Cannot change freeze rules after deployment
 
 Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelock). Operator fees are immutable.
@@ -172,17 +172,17 @@ Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelo
 </Accordion>
 
 <Accordion title="Composability">
-- Conditions can be combined with And/Or/Not logic
+- Conditions compose with And/Or/Not logic
 - Operators can share condition implementations
 - Factories enable on-demand instance deployment
-- Stateless conditions work across multiple operators
+- Stateless conditions work across many operators
 </Accordion>
 
 <Accordion title="Security First">
 - Reentrancy guards on all state changes
 - 7-day timelock on protocol fee changes
 - Two-step ownership transfers
-- Comprehensive event logging for monitoring
+- Detailed event logging for monitoring
 </Accordion>
 
 ## Architecture Overview

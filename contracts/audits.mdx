@@ -6,16 +6,16 @@ icon: "shield-halved"
 
 ## Audit Status
 
-x402r is built on top of the canonical [commerce-payments](https://github.com/base/commerce-payments) protocol from Base. The commerce-payments contracts are professionally audited and are used directly at their universal CREATE2 addresses (no fork). The x402r-specific contracts built on top of them are **not yet audited**.
+x402r extends the canonical [commerce-payments](https://github.com/base/commerce-payments) protocol from Base. The commerce-payments contracts have professional audits and run directly at their universal CREATE2 addresses (no fork). The x402r-specific contracts on top of them are **not yet audited**.
 
 ### What's Audited (Upstream)
 
-The commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration) were audited by:
+Auditors covered the commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration):
 
 - **Spearbit** (2 audits)
 - **Coinbase Protocol Security** (3 audits)
 
-These audits cover the core escrow lifecycle: authorize, capture, void, reclaim, and refund. Audit reports are available in the [commerce-payments repository](https://github.com/base/commerce-payments).
+These audits cover the core escrow lifecycle: `authorize`, `capture`, `void`, `reclaim`, and `refund`. The [commerce-payments repository](https://github.com/base/commerce-payments) hosts the audit reports.
 
 ### What's Not Audited
 
@@ -38,7 +38,7 @@ These audits cover the core escrow lifecycle: authorize, capture, void, reclaim,
 - The condition/hook plugin system is stateless or minimal-state by design, reducing attack surface
 
 <Warning>
-Use x402r contracts on mainnet at your own risk. While we've built with security best practices (CEI pattern, reentrancy guards, immutable configuration, timelocked governance), the x402r-specific code has not undergone a formal audit.
+Use x402r contracts on mainnet at your own risk. The x402r-specific code follows security best practices (CEI pattern, reentrancy guards, immutable configuration, timelocked governance), but has not undergone a formal audit.
 </Warning>
 
 ## Security Practices
@@ -47,22 +47,22 @@ Even without a formal audit, the x402r contracts follow established security pat
 
 - **CEI (Checks-Effects-Interactions)** ordering in all state-changing functions
 - **ReentrancyGuardTransient** (EIP-1153) on all external entry points
-- **Immutable configuration**: operator conditions and fee calculators cannot be changed after deployment
+- **Immutable configuration**: deployment locks the operator conditions and fee calculators
 - **7-day timelock** on protocol fee changes via ProtocolFeeConfig
 - **2-step ownership transfers** via Solady's Ownable
-- **Comprehensive Forge test suite** covering core flows and edge cases
+- **Forge test suite** covering core flows and edge cases
 
 ## Audit Roadmap
 
-We plan to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
+The plan is to pursue third-party audits as the contract architecture and use cases stabilize. Priority order:
 
 1. **PaymentOperator**: condition dispatch, fee calculation, fee locking, distribution
 2. **Plugin system**: conditions, hooks, combinators, and their factories
 3. **EscrowPeriod + Freeze**: time-lock enforcement and freeze state management
 4. **RefundRequest**: request lifecycle and access control
 
-We'll publish audit reports publicly once completed.
+Completed audit reports go public.
 
 <Note>
-If you're interested in integrating x402r and want to discuss the security posture in more detail, or if you've found a vulnerability, reach out at [security@x402r.org](mailto:security@x402r.org).
+To discuss the security posture in more detail before integrating, or to report a vulnerability, reach out at [security@x402r.org](mailto:security@x402r.org).
 </Note>

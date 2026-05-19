@@ -6,7 +6,7 @@ icon: "coins"
 
 ## Overview
 
-x402r uses an **additive modular** fee system: `totalFee = protocolFee + operatorFee`. Each layer is independently configurable, and fees are split between a shared protocol recipient and a per-operator fee recipient.
+x402r uses an **additive modular** fee system: `totalFee = protocolFee + operatorFee`. Each layer is independently configurable, and the operator splits fees between a shared protocol recipient and a per-operator fee recipient.
 
 ## Fee Architecture
 
@@ -104,7 +104,7 @@ const sameAddress = await staticFeeCalculatorFactory.write.deploy([250]);
 
 ## Fee Locking
 
-Fees are **locked at authorization time** to prevent protocol fee changes from breaking already-authorized payments.
+The operator **locks fees at authorization time** so later protocol fee changes don't break already-authorized payments.
 
 ```solidity
 struct AuthorizedFees {
@@ -139,7 +139,7 @@ This ensures payers always know the fee range they're agreeing to.
 
 ## Fee Distribution
 
-Fees accumulate in the operator contract and are distributed via `distributeFees()`:
+Fees accumulate in the operator contract. Call `distributeFees()` to disburse them:
 
 ```solidity
 // Anyone can call to distribute fees for a token
@@ -157,7 +157,7 @@ operator.distributeFees(usdcAddress);
 6. Reset accumulated tracking to 0
 
 <Tip>
-`distributeFees()` is permissionless, anyone can trigger distribution. This prevents fees from being stuck in the operator.
+`distributeFees()` is permissionless, anyone can trigger distribution. This stops fees from accumulating indefinitely in the operator.
 </Tip>
 
 ## ProtocolFeeConfig
@@ -201,7 +201,7 @@ await protocolFeeConfig.executeRecipient();
 ```
 
 <Warning>
-Operator fees are **immutable**: set at deploy time via `IFeeCalculator` and `FEE_RECEIVER`. Only protocol fees can be changed (with 7-day timelock). Already-authorized payments use locked fee rates regardless.
+Operator fees are **immutable**: set at deploy time via `IFeeCalculator` and `FEE_RECEIVER`. Only protocol fees support updates (with 7-day timelock). Already-authorized payments use locked fee rates regardless.
 </Warning>
 
 ### Disabling Protocol Fees

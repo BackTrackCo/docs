@@ -46,7 +46,7 @@ icon: "rotate-left"
 
 ## Request status states
 
-Each payment supports one refund request, keyed by `paymentInfoHash`. Requesting again is only allowed after the prior request was cancelled.
+Each payment supports one refund request, keyed by `paymentInfoHash`. The payer may only request again after cancelling the prior request.
 
 ```mermaid
 stateDiagram-v2
@@ -80,7 +80,7 @@ function requestRefund(
 
 **Parameters:**
 - `paymentInfo`: PaymentInfo struct
-- `amount`: amount being requested for refund (uint120)
+- `amount`: refund amount the payer is asking for (uint120)
 
 **Reverts** if a non-cancelled request already exists, if the payment is unknown to the canonical escrow, or if `amount == 0`.
 
@@ -112,7 +112,7 @@ function refuse(AuthCaptureEscrow.PaymentInfo calldata paymentInfo) external
 
 ### Approval
 
-There is no `updateStatus` / explicit `approve` entrypoint. Approval happens automatically when the arbiter executes the refund through the operator (`operator.void()` or `operator.refund()`), which fires `VOID_POST_ACTION_HOOK` / `REFUND_POST_ACTION_HOOK` and flips status to `Approved`.
+The contract has no `updateStatus` or explicit `approve` entrypoint. Approval happens automatically when the arbiter executes the refund through the operator (`operator.void()` or `operator.refund()`), which fires `VOID_POST_ACTION_HOOK` / `REFUND_POST_ACTION_HOOK` and flips status to `Approved`.
 
 ### Query helpers
 

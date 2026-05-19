@@ -4,9 +4,9 @@ description: "Supporting contracts that extend the PaymentOperator: escrow, refu
 icon: "puzzle-piece"
 ---
 
-## What Are Periphery Contracts?
+## What are periphery contracts
 
-Periphery contracts support the [PaymentOperator](/contracts/payment-operator) but are not the operator itself. They handle escrow storage, token collection, refund workflows, and evidence submission.
+Periphery contracts support the [PaymentOperator](/contracts/payment-operator) without being the operator itself. They handle escrow storage, token collection, refund workflows, and evidence submission.
 
 ## Contract Map
 
@@ -28,6 +28,7 @@ All periphery contracts use **universal CREATE2 addresses**: the same address on
 |----------|---------|
 | AuthCaptureEscrow | `0xBdEA0D1bcC5966192B070Fdf62aB4EF5b4420cff` |
 | ERC3009PaymentCollector | `0x0E3dF9510de65469C4518D7843919c0b8C7A7757` |
+| Permit2PaymentCollector | `0x992476B9Ee81d52a5BdA0622C333938D0Af0aB26` |
 | ProtocolFeeConfig | `0xBe2d24614F339a1eB103A399F93AA2a39Ca815Bc` |
 | ReceiverRefundCollector | `0x88C9826dFA17Ad9d3a726015C667dD995394D341` |
 | RefundRequestEvidence | `0x4089A5A853e9eF35f504B842795fB272dF69c739` |

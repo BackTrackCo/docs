@@ -52,7 +52,7 @@ const merchant = createMerchantClient({
 
 ## payment.capture
 
-Transfer escrowed funds to the receiver. Specify a smaller amount than `paymentInfo.maxAmount` for a partial capture; the remainder stays in escrow.
+Transfer escrowed funds to the receiver. Specify a smaller amount than `paymentInfo.maxAmount` for a partial capture; the rest stays in escrow.
 
 ```typescript
 const tx = await merchant.payment.capture(paymentInfo, 10_000_000n)
@@ -74,7 +74,7 @@ Always query `payment.getAmounts()` first to determine the available capturable 
 
 ## payment.voidPayment
 
-Return all escrowed funds to the payer before capture. Full-only: `void()` empties the authorization in one transaction. For a partial return, capture the portion you want to keep first, then void the remainder (or let it expire at `captureDeadline`).
+Return all escrowed funds to the payer before capture. Full-only: `void()` empties the authorization in one transaction. For a partial return, capture the share you want to keep first, then void the rest (or let it expire at `captureDeadline`).
 
 ```typescript
 const tx = await merchant.payment.voidPayment(paymentInfo)
@@ -115,7 +115,7 @@ const tx = await merchant.payment.charge(
 
 ## payment.refund
 
-Refund funds that have already been captured. Requires a token collector to pull funds from the merchant's balance.
+Refund funds the merchant has already captured. Requires a token collector to pull funds from the merchant's balance.
 
 ```typescript
 const tx = await merchant.payment.refund(
@@ -133,12 +133,12 @@ const tx = await merchant.payment.refund(
 | `paymentInfo` | `PaymentInfo` | Full struct identifying the payment |
 | `amount` | `bigint` | Atomic units to refund to the payer |
 | `tokenCollector` | `Address` | Token collector that sources the refund (typically `ReceiverRefundCollector`) |
-| `collectorData` | `Hex` | Data passed to the collector (e.g., receiver signature) |
+| `collectorData` | `Hex` | Data passed to the collector (for example, the receiver signature) |
 
 **Returns** `Promise<Hash>`, the refund transaction hash.
 
 <Warning>
-Refunds after capture require the merchant to have sufficient token balance and an approved allowance on the refund collector.
+Refunds after capture require the merchant to hold enough token balance and to grant an allowance on the refund collector.
 </Warning>
 
 ## payment.getAmounts
@@ -159,13 +159,13 @@ const amounts = await merchant.payment.getAmounts(paymentInfo)
 
 | Field | Type | Description |
 |---|---|---|
-| `hasCollectedPayment` | `boolean` | Whether the payment is collected on-chain |
+| `hasCollectedPayment` | `boolean` | Whether the on-chain escrow holds the payment |
 | `capturableAmount` | `bigint` | Atomic units still capturable from escrow |
 | `refundableAmount` | `bigint` | Atomic units still refundable |
 
 ## payment.getState
 
-Returns the payment's lifecycle position as a tuple. There is no `PaymentState` enum.
+Returns the payment's lifecycle position as a tuple. The SDK exposes no `PaymentState` enum.
 
 ```typescript
 const [hasCollectedPayment, capturableAmount, refundableAmount] =

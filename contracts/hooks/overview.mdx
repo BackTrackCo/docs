@@ -4,13 +4,13 @@ description: "State recording system for tracking payment lifecycle events"
 icon: "database"
 ---
 
-## What Are Hooks?
+## What are hooks
 
-Hooks are pluggable contracts that update state **after** an action successfully executes on a PaymentOperator. Each operator has **5 hook slots**: one per action:
+Hooks are pluggable contracts that update state **after** an action successfully executes on a PaymentOperator. Each operator has **5 hook slots**, one per action:
 
-| Slot | Records After |
+| Slot | Records after |
 |------|---------------|
-| `AUTHORIZE_POST_ACTION_HOOK` | Authorization (e.g., timestamp) |
+| `AUTHORIZE_POST_ACTION_HOOK` | Authorization (for example, timestamp) |
 | `CHARGE_POST_ACTION_HOOK` | Charge event |
 | `CAPTURE_POST_ACTION_HOOK` | Capture from escrow |
 | `VOID_POST_ACTION_HOOK` | Void |
@@ -33,51 +33,51 @@ interface IHook {
 - `amount`, The amount involved in the action
 - `caller`, The address that executed the action (msg.sender on operator)
 
-## Default Behavior
+## Default behavior
 
-**Hook slot = `address(0)`**: no-op (does nothing). No state is recorded.
+**Hook slot = `address(0)`**: no-op (does nothing). The operator records no state for that slot.
 
-This means you only need to set hooks for slots where you want state tracking. Leave the rest as `address(0)`.
+Set hooks only on the slots where you want state tracking. Leave the rest as `address(0)`.
 
 ## BaseHook
 
 All built-in hooks extend `BaseHook`, which verifies that the caller is an authorized operator. This prevents unauthorized contracts from writing state.
 
-## Choosing a Recording Strategy
+## Choosing a recording strategy
 
 Not every payment needs on-chain hooks. Choose based on your use case:
 
-### Events Only (~0 Extra Gas)
+### Events only (~0 extra gas)
 
-The operator already emits events (`AuthorizeExecuted`, `CaptureExecuted`, etc.) for every action. If you only need payment history for analytics or display, skip hooks entirely and index events off-chain.
+The operator already emits an event for every action (`AuthorizeExecuted`, `CaptureExecuted`, and the same shape for the rest). If you only need payment history for analytics or display, skip hooks entirely and index events off-chain.
 
-**Best for:** Micropayments, high-volume payments where gas overhead matters, simple UIs.
+**Best for:** micropayments, high-volume payments where gas overhead matters, simple UIs.
 
-### Events + Subgraph (Best Queries)
+### Events plus subgraph (richest queries)
 
 Index operator events with a subgraph for rich queries (payment history by payer, receiver, status, date range). No on-chain hook gas cost.
 
-**Best for:** Analytics dashboards, payment history, multi-payment queries.
+**Best for:** analytics dashboards, payment history, cross-payment queries.
 
-**Trade-off:** Requires subgraph infrastructure (semi-centralized).
+**Trade-off:** requires subgraph infrastructure (semi-centralized).
 
-### On-Chain Hooks (~20k Gas per Write)
+### On-chain hooks (~20k gas per write)
 
-Use hooks when you need **on-chain reads**: other contracts or conditions that depend on recorded state. [EscrowPeriod](/contracts/conditions/escrow-period) is the most common example: it records authorization time so the capture condition can check if the escrow window has passed.
+Use hooks when you need **on-chain reads**: other contracts or conditions that depend on recorded state. [EscrowPeriod](/contracts/conditions/escrow-period) is the most common example. It records authorization time so the capture condition can check if the escrow window has passed.
 
-**Best for:** Escrow enforcement, dispute evidence, decentralized frontends, on-chain composability.
+**Best for:** escrow enforcement, dispute evidence, decentralized frontends, on-chain composability.
 
 **Trade-off:** ~20k gas per `SSTORE` operation.
 
-### Decision Table
+### Decision table
 
-| Need | Strategy | Hook Slots |
+| Need | Strategy | Hook slots |
 |------|----------|---------------|
 | Payment history for UI | Events only | `address(0)` |
 | Rich queries, analytics | Events + Subgraph | `address(0)` |
 | Time-locked releases | On-chain | [EscrowPeriod](/contracts/conditions/escrow-period) on `AUTHORIZE_POST_ACTION_HOOK` |
 | On-chain payment index | On-chain | [PaymentIndexRecorderHook](/contracts/hooks/payment-index) |
-| Multiple data points | On-chain | [HookCombinator](/contracts/hooks/combinator) |
+| Many data points | On-chain | [HookCombinator](/contracts/hooks/combinator) |
 
 <Tip>
 For most configurations, you only need a hook on the `AUTHORIZE_POST_ACTION_HOOK` slot (for [EscrowPeriod](/contracts/conditions/escrow-period)). Leave other hook slots as `address(0)`.
@@ -93,7 +93,7 @@ For most configurations, you only need a hook on the `AUTHORIZE_POST_ACTION_HOOK
     Index payments for on-chain queries.
   </Card>
   <Card title="HookCombinator" icon="layer-group" href="/contracts/hooks/combinator">
-    Chain multiple hooks into one slot.
+    Chain hooks into one slot.
   </Card>
   <Card title="Custom Hooks" icon="wrench" href="/contracts/hooks/custom">
     Build your own hook.

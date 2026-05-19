@@ -6,7 +6,7 @@ icon: "wrench"
 
 ## Overview
 
-You can create custom conditions for specialized logic beyond what the built-in conditions provide. Implement the `ICondition` interface and follow the security rules below.
+You can create custom conditions for specialized logic beyond what the built-in conditions provide. Build against the `ICondition` interface and follow the security rules below.
 
 ## ICondition Rules
 
@@ -63,10 +63,10 @@ Before deploying a custom condition:
 - [ ] No external calls to untrusted contracts
 - [ ] No state modifications
 - [ ] Handles edge cases (zero address, zero amount, uninitialized payments)
-- [ ] Comprehensive test coverage with Forge tests
+- [ ] Full test coverage with Forge tests
 
 <Warning>
-Custom conditions with bugs can lead to **permanently locked funds** (if `check()` always returns `false`) or **unauthorized access** (if `check()` always returns `true`). Test thoroughly on testnet before mainnet deployment.
+Custom conditions with bugs can lead to **permanently locked funds** (if `check()` always returns `false`) or **unauthorized access** (if `check()` always returns `true`). Test on Base Sepolia before mainnet deployment.
 </Warning>
 
 ## Testing

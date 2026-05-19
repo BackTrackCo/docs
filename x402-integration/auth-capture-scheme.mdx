@@ -27,7 +27,7 @@ AUTHORIZE -> RESOURCE DELIVERED -> CAPTURE / VOID -> (REFUND)
 
 <Steps>
   <Step title="Authorize">
-    Client authorization is submitted, funds locked in escrow via `AuthCaptureEscrow.authorize()`. The token collector executes the client's signature (ERC-3009 `receiveWithAuthorization` or Permit2 `permitTransferFrom`) to pull tokens into escrow.
+    The facilitator submits the client's authorization, locking funds in escrow via `AuthCaptureEscrow.authorize()`. The token collector executes the client's signature (ERC-3009 `receiveWithAuthorization` or Permit2 `permitTransferFrom`) to pull tokens into escrow.
   </Step>
 
   <Step title="Resource Delivered">
@@ -55,7 +55,7 @@ CHARGE -> RESOURCE DELIVERED -> (REFUND)
 
 <Steps>
   <Step title="Charge">
-    Client authorization is submitted, funds sent directly to receiver via `AuthCaptureEscrow.charge()`. No escrow hold.
+    The facilitator submits the client's authorization, sending funds directly to the receiver via `AuthCaptureEscrow.charge()`. No escrow hold.
   </Step>
 
   <Step title="Resource Delivered">
@@ -134,7 +134,7 @@ sequenceDiagram
 
 ## CaptureAuthorizer
 
-The **captureAuthorizer** is the address authorized to authorize/capture/void/refund/charge a payment. The escrow contract gates those operations on `msg.sender`. In x402's facilitator-submits flow that means either the facilitator's EOA, or any smart contract that ends up calling the escrow (e.g., an arbiter contract with dispute logic, a multisig, etc.).
+The **captureAuthorizer** is the address that may call `authorize`, `capture`, `void`, `refund`, or `charge` on a payment. The escrow contract gates those operations on `msg.sender`. In x402's facilitator-submits flow that means either the facilitator's EOA, or any smart contract that ends up calling the escrow (for example, an arbiter contract with dispute logic or a multisig).
 
 | Use Case | CaptureAuthorizer |
 |---|---|
@@ -176,7 +176,7 @@ Server sends this to request payment:
 }
 ```
 
-A server MAY list multiple `accepts[]` entries with different `assetTransferMethod` values so clients can pick the method matching their token approvals.
+A server MAY list more than one `accepts[]` entry with different `assetTransferMethod` values so clients can pick the method matching their token approvals.
 
 ### PaymentPayload: EIP-3009 (default)
 
@@ -239,7 +239,7 @@ When `extra.assetTransferMethod === "permit2"`, the client signs a Permit2 `Perm
 }
 ```
 
-The merchant address is bound through the deterministic nonce (no witness struct).
+The deterministic nonce binds the merchant address (no witness struct).
 
 ## Field Reference
 
@@ -247,14 +247,14 @@ The merchant address is bound through the deterministic nonce (no witness struct
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | string | EIP-712 token-domain name (e.g., `"USDC"`). Used for ERC-3009 signing only. |
-| `version` | string | EIP-712 token-domain version (e.g., `"2"`). |
-| `captureAuthorizer` | address | Address authorized to authorize/capture/void/refund/charge. Committed on-chain as `PaymentInfo.operator`. |
+| `name` | string | EIP-712 token-domain name (for example, `"USDC"`). Used for ERC-3009 signing only. |
+| `version` | string | EIP-712 token-domain version (for example, `"2"`). |
+| `captureAuthorizer` | address | Address that may call `authorize`, `capture`, `void`, `refund`, or `charge`. Committed on-chain as `PaymentInfo.operator`. |
 | `captureDeadline` | uint48 | Absolute Unix seconds: capture must occur before this. Encoded as `authorizationExpiry`. |
 | `refundDeadline` | uint48 | Absolute Unix seconds: refunds allowed until this. Encoded as `refundExpiry`. |
 | `feeRecipient` | address | Fee recipient. Set to `address(0)` to let the captureAuthorizer specify any non-zero recipient at capture/charge time. |
-| `minFeeBps` | uint16 | Minimum fee in basis points the captureAuthorizer must take. `0` = no minimum. |
-| `maxFeeBps` | uint16 | Maximum fee in basis points the captureAuthorizer can take. |
+| `minFeeBps` | uint16 | Lowest fee in basis points the captureAuthorizer must take. `0` = no floor. |
+| `maxFeeBps` | uint16 | Highest fee in basis points the captureAuthorizer can take. |
 
 ### Optional Extra Fields
 
@@ -264,19 +264,19 @@ The merchant address is bound through the deterministic nonce (no witness struct
 | `assetTransferMethod` | `"eip3009"` \| `"permit2"` | Which token collector to use. | `"eip3009"` |
 
 <Note>
-**Fee Configuration:** Fees are enforced on-chain in the `PaymentInfo` struct. The escrow rejects captures/charges that fall outside `[minFeeBps, maxFeeBps]`. If `feeRecipient` is non-zero, the actual fee recipient at capture/charge must match.
+**Fee Configuration:** The escrow enforces fees on-chain via the `PaymentInfo` struct. The escrow rejects captures/charges that fall outside `[minFeeBps, maxFeeBps]`. If `feeRecipient` is non-zero, the actual fee recipient at capture/charge must match.
 </Note>
 
 ## Nonce Derivation
 
-The signature nonce is the payer-agnostic `PaymentInfo` hash. Payer is zeroed; everything else is the values that will appear on-chain.
+The signature nonce is the payer-agnostic `PaymentInfo` hash. The encoding zeros out the payer; every other field carries the value that will appear on-chain.
 
 ```
 paymentInfoHash = keccak256(abi.encode(PAYMENT_INFO_TYPEHASH, paymentInfoWithZeroPayer))
 nonce           = keccak256(abi.encode(chainId, AUTH_CAPTURE_ESCROW_ADDRESS, paymentInfoHash))
 ```
 
-Freshness is enforced by `salt`: each signing call generates a fresh `bytes32` salt, so two payers signing concurrently produce distinct nonces with no collision risk.
+The `salt` field enforces freshness: each signing call generates a fresh `bytes32` salt, so two payers signing concurrently produce distinct nonces with no collision risk.
 
 ## Verification Logic
 
@@ -312,7 +312,7 @@ For smart wallet clients, the signature may be EIP-6492 wrapped (containing depl
 
 ## PaymentInfo Struct
 
-This is the on-chain Solidity struct. The `payer` field is not included in the JSON payload, it is derived from the signature recovery at settlement time. Wire-format `extra` uses spec-level field names; the on-chain struct keeps canonical names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
+This is the on-chain Solidity struct. The JSON payload omits the `payer` field; the facilitator recovers it from the signature at settlement time. Wire-format `extra` uses spec-level field names; the on-chain struct keeps canonical names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
 
 ```solidity
 struct PaymentInfo {
@@ -347,7 +347,7 @@ The escrow contract enforces invariants on-chain:
 
 <CardGroup cols={2}>
   <Card title="No Overcharging" icon="shield-check">
-    Settlement amount is capped by client-signed `maxAmount`. Attempting to exceed the limit reverts.
+    The client-signed `maxAmount` caps the settlement amount. Attempts to exceed the limit revert.
   </Card>
 
   <Card title="Replay Prevention" icon="lock">
@@ -364,7 +364,7 @@ The escrow contract enforces invariants on-chain:
 </CardGroup>
 
 <Warning>
-**CaptureAuthorizer Trust Required:** The captureAuthorizer controls when and how much to capture. Choose carefully and understand the capture policy. See [PaymentOperator](/contracts/payment-operator) for examples.
+**CaptureAuthorizer Trust Required:** The captureAuthorizer controls when and how much to capture. Choose with intent and understand the capture policy. See [PaymentOperator](/contracts/payment-operator) for examples.
 </Warning>
 
 ## Error Codes
@@ -407,7 +407,7 @@ The `authCapture` scheme adds an authorization step before settlement (or refund
 
 <CardGroup cols={2}>
   <Card title="Overview" icon="globe" href="/x402-integration/overview">
-    Understand why escrow is needed for HTTP payments.
+    Understand why HTTP payments need escrow.
   </Card>
 
   <Card title="Smart Contracts" icon="code" href="/contracts/overview">

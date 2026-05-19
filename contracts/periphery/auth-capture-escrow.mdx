@@ -10,7 +10,7 @@ x402r builds on the canonical [Commerce Payments Protocol](https://github.com/ba
 - **ERC3009PaymentCollector**: collects funds via signed ERC-3009 `receiveWithAuthorization`.
 - **Permit2PaymentCollector**: collects funds via Uniswap Permit2 `permitTransferFrom`.
 
-All three are deployed at universal CREATE2 addresses (same address on every supported chain).
+All three sit at universal CREATE2 addresses (same address on every supported chain).
 
 | Contract | Canonical address |
 |---|---|
@@ -53,7 +53,7 @@ stateDiagram-v2
 
 #### authorize()
 
-Pulls funds into escrow via the token collector. Called by the `captureAuthorizer` (typically the facilitator EOA, or a smart contract acting as captureAuthorizer).
+Pulls funds into escrow via the token collector. Only the `captureAuthorizer` (typically a facilitator EOA, or a smart contract acting as captureAuthorizer) can call it.
 
 ```solidity
 function authorize(
@@ -123,14 +123,14 @@ function refund(
 
 ### Access control
 
-Lifecycle actions (`authorize`, `charge`, `capture`, `void`, `refund`) check `msg.sender` against `PaymentInfo.operator` (the captureAuthorizer). `reclaim` is permissionless after `captureDeadline`.
+Lifecycle actions (`authorize`, `charge`, `capture`, `void`, `refund`) check `msg.sender` against `PaymentInfo.operator` (the captureAuthorizer). Anyone can call `reclaim` after `captureDeadline`.
 
-There is no escrow-wide "operator whitelist", access is per-payment via the signed `PaymentInfo`.
+The escrow has no global "operator whitelist." Access is per-payment, governed by the signed `PaymentInfo`.
 
 ### Security features
 
 - **Replay prevention**: each payment has a unique nonce derived from `(chainId, escrowAddress, paymentInfoHash)`, consumed on-chain at settlement
-- **Fee bounds enforcement**: `minFeeBps` / `maxFeeBps` / `feeReceiver` in `PaymentInfo` are signed by the client; the escrow rejects out-of-bounds captures/charges
+- **Fee bounds enforcement**: the client signs `minFeeBps` / `maxFeeBps` / `feeReceiver` in `PaymentInfo`; the escrow rejects out-of-bounds captures/charges
 - **Expiry ordering**: contract enforces `preApprovalExpiry <= authorizationExpiry <= refundExpiry`
 - **Reentrancy protection** on all state-changing entry points
 
@@ -148,8 +148,8 @@ The escrow calls the token collector during `authorize()` or `charge()`, passing
 
 - **ERC-3009 `receiveWithAuthorization()`**: gasless token transfers via signed messages
 - **EIP-6492 support**: handles smart wallet clients with deployment bytecode in signatures (via `ERC6492SignatureHandler`)
-- **Nonce-based replay protection**: each authorization can only be used once; the nonce is the payer-agnostic `PaymentInfo` hash
-- **Deadline-based expiry**: `validBefore` (typically `now + maxTimeoutSeconds`) prevents stale authorizations
+- **Nonce-based replay protection**: each authorization can run only once; the nonce is the payer-agnostic `PaymentInfo` hash
+- **Deadline-based expiry**: `validBefore` (typically `now + maxTimeoutSeconds`) blocks stale authorizations
 
 ### ERC-3009 signature
 
@@ -174,8 +174,8 @@ The authCapture scheme uses `receiveWithAuthorization` (not `transferWithAuthori
 
 ## Permit2PaymentCollector
 
-Collects ERC-20 tokens via Uniswap Permit2 `permitTransferFrom`. Used when `assetTransferMethod === "permit2"` in the scheme `extra`. Any ERC-20 the payer has approved Permit2 for becomes spendable through this collector.
+Collects ERC-20 tokens through Uniswap Permit2 `permitTransferFrom`. The operator selects this collector when `assetTransferMethod === "permit2"` in the scheme `extra`. Any ERC-20 the payer has approved Permit2 for becomes spendable through this collector.
 
-The client signs a Permit2 `PermitTransferFrom`; the merchant address is bound through the deterministic nonce, so no separate witness struct is needed.
+The client signs a Permit2 `PermitTransferFrom`; the deterministic nonce binds the merchant address, removing the need for a separate witness struct.
 
 See the [authCapture Scheme Specification](/x402-integration/auth-capture-scheme) for the full Permit2 wire format.

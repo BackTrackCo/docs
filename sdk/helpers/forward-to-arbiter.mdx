@@ -9,7 +9,7 @@ The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards 
 
 - Only fires for successful **`authCapture`** scheme settlements
 - POSTs `{ responseBody, transaction, paymentPayload }` to `{arbiterUrl}/verify`
-- Errors are silently caught so an unavailable arbiter cannot break the payment flow
+- The hook catches errors internally so an unreachable arbiter cannot break the payment flow
 
 ## Usage
 
@@ -36,7 +36,7 @@ function forwardToArbiter(
 
 | Parameter | Type | Description |
 |---|---|---|
-| `arbiterUrl` | `string` | Base URL of your arbiter service (e.g. `http://arbiter:3001`) |
+| `arbiterUrl` | `string` | Base endpoint of your arbiter service (for example, `http://arbiter:3001`) |
 | `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
 
 ### Options
@@ -74,7 +74,7 @@ When an `authCapture` settlement succeeds, the hook POSTs the following JSON to 
 }
 ```
 
-There is no nested `paymentInfo` in the payload. The arbiter reconstructs `PaymentInfo` from `accepted.extra` + `payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), the same way the facilitator does at settlement.
+The payload does not nest a `paymentInfo` object. The arbiter reconstructs `PaymentInfo` from `accepted.extra` + `payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), the same way the facilitator does at settlement.
 
 <Tip>
 The arbiter can also resolve the `PaymentInfo` indirectly: derive `paymentInfoHash` from the wire data, then read the on-chain `PaymentInfo` from the escrow if it stores it, or simply forward the wire payload back into your own facilitator to verify.
@@ -82,7 +82,7 @@ The arbiter can also resolve the `PaymentInfo` indirectly: derive `paymentInfoHa
 
 ## Error handling
 
-By default, fetch errors are logged with `console.warn`. You can override this with a custom handler:
+By default, the hook logs fetch errors with `console.warn`. Override this with a custom handler:
 
 ```typescript
 import { forwardToArbiter } from '@x402r/helpers'
@@ -96,11 +96,11 @@ const resourceServer = new x402ResourceServer(facilitatorClient)
   )
 ```
 
-Errors are wrapped in an `X402rError` with the arbiter URL and request details for easier debugging.
+The hook wraps each error in an `X402rError` carrying the arbiter endpoint and request details for easier debugging.
 
 ## Skipped scenarios
 
-The hook silently returns without making a request when:
+The hook returns without making a request when:
 
 - The settlement was not successful (`context.result.success === false`)
 - The scheme is not `authCapture`

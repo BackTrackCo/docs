@@ -4,7 +4,7 @@ description: "One-shot command-line tool for paying x402 endpoints. Wallet-agnos
 icon: "terminal"
 ---
 
-`@x402r/cli` makes a single x402 payment from the command line. You point it at a URL, provide a signer, and get back the response body plus a settlement transaction hash.
+`@x402r/cli` makes a single x402 payment from the command line. You point it at an address, provide a signer, and get back the response body plus a settlement transaction hash.
 
 The CLI carries zero provider SDK dependencies. Raw private keys, JSON-RPC signers (Privy, Turnkey, Fireblocks, Safe), and custom signer modules all work through the same interface.
 
@@ -22,7 +22,7 @@ bunx @x402r/cli pay <url> [options]
 ```
 </CodeGroup>
 
-No project install required. Pin the version (e.g. `@x402r/cli@0.2.0`) for reproducible agent workflows.
+No project install required. Pin the version (for example, `@x402r/cli@0.2.0`) for reproducible scripted workflows.
 
 ### Usage
 
@@ -30,32 +30,32 @@ No project install required. Pin the version (e.g. `@x402r/cli@0.2.0`) for repro
 x402r pay <url> [signer flags] [--chain <eip155:id>] [--rpc <url>] [--max-amount N] [--json]
 ```
 
-If the URL does not return HTTP 402, the CLI short-circuits and prints the response body with exit code 0. No payment is made.
+If the endpoint does not return HTTP 402, the CLI short-circuits and prints the response body with exit code 0. The CLI sends no payment.
 
 ### Signer configuration
 
-Exactly one signer source must be configured. CLI flags take precedence over environment variables. If zero or multiple sources are detected, the CLI exits with code 6.
+Configure exactly one signer source. CLI flags take precedence over environment variables. If the CLI finds zero or more than one source, it exits with code 6.
 
-| Source | Flag | Env var |
+| Source | Flag | Environment variable |
 |--------|------|---------|
 | Raw private key | `--key 0x...` | `PRIVATE_KEY` |
 | Remote JSON-RPC | `--signer-url <url>` and `--signer-address 0x...` | `SIGNER_URL` and `SIGNER_ADDRESS` |
 | Custom module | `--signer-module <pkg-or-path>` | `SIGNER_MODULE` |
 
-Environment variable names are unprefixed to match Foundry, Hardhat, and x402-reference conventions.
+Environment variable names use no `X402R_` prefix to match Foundry, Hardhat, and x402-reference conventions.
 
 ### Request options
 
 | Flag | Description |
 |------|-------------|
-| `--chain <eip155:id>` | Select a specific `accepts[]` entry when the merchant offers multiple chains. Required when there are multiple options. |
-| `--rpc <url>` | Override the RPC URL for on-chain reads. Required for chain IDs not in `viem/chains`. |
+| `--chain <eip155:id>` | Select a specific `accepts[]` entry when the merchant offers more than one chain. Required when more than one option exists. |
+| `--rpc <url>` | Override the RPC endpoint for on-chain reads. Required for chain IDs not in `viem/chains`. |
 | `--max-amount <n>` | Refuse to pay more than `n` atomic token units. Exits with code 3 if the price exceeds this. |
 | `--json` | Emit a single JSON envelope to stdout instead of plain text. |
 
 ### Supported chains
 
-The CLI auto-detects the chain from the 402 response's `accepts[].network` field. Any EVM chain known to `viem/chains` is supported (Base, Base Sepolia, Ethereum, Arbitrum, Optimism, and others). For unknown chain IDs, pass `--rpc <url>` to provide an RPC endpoint.
+The CLI reads the chain from the 402 response's `accepts[].network` field. Any EVM chain known to `viem/chains` works, including Base and Base Sepolia. For chain IDs `viem/chains` does not recognize, pass `--rpc <url>` with an RPC endpoint.
 
 ### Exit codes
 
@@ -67,7 +67,7 @@ The CLI auto-detects the chain from the 402 response's `accepts[].network` field
 | 3 | Price exceeds `--max-amount` |
 | 4 | Signature rejected |
 | 5 | Settlement failed (merchant error after payment, or facilitator error) |
-| 6 | Signer resolution failed (none, multiple, or partially configured) |
+| 6 | Signer resolution failed (none, more than one, or incomplete configuration) |
 
 ### Examples
 
@@ -84,7 +84,7 @@ Any endpoint that speaks `eth_signTypedData_v4` works: Privy wallet RPC, Turnkey
 ```bash
 npx @x402r/cli pay https://api.example.com/paid-endpoint \
   --signer-url https://signer.example/rpc \
-  --signer-address 0xYourAddress...
+  --signer-address 0x586486394C38A2a7d36B16a3FDaF366cd202d823
 ```
 
 #### Custom module (Privy)
@@ -145,11 +145,11 @@ With `--json`, the CLI writes a single JSON envelope to stdout:
 }
 ```
 
-The `signer` field is omitted when the URL returned a non-402 response (no payment was made).
+The CLI drops the `signer` field when the endpoint returned a non-402 response (the CLI sent no payment).
 
 ### Signer module contract
 
-A custom signer module must default-export a factory function with the signature `() => Promise<Account>`. The returned object must be a viem `Account` with at least `address` and `signTypedData`. The CLI only needs typed-data signatures, transaction broadcasting is handled by the facilitator.
+A custom signer module must default-export a factory function with the signature `() => Promise<Account>`. The returned object must be a viem `Account` with at least `address` and `signTypedData`. The CLI only needs typed-data signatures; the facilitator broadcasts the transaction.
 
 ### Programmatic usage
 
@@ -179,7 +179,7 @@ The `@x402r/cli` package exports:
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `pay` | function | Execute a one-shot payment against a URL |
+| `pay` | function | Execute a one-shot payment against an endpoint |
 | `resolveSigner` | function | Resolve a signer from flags and environment variables |
 | `CliError` | class | Base error class with typed exit codes |
 | `NetworkError` | class | Exit code 1 |

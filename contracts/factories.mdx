@@ -8,7 +8,7 @@ icon: "industry"
 
 x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic contract deployments. Factories enable on-demand instance creation with predictable addresses.
 
-## Why Factories?
+## Why factories
 
 <AccordionGroup>
   <Accordion title="Deterministic Addresses (CREATE2)">
@@ -19,17 +19,17 @@ x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic con
   </Accordion>
 
   <Accordion title="Shared Configuration">
-    Multiple instances can share immutable configuration:
+    Many instances can share immutable configuration:
     - Lower deployment costs
     - Consistent behavior across instances
     - Centralized ownership control
   </Accordion>
 
   <Accordion title="Idempotent Deployments">
-    Calling factory with same parameters returns existing contract:
-    - Safe to call multiple times
+    Calling a factory with the same parameters returns the existing contract:
+    - Safe to call again
     - No duplicate deployments
-    - Automatic deduplication
+    - Built-in deduplication
   </Accordion>
 
   <Accordion title="Gas Optimization">
@@ -78,10 +78,10 @@ function deployOperator(
 ```
 
 **Parameters (in config):**
-- `feeReceiver` - Who receives operator fees (arbiter, service provider, treasury, etc.)
+- `feeReceiver` - Who receives operator fees (arbiter, service provider, or treasury)
 - `authorizePreActionCondition` through `refundPostActionHook` - 10-slot configuration
 
-**Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
+**Note:** the factory sets `maxFeeBps` and `protocolFeePct` (shared across all operators)
 
 **Returns:** Address of deployed operator (or existing if already deployed)
 
@@ -220,7 +220,7 @@ function deploy(
 ```
 
 **Parameters:**
-- `escrowPeriod` - Duration in seconds (e.g., `7 * 24 * 60 * 60` for 7 days)
+- `escrowPeriod` - Duration in seconds (for example, `7 * 24 * 60 * 60` for 7 days)
 - `authorizedCodehash` - Runtime codehash of authorized caller (`bytes32(0)` = operator-only)
 
 **Returns:** Address of deployed EscrowPeriod contract
@@ -293,7 +293,7 @@ const config = {
 
 ## Freeze Factory
 
-Deploys `Freeze` condition contracts that block capture when a payment is frozen.
+Deploys `Freeze` condition contracts that block capture when the payer freezes a payment.
 
 ### Contract Address
 
@@ -311,8 +311,8 @@ function deploy(
 ```
 
 **Parameters:**
-- `freezeCondition` - ICondition that authorizes freeze calls (e.g., PayerCondition)
-- `unfreezeCondition` - ICondition that authorizes unfreeze calls (e.g., PayerCondition, ArbiterCondition)
+- `freezeCondition` - ICondition that gates freeze calls (for example, PayerCondition)
+- `unfreezeCondition` - ICondition that gates unfreeze calls (for example, PayerCondition or ArbiterCondition)
 - `freezeDuration` - How long freeze lasts in seconds (`0` = permanent until unfrozen)
 - `escrowPeriodContract` - Address of EscrowPeriod contract (`address(0)` = freeze unconstrained by time)
 
@@ -362,7 +362,7 @@ Use these pre-deployed condition contracts:
 
 <Tabs>
   <Tab title="Payer Freeze">
-    Payer can freeze, arbiter can unfreeze (or auto-expires after 3 days):
+    Payer can freeze, arbiter can unfreeze (or it expires after 3 days):
 
     ```typescript
     const freeze = await freezeFactory.deploy(
@@ -375,7 +375,7 @@ Use these pre-deployed condition contracts:
   </Tab>
 
   <Tab title="Receiver Freeze">
-    Receiver can freeze, arbiter can unfreeze (or auto-expires after 5 days):
+    Receiver can freeze, arbiter can unfreeze (or it expires after 5 days):
 
     ```typescript
     const freeze = await freezeFactory.deploy(
@@ -437,7 +437,7 @@ Freeze duration should balance payer protection with receiver UX. Too long and r
 
 ## Factory Ownership
 
-All factories are owned by a multisig wallet for security.
+A multisig wallet owns all factories for security.
 
 ### Owner Capabilities
 
@@ -447,7 +447,7 @@ Factory owners can:
 - Transfer ownership (2-step process)
 
 Factory owners **cannot:**
-- Modify deployed instances
+- Change deployed instances
 - Pause or stop operations
 - Access funds in deployed operators
 
@@ -568,11 +568,11 @@ Deploy on testnet with same configuration before mainnet:
 const testHash = await testnetFactory.write.deployOperator([config]);
 // ... test thoroughly ...
 
-// Deploy on mainnet with identical config (same address!)
+// Deploy on mainnet with identical config (same address)
 const mainnetHash = await mainnetFactory.write.deployOperator([config]);
 ```
 
-### 4. Document Your Config
+### 4. Document your config
 
 Keep a record of your deployed configurations:
 

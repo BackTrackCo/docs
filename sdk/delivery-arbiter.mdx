@@ -11,7 +11,7 @@ icon: "shield-check"
 * Operator and escrow addresses from the [Merchant Setup](/sdk/delivery-merchant)
 
 <Note>
-There is a full [AI garbage detector example](https://github.com/BackTrackCo/arbiter-examples) that implements this pattern with heuristic + LLM evaluation.
+The [AI garbage detector example](https://github.com/BackTrackCo/arbiter-examples) implements this pattern end-to-end with heuristic plus LLM evaluation.
 </Note>
 
 <Steps>
@@ -92,10 +92,10 @@ There is a full [AI garbage detector example](https://github.com/BackTrackCo/arb
   </Step>
 
   <Step title="Implement your evaluation logic">
-    The `evaluate()` function is where your logic lives. It could be:
+    The `evaluate()` function is where your logic lives. It can run:
 
     - **Heuristic checks**: HTTP status code, response size, content-type validation
-    - **AI evaluation**: send response body to an LLM and ask "is this a valid response?"
+    - **AI judgment**: send response body to an LLM and ask "is this a valid response?"
     - **Schema validation**: check if the response matches an expected JSON schema
 
     ```typescript

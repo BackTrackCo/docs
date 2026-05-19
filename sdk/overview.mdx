@@ -16,9 +16,9 @@ Three roles interact with the protocol:
 
 ### Two Operator Models
 
-**Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Use this for general commerce where most transactions are uncontested.
+**Marketplace** (`deployMarketplaceOperator`): The merchant releases funds after escrow. If the payer contests, they file a refund request and an arbiter resolves it. Use this for general commerce where most transactions clear without dispute.
 
-**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction automatically. The arbiter or a satisfied payer can capture funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds auto-refund after escrow. Use this for AI content verification, schema validation, or automated quality checks.
+**Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction. The arbiter or a satisfied payer can capture funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds return to the payer once escrow expires. Use this for AI content verification, schema validation, or quality checks.
 
 ### Packages
 
@@ -34,7 +34,7 @@ bun add @x402r/sdk
 ```
 </CodeGroup>
 
-`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), an `.extend()` plugin system, and ERC-8004 helpers for extracting agent identity and reputation data from x402 extension responses.
+`@x402r/sdk` is the only package most developers need. It includes role-scoped client factories, 8 action groups (payment, escrow, refund, evidence, freeze, query, operator, watch), an `.extend()` plugin system, and ERC-8004 helpers that extract on-chain identity and reputation data from x402 extension responses.
 
 For low-level access to contract ABIs and deploy utilities:
 
@@ -94,9 +94,9 @@ bunx @x402r/cli pay <url> [options]
 
 ## Network support
 
-All x402r-authored contracts use universal CREATE2 addresses: when a chain is supported, the address is the same as on every other supported chain.
+All x402r-authored contracts use universal CREATE2 addresses: every supported chain resolves to the same address as every other supported chain.
 
-Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. Additional EVMs will be added as canonical `base/commerce-payments@v1.0.0` coverage extends.
+Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. More EVM chains land as canonical `base/commerce-payments@v1.0.0` coverage extends.
 
 | Chain | Chain ID | USDC |
 |---|---|---|
@@ -105,7 +105,7 @@ Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. 
 
 ### commerce-payments v1 primitives
 
-The `base/commerce-payments@v1.0.0` primitives are redeployed at canonical CREATE2 addresses via CreateX permissionless salts. Each contract has the same address on every supported chain.
+The `base/commerce-payments@v1.0.0` primitives ship at canonical CREATE2 addresses via CreateX permissionless salts. Each contract resolves to the same address on every supported chain.
 
 | Contract | Address |
 |----------|---------|
@@ -126,4 +126,4 @@ authCaptureEscrow;
 tokenCollector;
 ```
 
-The primitives are exposed to SDK consumers on the chains listed in `@x402r/core`'s `x402rChains` (Base + Base Sepolia today). The CREATE2 addresses themselves have been prepositioned via CreateX on additional chains and will be enabled in the registry as canonical `base/commerce-payments@v1.0.0` coverage extends.
+The SDK exposes these primitives on the chains listed in `@x402r/core`'s `x402rChains` (Base + Base Sepolia today). CreateX salts already reserve the CREATE2 addresses on more chains, and the registry enables each one as canonical `base/commerce-payments@v1.0.0` coverage extends.

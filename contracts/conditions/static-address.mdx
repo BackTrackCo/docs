@@ -49,13 +49,13 @@ const arbiterCondition = await staticAddressConditionFactory.write.deploy([arbit
 // For subscription service provider
 const providerCondition = await staticAddressConditionFactory.write.deploy([serviceProviderAddress]);
 
-// For DAO governance — same address = same deterministic address (idempotent)
+// For DAO governance, same address produces the same deterministic deployment (idempotent)
 const daoCondition = await staticAddressConditionFactory.write.deploy([daoMultisigAddress]);
 ```
 
 ## Gas
 
-**Cost:** Minimal — `view` function with a single `immutable` read (compiled as a constant in bytecode, not a storage read).
+**Cost:** Minimal. `view` function with a single `immutable` read (compiled as a constant in bytecode, not a storage read).
 
 ## Next Steps
 

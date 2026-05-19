@@ -15,7 +15,7 @@ The SDK ships two deployment presets. Pick the one that matches your use case:
 | `deployMarketplaceOperator` | General marketplace with dispute resolution | Yes (optional) | Yes (optional) | Yes |
 | `deployDeliveryProtectionOperator` | Garbage detection / delivery verification | No | No | No |
 
-All contracts are deployed via factories using CREATE2, so identical configurations produce identical addresses across deployments.
+All contracts ship via CREATE2 factories, so identical configurations produce identical addresses across deployments.
 
 ## Marketplace operator
 
@@ -24,7 +24,7 @@ A complete marketplace operator deployment includes:
 1. **EscrowPeriod**: Records authorization time, enforces waiting period before capture
 2. **Freeze**: Allows payer to freeze payment during escrow, receiver to unfreeze
 3. **ReceiverCondition**: Gates voids to the merchant (receiver)
-4. **RefundRequest (IHook)**: Wired as `voidPostActionHook`, auto-approves pending refund requests during `voidPayment()`
+4. **RefundRequest (`IHook`)**: Wired as `voidPostActionHook`, flips pending refund requests to `Approved` during `voidPayment()`
 5. **StaticFeeCalculator**: Optional operator fee (basis points)
 6. **PaymentOperator**: The main contract tying everything together
 
@@ -32,9 +32,9 @@ A complete marketplace operator deployment includes:
 
 **Prerequisites:**
 - Node.js 20+, pnpm 9.15+
-- A private key with Base Sepolia ETH ([get testnet ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
+- A private key with Base Sepolia ETH ([get Sepolia ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
 
-Call `deployMarketplaceOperator` from `@x402r/core` with a viem wallet client. Because every contract uses CREATE2, deploys are idempotent: re-running with the same parameters detects existing contracts and skips them.
+Call `deployMarketplaceOperator` from `@x402r/core` with a viem wallet client. Because every contract uses CREATE2, deploys are idempotent: re-running with the same parameters reuses any existing contract at the predicted address and skips it.
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -78,10 +78,10 @@ console.log('Existing (reused):', result.summary.existingCount);
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `chainId` | `number` | Target chain ID (e.g., `84532` for Base Sepolia) |
+| `chainId` | `number` | Target chain ID (for example, `84532` for Base Sepolia) |
 | `feeReceiver` | `Address` | Address that receives operator fees |
 | `arbiter` | `Address` | Arbiter address for dispute resolution |
-| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
+| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (for example, `604800n` for 7 days) |
 | `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
 | `operatorFeeBps` | `bigint` | Fee in basis points. Default: `0n` (no fee). `100n` = 1% |
 | `authorizedCodehash` | `Hex` | Optional. Restricts which contract codehashes can record. Defaults to `bytes32(0)` (no restriction) |
@@ -108,7 +108,7 @@ interface MarketplaceOperatorDeployment {
 ```
 
 <Tip>
-Because all contracts use CREATE2, redeploying with the same parameters is idempotent: existing contracts are detected and skipped. The `summary` tells you what was new vs reused.
+Because all contracts use CREATE2, redeploying with the same parameters is idempotent. The tooling skips any contract that already exists at the predicted address. The `summary` tells you what was new vs reused.
 </Tip>
 
 ## Preview addresses (no deploy)
@@ -118,7 +118,7 @@ import { previewMarketplaceOperator } from '@x402r/core'
 
 const preview = await previewMarketplaceOperator(publicClient, {
   chainId: 84532,
-  feeReceiver: '0xYourAddress...',
+  feeReceiver: account.address,
   arbiter: '0xArbiterAddress...',
   escrowPeriodSeconds: 604800n,
 })
@@ -147,22 +147,22 @@ The deployed marketplace operator has the following slot configuration:
 
 ## Network support
 
-Today, deployment is supported on the chains in `@x402r/core`'s `x402rChains`:
+Today, the deploy presets target the chains in `@x402r/core`'s `x402rChains`:
 
 | Network | Chain ID | EIP-155 ID |
 |---|---|---|
 | Base | 8453 | `eip155:8453` |
 | Base Sepolia | 84532 | `eip155:84532` |
 
-Additional EVMs will be added as canonical `base/commerce-payments@v1.0.0` coverage extends.
+More EVM chains land as canonical `base/commerce-payments@v1.0.0` coverage extends.
 
 <Warning>
-Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can get testnet ETH from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).
+Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can fund a wallet from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).
 </Warning>
 
 ## Delivery Protection Operator
 
-For automated quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can capture funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
+For programmatic quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can capture funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -205,10 +205,10 @@ console.log('AuthorizeHook:', deployment.authorizeHookAddress)
 | `chainId` | `number` | Target chain |
 | `arbiter` | `Address` | Arbiter address for capture and refund decisions |
 | `feeReceiver` | `Address` | Receives protocol fees |
-| `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
+| `escrowPeriodSeconds` | `bigint` | Verification window before automatic refund |
 | `authorizedCodehash` | `Hex` | Override the default `hookCombinatorCodehash`. Optional |
 | `paymentIndexRecorderHookAddress` | `Address` | Override the default PaymentIndexRecorderHook. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
-| `allowArbiterRefund` | `boolean` | Allow arbiter to refund immediately during escrow. Default: `false` |
+| `allowArbiterRefund` | `boolean` | Lets the arbiter refund immediately during escrow. Default: `false` |
 
 <AccordionGroup>
   <Accordion title="Deployment Result Type">
@@ -233,7 +233,7 @@ console.log('AuthorizeHook:', deployment.authorizeHookAddress)
 
     Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), HookCombinator, and the Operator. If you pass `paymentIndexRecorderHookAddress: zeroAddress`, the HookCombinator is skipped (5 contracts).
 
-    Redeploying with the same parameters is idempotent (CREATE2). It detects existing contracts and skips them.
+    Redeploying with the same parameters is idempotent (CREATE2). The tooling reuses any contract that already exists at the predicted address.
   </Accordion>
 
   <Accordion title="Preview Addresses (No Deploy)">

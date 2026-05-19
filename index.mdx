@@ -6,15 +6,15 @@ icon: "house"
 
 **x402r** is a refundable payments protocol extension for [x402](https://www.x402.org/). It enables secure, reversible transactions with built-in buyer protection through smart contract escrow on Base.
 
-## Why x402r?
+## Why x402r
 
 Standard x402 payments are immediate and irreversible. x402r adds:
 
-- **Escrow deposits**: Funds held in smart contracts until conditions are met
-- **Refund windows**: Configurable time periods for buyers to request refunds
-- **Dispute resolution**: Arbiter system for handling contested transactions
+- **Escrow deposits**: smart contracts hold funds until conditions clear
+- **Refund windows**: configurable time periods for buyers to request refunds
+- **Dispute resolution**: arbiter system for handling contested transactions
 
-## How It Works
+## How it works
 
 ```mermaid
 sequenceDiagram
@@ -38,7 +38,7 @@ sequenceDiagram
     end
 ```
 
-## Who Is This For?
+## Who this is for
 
 <CardGroup cols={3}>
   <Card title="Merchants (Receivers)" icon="store" href="/sdk/examples">
@@ -46,7 +46,7 @@ sequenceDiagram
   </Card>
 </CardGroup>
 
-## Get Started
+## Get started
 
 <CardGroup cols={2}>
   <Card title="Protocol Overview" icon="diagram-project" href="/x402-integration/overview">
@@ -77,9 +77,9 @@ x402r consists of these core components:
 
 All protocol contracts use universal CREATE2 addresses, same address on every supported chain.
 
-## Supported Networks
+## Supported networks
 
-Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. Additional EVMs will be added as canonical `base/commerce-payments@v1.0.0` coverage extends.
+Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. More EVMs land as canonical `base/commerce-payments@v1.0.0` coverage extends.
 
 | Network | Chain ID | Status |
 |---|---|---|

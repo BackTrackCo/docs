@@ -6,10 +6,10 @@ icon: "clock"
 
 ## Overview
 
-AuthorizationTimeRecorderHook stores the `block.timestamp` when a payment is authorized. This timestamp is used by time-based conditions like [EscrowPeriod](/contracts/conditions/escrow-period).
+AuthorizationTimeRecorderHook stores `block.timestamp` at the moment the operator authorizes a payment. Time-based conditions like [EscrowPeriod](/contracts/conditions/escrow-period) read this timestamp to gate later actions.
 
 <Note>
-[EscrowPeriod](/contracts/conditions/escrow-period) **extends** AuthorizationTimeRecorderHook and adds `ICondition` implementation. For escrow enforcement, use EscrowPeriod directly instead of deploying AuthorizationTimeRecorderHook separately.
+[EscrowPeriod](/contracts/conditions/escrow-period) **extends** AuthorizationTimeRecorderHook and adds an `ICondition` implementation. For escrow enforcement, use EscrowPeriod directly instead of deploying AuthorizationTimeRecorderHook on its own.
 </Note>
 
 ## State

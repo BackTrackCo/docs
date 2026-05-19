@@ -51,19 +51,19 @@ Type narrowing is a DX convenience, not a security boundary. On-chain [condition
 | `publicClient` | `PublicClient` | Yes | viem public client for reads |
 | `walletClient` | `WalletClient` | No | Required for writes. Role presets throw without it. |
 | `operatorAddress` | `Address` | Yes | Your deployed PaymentOperator |
-| `chainId` | `number` | No | Auto-detected from `publicClient.chain` |
-| `network` | `string` | No | EIP-155 network ID (e.g., `'eip155:84532'`). Alternative to `chainId`. |
+| `chainId` | `number` | No | Resolves from `publicClient.chain` when omitted |
+| `network` | `string` | No | EIP-155 network ID (for example, `'eip155:84532'`). Alternative to `chainId`. |
 | `escrowPeriodAddress` | `Address` | No | Activates `escrow` group |
 | `refundRequestAddress` | `Address` | No | Activates `refund` group |
 | `refundRequestEvidenceAddress` | `Address` | No | Activates `evidence` group (requires `refundRequestAddress`) |
 | `freezeAddress` | `Address` | No | Activates `freeze` group |
 | `paymentIndexRecorderHookAddress` | `Address` | No | Activates `query` group |
-| `paymentStore` | `PaymentStore` | No | Pluggable storage for payment lookups |
+| `paymentStore` | `PaymentStore` | No | Custom storage layer for payment lookups |
 | `eventFromBlock` | `bigint` | No | Starting block for event-based payment lookups |
 
 ### Action Groups
 
-| Group | Methods | Requirement |
+| Group | Methods | Required config |
 |-------|---------|-------------|
 | `payment` | 9 | Always available |
 | `operator` | 8 | Always available |
@@ -157,7 +157,7 @@ interface CheckAgentResult {
 }
 ```
 
-When `reviewers` is omitted or empty, `reputation` is `null` and only on-chain verification runs.
+If you omit `reviewers` or pass an empty array, `reputation` is `null` and only on-chain verification runs.
 
 <Tip>
 For standalone helpers that extract identity data from x402 extension responses without a client instance, use the `extractArbiterIdentity`, `extractReputationRegistrations`, and `fetchArbiterIdentity` exports from `@x402r/sdk`.

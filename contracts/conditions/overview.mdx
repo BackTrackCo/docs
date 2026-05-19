@@ -4,13 +4,13 @@ description: "Pluggable condition system for flexible payment authorization and 
 icon: "filter"
 ---
 
-## What Are Conditions?
+## What conditions do
 
-Conditions are pluggable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots**: one per action:
+Conditions are swappable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots**, one per action:
 
 | Slot | Controls |
 |------|----------|
-| `AUTHORIZE_PRE_ACTION_CONDITION` | Who can authorize payments |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Who can create payments |
 | `CHARGE_PRE_ACTION_CONDITION` | Who can charge partial amounts |
 | `CAPTURE_PRE_ACTION_CONDITION` | Who can capture funds from escrow |
 | `VOID_PRE_ACTION_CONDITION` | Who can refund during escrow |
@@ -33,13 +33,13 @@ interface ICondition {
 - `amount`, The amount involved in the action (0 for authorization-only checks like refund request status updates)
 - `caller`, The address attempting the action
 
-**Return:** `true` if the caller is authorized, `false` otherwise.
+**Return:** `true` if the caller can proceed, `false` otherwise.
 
 ## Default Behavior
 
-**Condition slot = `address(0)`**: always returns `true` (allow). The action is unrestricted.
+**Condition slot = `address(0)`**: always returns `true` (allow). The action has no restrictions.
 
-This means you only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
+You only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
 
 ## Singleton vs Per-Deployment
 
@@ -57,7 +57,7 @@ This means you only need to set conditions for slots you want to restrict. Leave
 
 - Conditions should be `view` or `pure` to prevent reentrancy attacks
 - Never make external state-changing calls inside a condition
-- Test thoroughly, edge cases in authorization logic can lead to locked funds
+- Cover edge cases in tests. Bugs in authorization logic can lock funds
 
 ## Configuration Patterns
 
@@ -103,7 +103,7 @@ For complete configuration examples, see the [Examples](/contracts/examples) pag
 
 ### Singleton Reuse
 
-Singleton conditions are deployed once and reused by all operators. Reference the existing addresses, don't deploy new instances:
+All operators reuse the same singleton conditions. Reference the existing addresses, don't deploy new instances:
 
 ```typescript
 // Good: Reference the singleton address

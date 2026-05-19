@@ -5,7 +5,7 @@ icon: "code"
 ---
 
 <Note>
-The configuration examples below use simplified pseudo-code (e.g., `new StaticAddressCondition(...)`, `new AndCondition(...)`) to illustrate the logical composition of conditions. In practice, deploy conditions via their respective [factory contracts](/contracts/factories) using viem. See the [Deploy an operator guide](/sdk/deploy-operator) for executable code.
+The configuration examples below use simplified pseudo-code (for example, `new StaticAddressCondition(args)` or `new AndCondition([list])`) to illustrate how conditions compose. In practice, deploy conditions via their respective [factory contracts](/contracts/factories) using viem. See the [Deploy an operator guide](/sdk/deploy-operator) for executable code.
 </Note>
 
 ## Example 1: Standard E-Commerce with 7-Day Escrow
@@ -28,7 +28,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
     const freezePolicy = await freezePolicyFactory.deploy(
       PAYER_CONDITION,              // Only payer can freeze
       arbiterCondition.address,     // Only arbiter can unfreeze
-      3 * 24 * 60 * 60              // 3 days (auto-expires)
+      3 * 24 * 60 * 60              // 3 days (expires automatically)
     );
     ```
   </Step>
@@ -126,7 +126,7 @@ sequenceDiagram
 
 ## Example 2: Instant Payment (Using Charge)
 
-**Use Case:** Digital goods or services where immediate payment to seller is expected.
+**Use Case:** Digital goods or services where the seller expects immediate payment.
 
 ### Configuration
 
@@ -160,11 +160,11 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 ```
 
 **Trade-offs:**
-- ✅ Single transaction - no separate authorize step
-- ✅ Instant delivery for digital goods
-- ✅ Better UX - seller gets paid immediately
-- ❌ No buyer protection escrow period
-- ❌ Payment immediately moves to after capture state
+- Single transaction, no separate `authorize` step
+- Instant delivery for digital goods
+- Better UX: seller gets paid immediately
+- No buyer protection escrow period
+- Payment moves to the captured state right away
 
 ---
 
@@ -368,7 +368,7 @@ Factory-level fees still apply (MAX_TOTAL_FEE_RATE and PROTOCOL_FEE_PERCENTAGE).
 
 ## Example 6: Receiver-Initiated Refunds
 
-**Use Case:** Receiver can voluntarily offer refunds (e.g., return policy).
+**Use Case:** Receiver can offer refunds (for example, a return policy).
 
 ### Configuration
 
@@ -515,7 +515,7 @@ sequenceDiagram
 
 ## Example 8: DAO Treasury Controlled
 
-**Use Case:** DAO manages grant releases via multisig governance. No arbiter needed - DAO is the authority.
+**Use Case:** DAO manages grant releases via multisig governance. No arbiter needed: the DAO is the authority.
 
 ### Configuration
 
@@ -744,8 +744,8 @@ Before deploying, verify:
 - [ ] Fee rates are competitive and sustainable
 - [ ] Protocol fee percentage is reasonable
 - [ ] Tested on testnet with same configuration
-- [ ] Arbiter address is controlled (preferably multisig)
-- [ ] Condition contracts are verified on block explorer
+- [ ] A trusted party controls the arbiter address (preferably multisig)
+- [ ] Verify condition contracts on the block explorer
 
 ---
 
@@ -827,7 +827,7 @@ Test your configuration handles:
 - Freeze expiry
 - Refunds in both states
 - Fee distribution
-- Multiple partial charges
+- Partial charges followed by capture
 </Accordion>
 
 <Accordion title="Document Your Config">

@@ -28,7 +28,7 @@ icon: "map"
 
 - Bond-based disputes
 - Multi-level verification (L1 schema/auto, L2 AI review, L3 human arbitration) with per-tier `MaxAmountCondition` exposure caps
-- Multiple arbiters per operator and arbiter marketplace
+- Many arbiters per operator and an arbiter marketplace
 - After-capture arbitration handling
 - Reputation system for clients, merchants, and arbiters (via ERC-8004)
 - Token wrapper for enforced refund protection
@@ -37,7 +37,7 @@ icon: "map"
 
 ## Solana Pilot (Alpha)
 
-Solana support is **alpha/experimental**. The Anchor programs and TypeScript mechanism package are implemented, but the pilot is **unaudited** and not yet deployed to mainnet-beta. Use at your own risk; flag any production use to the team first.
+Solana support is **alpha/experimental**. The Anchor programs and TypeScript mechanism package exist, but no audit has run, and the pilot has not yet shipped to mainnet-beta. Use at your own risk; flag any production use to the team first.
 
 ### Shipped
 
@@ -94,11 +94,11 @@ Other shipped capabilities:
 
 ## Contract Status
 
-All EVM contracts use **universal CREATE2 addresses**: when a chain is supported, the address is the same as on every other supported chain. The canonical commerce-payments primitives come from [`base/commerce-payments@v1.0.0`](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
+All EVM contracts use **universal CREATE2 addresses**: when x402r supports a chain, the address matches every other supported chain. The canonical commerce-payments primitives come from [`base/commerce-payments@v1.0.0`](https://github.com/base/commerce-payments/releases/tag/v1.0.0).
 
 ### Supported chains
 
-Today: **Base mainnet** and **Base Sepolia**. Additional EVMs will be added as canonical `commerce-payments@v1.0.0` coverage from Base extends.
+Today: **Base mainnet** and **Base Sepolia**. More EVMs land as canonical `commerce-payments@v1.0.0` coverage from Base extends.
 
 Solana support is alpha and not yet on mainnet-beta. See [Solana Pilot (Alpha)](#solana-pilot-alpha).
 
