@@ -1,0 +1,67 @@
+[Ss]epolia
+[Mm]iddleware
+[Mm]isconfigured
+RPCs?
+CAIP
+Hono
+Permit2
+ERC3009
+ERC-3009
+Codehash
+[Bb]asescan
+[Bb]igint
+viem
+[Mm]ulticall3
+EIP-155
+EIP-712
+EIP-3009
+[Pp]aginated
+[Pp]agination
+[Cc]onfig
+[Cc]onfigs
+[Ll]ookups?
+PaymentInfo
+PaymentInfoHash
+PaymentOperator
+PaymentIndexRecorderHook
+HookCombinator
+AuthCaptureEscrow
+RefundRequest
+RefundRequestStatus
+ReceiverRefundCollector
+USDC
+EURC
+PYUSD
+DAI
+EOA
+CREATE2
+walletClient
+publicClient
+operatorAddress
+paymentInfo
+fromBlock
+eventFromBlock
+paymentIndexRecorderHook
+[Ee]nums?
+codehash
+multicall3
+async
+SDK
+SDKs?
+[Mm]ainnet
+[Pp]roxying
+[Pp]roxy
+
+# --- Chain names ---
+# Source of truth: `x402rChains` in
+# `x402r-sdk/packages/core/src/config/index.ts`. Only chains with deployed
+# contracts. When chains are added/removed in core, regenerate via:
+#
+#   awk '/export const x402rChains/,/^} as const/' \
+#     ../x402r-sdk/packages/core/src/config/index.ts \
+#     | grep -oE "'[A-Z][a-zA-Z ]+'" | sort -u
+#
+# Chain names referenced in marketing/roadmap docs but NOT in x402rChains
+# (e.g. Ethereum, Polygon, Arbitrum, Optimism) will fire as Vale warnings.
+# That is intentional signal — those mentions document unshipped support.
+Base

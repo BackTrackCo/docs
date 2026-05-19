@@ -2,19 +2,29 @@
 
 Mintlify docs at docs.x402r.org. Config in `docs.json`.
 
+## Workflow
+
+For any non-trivial doc work, invoke the **`writing-docs` skill** — it loads the style guide, per-page creative briefs, quality gates, and source-file map, and walks the full workflow.
+
 ## Commands
 
 ```bash
 npx mint dev  # Preview at localhost:3000
 ```
 
-## Standards
+## Hard constraints
 
 - YAML frontmatter required on all MDX files (`title`, `description`)
-- Second person ("You can..."), active voice, short paragraphs (2-4 sentences)
-- **Never use em dashes (`—`).** Use a comma, period, or rewrite the sentence instead.
+- Real addresses from `x402r-sdk/packages/core/src/config/index.ts` — never placeholders like `0xYourAddress` or `<CHAIN_ID>`
+- Verify every export, function name, and file path exists before referencing
+- Test all code examples before including
+- Never use em dashes (`—`) — use a comma, period, or rewrite
 - Use Mermaid for diagrams, never ASCII art
 - Relative paths for internal links, alt text on images
-- Test all code examples before including, use realistic values
-- All install commands must be copy-pasteable. Use `CodeGroup` with npm/pnpm/bun tabs for every install command.
 - Components: `Note`, `Tip`, `Warning`, `Info`, `Steps`, `CardGroup`, `Tabs`, `Accordion`, `CodeGroup`
+
+## Style
+
+Style rules (anti-slop, voice, structure) live in:
+- `.vale.ini` + `styles/x402r/` — deterministic enforcement (runs in CI and via PostToolUse hook on `.mdx` edits)
+- The `writing-docs` skill (installed at the monorepo workspace level) — full prose style guide, per-page briefs, quality gates, source-files map
