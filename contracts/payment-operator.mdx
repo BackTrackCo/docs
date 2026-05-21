@@ -130,13 +130,15 @@ Releases funds from escrow to receiver (capture).
 ```solidity
 function capture(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 amount
+    uint256 amount,
+    bytes calldata data
 ) external nonReentrant
 ```
 
 **Parameters:**
 - `paymentInfo` - Payment info struct
 - `amount` - Amount to capture
+- `data` - Optional pass-through data for the pre/post action plugins
 
 **Flow:**
 1. Check `CAPTURE_PRE_ACTION_CONDITION` (if set)

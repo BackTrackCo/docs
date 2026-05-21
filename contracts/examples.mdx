@@ -22,29 +22,25 @@ The configuration examples below use simplified pseudo-code (for example, `new S
     ```
   </Step>
 
-  <Step title="Deploy Freeze Policy">
-    ```typescript
-    // Payer can freeze, arbiter can unfreeze (or wait for expiry)
-    const freezePolicy = await freezePolicyFactory.deploy(
-      PAYER_CONDITION,              // Only payer can freeze
-      arbiterCondition.address,     // Only arbiter can unfreeze
-      3 * 24 * 60 * 60              // 3 days (expires automatically)
-    );
-    ```
-  </Step>
-
-  <Step title="Deploy EscrowPeriod and Freeze">
+  <Step title="Deploy EscrowPeriod">
     ```typescript
     // 7-day escrow period (combined hook + condition)
     const escrowPeriod = await escrowPeriodFactory.deploy(
       7 * 24 * 60 * 60,    // 7 days
       zeroHash             // bytes32(0) = operator-only
     );
+    ```
+  </Step>
 
-    // Freeze condition linked to escrow period
+  <Step title="Deploy Freeze">
+    ```typescript
+    // Payer can freeze, arbiter can unfreeze (or wait for 3-day expiry),
+    // linked to the 7-day escrow period.
     const freeze = await freezeFactory.deploy(
-      freezePolicy,
-      escrowPeriod         // Link to escrow period for time constraint
+      PAYER_CONDITION,              // freezeCondition: only payer can freeze
+      arbiterCondition.address,     // unfreezeCondition: only arbiter can unfreeze
+      3 * 24 * 60 * 60,             // freezeDuration: 3 days (auto-expires; 0 = permanent)
+      escrowPeriod                  // escrowPeriodContract: restricts freeze() to the escrow window (address(0) = unconstrained)
     );
     ```
   </Step>
@@ -178,21 +174,20 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 // Deploy arbiter condition
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
-// Receiver can freeze for 5 days, arbiter can unfreeze
-const freezePolicy = await freezePolicyFactory.deploy(
-  RECEIVER_CONDITION,           // Receiver can freeze (product defect)
-  arbiterCondition.address,     // Arbiter can unfreeze (dispute resolution)
-  5 * 24 * 60 * 60              // 5 days (auto-expires)
-);
-
 // 14-day escrow (shipping + inspection)
 const escrowPeriod = await escrowPeriodFactory.deploy(
   14 * 24 * 60 * 60,   // 14 days
   zeroHash             // bytes32(0) = operator-only
 );
 
-// Deploy Freeze linked to escrow period
-const freeze = await freezeFactory.deploy(freezePolicy, escrowPeriod);
+// Receiver freeze (product defect), arbiter unfreeze (dispute resolution),
+// linked to the 14-day escrow period.
+const freeze = await freezeFactory.deploy(
+  RECEIVER_CONDITION,           // freezeCondition
+  arbiterCondition.address,     // unfreezeCondition
+  5 * 24 * 60 * 60,             // freezeDuration: 5 days
+  escrowPeriod                  // escrowPeriodContract
+);
 
 // Receiver OR Arbiter can capture (after escrow + not frozen)
 const capturePreActionCondition = await new AndCondition([
@@ -246,8 +241,8 @@ sequenceDiagram
     Arbiter->>Arbiter: Investigates
 
     Note over Buyer,Escrow: Day 16 - Resolution
-    Arbiter->>Operator: voidPayment(paymentId)
-    Operator->>Escrow: void(paymentId)
+    Arbiter->>Operator: void(paymentInfo, data)
+    Operator->>Escrow: void(paymentInfo)
     Escrow->>Buyer: Full refund
 ```
 
@@ -432,8 +427,8 @@ sequenceDiagram
     Note over Buyer,Escrow: Day 5 - Return Request
     Buyer->>Seller: Requests return
     Note over Seller: Approves return
-    Seller->>Operator: voidPayment(paymentId)
-    Operator->>Escrow: void(paymentId)
+    Seller->>Operator: void(paymentInfo, data)
+    Operator->>Escrow: void(paymentInfo)
     Escrow->>Buyer: Full refund
     Note over Buyer,Escrow: Buyer returns product
 ```
@@ -460,7 +455,7 @@ const config = {
   chargePostActionHook: '0x0000000000000000000000000000000000000000',
   capturePreActionCondition: providerCondition.address,// Provider releases
   capturePostActionHook: '0x0000000000000000000000000000000000000000',
-  voidPreActionCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
+  voidPreActionCondition: '0x0000000000000000000000000000000000000000',        // Open-access: anyone can call void() (`address(0)` = default-allow)
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
   refundPreActionCondition: '0x0000000000000000000000000000000000000000',
   refundPostActionHook: '0x0000000000000000000000000000000000000000'

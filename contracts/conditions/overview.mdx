@@ -23,7 +23,8 @@ interface ICondition {
     function check(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
+        address caller,
+        bytes calldata data
     ) external view returns (bool allowed);
 }
 ```
@@ -32,6 +33,7 @@ interface ICondition {
 - `paymentInfo`, The payment information struct
 - `amount`, The amount involved in the action (0 for authorization-only checks like refund request status updates)
 - `caller`, The address attempting the action
+- `data`, Arbitrary data forwarded from the caller (signatures, proofs, attestations)
 
 **Return:** `true` if the caller can proceed, `false` otherwise.
 
@@ -117,14 +119,14 @@ Prefer stateless conditions when possible:
 
 ```solidity
 // Stateless: No storage reads (pure)
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external pure returns (bool)
 {
     return caller == payment.receiver;  // Pure computation
 }
 
 // Stateful: Storage reads cost gas (view)
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external view returns (bool)
 {
     return allowList[caller];  // SLOAD costs gas

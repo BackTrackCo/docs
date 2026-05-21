@@ -22,12 +22,13 @@ mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTim
 
 ```solidity
 // Called after authorize()
-function record(
+function run(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 amount,
-    address caller
+    uint256 /* amount */,
+    address /* caller */,
+    bytes calldata /* data */
 ) external {
-    bytes32 hash = escrow.getHash(paymentInfo);
+    bytes32 hash = _verifyAndHash(paymentInfo);
     authorizationTimes[hash] = block.timestamp;
 }
 
@@ -39,13 +40,15 @@ function getAuthorizationTime(
 }
 ```
 
+`amount`, `caller`, and `data` are unused; they exist to satisfy `IHook.run`.
+
 ## When to Use
 
 Use AuthorizationTimeRecorderHook directly only if you need authorization timestamps **without** escrow period enforcement. For most use cases, [EscrowPeriod](/contracts/conditions/escrow-period) is the better choice since it includes this hook plus time-lock condition logic.
 
 ## Gas
 
-**Cost:** ~20k gas per `record()` call (one `SSTORE` for the timestamp).
+**Cost:** ~20k gas per `run()` call (one `SSTORE` for the timestamp).
 
 ## Next Steps
 

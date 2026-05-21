@@ -49,6 +49,7 @@ Environment variable names use no `X402R_` prefix to match Foundry, Hardhat, and
 | Flag | Description |
 |------|-------------|
 | `--chain <eip155:id>` | Select a specific `accepts[]` entry when the merchant offers more than one chain. Required when more than one option exists. |
+| `--asset-transfer-method <eip3009\|permit2>` | Select the token-collection path when the chosen `accepts[]` entry supports both EIP-3009 and Permit2. Required when more than one option exists. |
 | `--rpc <url>` | Override the RPC endpoint for on-chain reads. Required for chain IDs not in `viem/chains`. |
 | `--max-amount <n>` | Refuse to pay more than `n` atomic token units. Exits with code 3 if the price exceeds this. |
 | `--json` | Emit a single JSON envelope to stdout instead of plain text. |

@@ -54,25 +54,24 @@ The [AI garbage detector example](https://github.com/BackTrackCo/arbiter-example
   </Step>
 
   <Step title="Handle the verify endpoint">
-    The merchant's `forwardToArbiter()` hook POSTs `{ responseBody, transaction, paymentPayload }` to `/verify`. The payload does not contain `PaymentInfo` directly. Reconstruct it from `paymentPayload.accepted.extra` + `paymentPayload.payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), or run the payload back through your own facilitator's verify step to recover it.
+    The merchant's `forwardToArbiter()` hook POSTs `{ responseBody, transaction, paymentInfoWire }` to `/verify`. The `paymentInfoWire` is the JSON-safe wire form of `PaymentInfo`; call `PaymentInfo.fromWire(...)` to recover the `bigint`-typed struct expected by SDK actions.
 
     ```typescript
-    import { isAuthCapturePayload } from '@x402r/helpers'
+    import { PaymentInfo } from '@x402r/sdk'
     import express from 'express'
 
     const app = express()
     app.use(express.json())
 
     app.post('/verify', async (req, res) => {
-      const { responseBody, transaction, paymentPayload } = req.body
+      const { responseBody, transaction, paymentInfoWire } = req.body
 
-      if (!isAuthCapturePayload(paymentPayload?.payload)) {
-        res.status(400).json({ error: 'unsupported_payload' })
+      if (!paymentInfoWire) {
+        res.status(400).json({ error: 'missing_payment_info' })
         return
       }
 
-      // Reconstruct PaymentInfo from the wire payload (see forwardToArbiter docs).
-      const paymentInfo = reconstructPaymentInfo(paymentPayload)
+      const paymentInfo = PaymentInfo.fromWire(paymentInfoWire)
 
       const passed = await evaluate(responseBody)
 

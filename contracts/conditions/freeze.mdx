@@ -23,7 +23,8 @@ Freeze is a standalone condition that blocks capture on frozen payments. It mana
 function check(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256,
-    address
+    address,
+    bytes calldata
 ) external view returns (bool allowed) {
     return !isFrozen(paymentInfo);
 }

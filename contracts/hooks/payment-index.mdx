@@ -6,59 +6,75 @@ icon: "list-ol"
 
 ## Overview
 
-PaymentIndexRecorderHook records a sequential index for each payment action, so one payment can support more than one refund request. Every `record()` call increments the index by 1.
+PaymentIndexRecorderHook indexes payments by payer and receiver and stores the full `PaymentInfo` struct keyed by `paymentInfoHash`. Wire it into `AUTHORIZE_POST_ACTION_HOOK` on a `HookCombinator` (or directly when authorize is the only hook slot you use) so each new authorization registers itself for on-chain lookups.
 
 ## When to use
 
 - You need on-chain payment lookups **without a subgraph**
-- You need to support **more than one refund request** per payment (each keyed by nonce)
-- Other contracts need to read the payment index on-chain
+- Other contracts need to read the full `PaymentInfo` for a hash, or page through every payment by payer / receiver
+- You want a single chain-singleton index that aggregates across every operator routing through `HookCombinator`
 
 **Skip when:** you're using a subgraph for payment queries, since the subgraph can derive indexes from events without the on-chain gas cost.
 
 ## State
 
 ```solidity
-mapping(bytes32 paymentInfoHash => uint256 count) public paymentIndex;
+mapping(bytes32 paymentInfoHash => AuthCaptureEscrow.PaymentInfo) private paymentInfoStore;
+mapping(address payer    => mapping(uint256 index => bytes32 hash)) private payerPayments;
+mapping(address payer    => uint256 count)                        public  payerPaymentCount;
+mapping(address receiver => mapping(uint256 index => bytes32 hash)) private receiverPayments;
+mapping(address receiver => uint256 count)                        public  receiverPaymentCount;
 ```
 
 ## Methods
 
 ```solidity
-function record(
+function run(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 amount,
-    address caller
+    uint256 /* amount */,
+    address /* caller */,
+    bytes calldata /* data */
 ) external {
     bytes32 hash = escrow.getHash(paymentInfo);
-    paymentIndex[hash]++;
+    paymentInfoStore[hash] = paymentInfo;
+    payerPayments[paymentInfo.payer][payerPaymentCount[paymentInfo.payer]++] = hash;
+    receiverPayments[paymentInfo.receiver][receiverPaymentCount[paymentInfo.receiver]++] = hash;
 }
 
-function getPaymentIndex(
-    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
-) external view returns (uint256) {
-    return paymentIndex[escrow.getHash(paymentInfo)];
-}
+function getPaymentInfo(
+    bytes32 paymentInfoHash
+) external view returns (AuthCaptureEscrow.PaymentInfo memory);
+
+function getPayerPayments(
+    address payer,
+    uint256 offset,
+    uint256 count
+) external view returns (AuthCaptureEscrow.PaymentInfo[] memory, uint256 total);
+
+function getReceiverPayments(
+    address receiver,
+    uint256 offset,
+    uint256 count
+) external view returns (AuthCaptureEscrow.PaymentInfo[] memory, uint256 total);
 ```
 
-## Integration with RefundRequest
+`amount`, `caller`, and `data` are unused; they exist to satisfy `IHook.run`.
 
-The `nonce` parameter in `RefundRequest.requestRefund()` corresponds to the payment index. This allows one refund request per charge/action:
+## Querying
 
 ```typescript
-// After two charges on the same payment:
-// paymentIndex = 2
+const info = await paymentIndex.read.getPaymentInfo([paymentInfoHash])
 
-// Refund request for first charge
-await refundRequest.requestRefund(paymentInfo, amount1, 0); // nonce 0
-
-// Refund request for second charge
-await refundRequest.requestRefund(paymentInfo, amount2, 1); // nonce 1
+const [payerInfos, total] = await paymentIndex.read.getPayerPayments([
+  payer,
+  0n,
+  10n,
+])
 ```
 
 ## Gas
 
-**Cost:** ~20k gas per `record()` call (one `SSTORE` for the counter increment).
+**Cost:** ~175k gas per authorization (payer index + receiver index + full `PaymentInfo` SSTORE).
 
 ## Next Steps
 

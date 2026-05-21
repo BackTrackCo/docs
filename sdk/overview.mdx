@@ -81,11 +81,14 @@ bunx @x402r/cli pay <url> [options]
 ### Guides
 
 <CardGroup cols={2}>
-  <Card title="Merchants" icon="store" href="/sdk/merchant/quickstart">
-    Deploy an operator, accept a payment, capture funds from escrow.
-  </Card>
   <Card title="Merchant guide" icon="store" href="/sdk/merchant/quickstart">
     Capture funds from escrow, charge directly, void, and process refunds using `createMerchantClient`.
+  </Card>
+  <Card title="Deploy an operator" icon="rocket" href="/sdk/deploy-operator">
+    Deploy a PaymentOperator on Base or Base Sepolia and configure plugin slots.
+  </Card>
+  <Card title="Delivery protection" icon="shield-check" href="/sdk/delivery-protection">
+    Wire merchant settlements into an arbiter that gates capture on response quality.
   </Card>
   <Card title="@x402r/cli" icon="terminal" href="/sdk/cli">
     Wallet-agnostic one-shot payments from the command line or scripts.

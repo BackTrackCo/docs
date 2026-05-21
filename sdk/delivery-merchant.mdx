@@ -25,20 +25,19 @@ icon: "store"
   </Step>
 
   <Step title="Configure forwardToArbiter()">
-    Add the `forwardToArbiter()` hook to your x402 resource server. After every successful `authCapture` settlement, it POSTs to your arbiter service fire-and-forget:
+    Add the `forwardToArbiter()` hook to your x402 resource server. After every successful `auth-capture` settlement, it POSTs to your arbiter service fire-and-forget:
 
     ```typescript
     import { forwardToArbiter } from '@x402r/helpers'
-    import { registerAuthCaptureEvmScheme } from '@x402r/evm/authCapture/server'
+    import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
 
     const resourceServer = new x402ResourceServer(facilitatorConfig)
-    registerAuthCaptureEvmScheme(resourceServer)
-
-    resourceServer.onAfterSettle(
-      forwardToArbiter('http://your-arbiter:3001', {
-        onError: (err) => console.error('Arbiter unreachable:', err),
-      }),
-    )
+      .register(networkId, new AuthCaptureEvmScheme())
+      .onAfterSettle(
+        forwardToArbiter('http://your-arbiter:3001', {
+          onError: (err) => console.error('Arbiter unreachable:', err),
+        }),
+      )
     ```
 
     The hook POSTs to `{arbiterUrl}/verify` with:
@@ -47,15 +46,24 @@ icon: "store"
     {
       "responseBody": "the HTTP response body as a string",
       "transaction": "0xsettlement_tx_hash",
-      "paymentPayload": {
-        "x402Version": 2,
-        "accepted": { "scheme": "authCapture", "network": "eip155:84532", "...": "..." },
-        "payload": { "authorization": { "...": "..." }, "signature": "0x...", "salt": "0x..." }
+      "paymentInfoWire": {
+        "operator": "0x...",
+        "payer": "0x...",
+        "receiver": "0x...",
+        "token": "0x...",
+        "maxAmount": "10000",
+        "preApprovalExpiry": 1740758554,
+        "authorizationExpiry": 1740762154,
+        "refundExpiry": 1741276954,
+        "minFeeBps": 0,
+        "maxFeeBps": 500,
+        "feeReceiver": "0x...",
+        "salt": "0x..."
       }
     }
     ```
 
-    The payload does not include a nested `paymentInfo`. The arbiter reconstructs `PaymentInfo` from `accepted.extra` + `payload.salt` + the recovered payer + the top-level requirements. See [forwardToArbiter() docs](/sdk/helpers/forward-to-arbiter) for the full payload shape.
+    The helper reconstructs `PaymentInfoWire` from the verified `SettleResultContext`. The arbiter consumes `req.body.paymentInfoWire` and runs it through `PaymentInfo.fromWire(...)` to recover the `bigint`-typed struct expected by SDK actions. See [forwardToArbiter() docs](/sdk/helpers/forward-to-arbiter) for the full payload shape.
 
     <Warning>
     `forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.

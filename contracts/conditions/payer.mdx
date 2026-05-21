@@ -15,7 +15,7 @@ PayerCondition is a singleton condition that restricts an action to the payment'
 ## Logic
 
 ```solidity
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external pure returns (bool)
 {
     return caller == payment.payer;

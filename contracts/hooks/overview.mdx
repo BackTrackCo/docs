@@ -20,10 +20,11 @@ Hooks are pluggable contracts that update state **after** an action successfully
 
 ```solidity
 interface IHook {
-    function record(
+    function run(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
+        address caller,
+        bytes calldata data
     ) external;
 }
 ```
@@ -32,6 +33,7 @@ interface IHook {
 - `paymentInfo`, The payment information struct
 - `amount`, The amount involved in the action
 - `caller`, The address that executed the action (msg.sender on operator)
+- `data`, Arbitrary data forwarded from the caller (signatures, proofs, attestations)
 
 ## Default behavior
 

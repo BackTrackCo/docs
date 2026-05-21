@@ -1,6 +1,6 @@
 ---
 title: "Commerce Payments"
-description: "AuthCaptureEscrow and the canonical token collectors that form the authCapture base layer"
+description: "AuthCaptureEscrow and the canonical token collectors that form the auth-capture base layer"
 icon: "vault"
 ---
 
@@ -102,7 +102,7 @@ function void(PaymentInfo calldata paymentInfo) external
 
 #### reclaim()
 
-Permissionless: the payer can pull funds back out of escrow after `captureDeadline` if the captureAuthorizer never captured.
+Payer-only: gated by `onlySender(paymentInfo.payer)`. The payer can pull funds back out of escrow after `captureDeadline` if the captureAuthorizer never captured. No third party (including the operator or arbiter) can call `reclaim` on the payer's behalf.
 
 ```solidity
 function reclaim(PaymentInfo calldata paymentInfo) external
@@ -167,7 +167,7 @@ const authorization = {
 ```
 
 <Note>
-The authCapture scheme uses `receiveWithAuthorization` (not `transferWithAuthorization`). The token collector is the `to` address, which then routes tokens into the escrow.
+The auth-capture scheme uses `receiveWithAuthorization` (not `transferWithAuthorization`). The token collector is the `to` address, which then routes tokens into the escrow.
 </Note>
 
 ---
@@ -178,4 +178,4 @@ Collects ERC-20 tokens through Uniswap Permit2 `permitTransferFrom`. The operato
 
 The client signs a Permit2 `PermitTransferFrom`; the deterministic nonce binds the merchant address, removing the need for a separate witness struct.
 
-See the [authCapture Scheme Specification](/x402-integration/auth-capture-scheme) for the full Permit2 wire format.
+See the [auth-capture Scheme Specification](/x402-integration/auth-capture-scheme) for the full Permit2 wire format.

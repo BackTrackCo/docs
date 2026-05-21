@@ -123,7 +123,7 @@ import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { paymentOperatorAbi } from '@x402r/core';
 
-const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
+const FACTORY_ADDRESS = '0xa0d4734842df1690a5B33Cb21828c946e39D55a2';
 
 const account = privateKeyToAccount('0x...');
 const walletClient = createWalletClient({
@@ -488,19 +488,19 @@ Each factory uses different salt strategies:
 
 **PaymentOperatorFactory:**
 ```solidity
-bytes32 key = keccak256(abi.encodePacked(
+bytes32 key = keccak256(abi.encode(
     config.feeReceiver,
     config.feeCalculator,
-    config.authorizeCondition,
-    config.authorizeHook,
-    config.chargeCondition,
-    config.chargeHook,
-    config.captureCondition,
-    config.captureHook,
-    config.voidCondition,
-    config.voidHook,
-    config.refundCondition,
-    config.refundHook
+    config.authorizePreActionCondition,
+    config.authorizePostActionHook,
+    config.chargePreActionCondition,
+    config.chargePostActionHook,
+    config.capturePreActionCondition,
+    config.capturePostActionHook,
+    config.voidPreActionCondition,
+    config.voidPostActionHook,
+    config.refundPreActionCondition,
+    config.refundPostActionHook
 ));
 ```
 

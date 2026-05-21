@@ -33,7 +33,8 @@ EscrowPeriod extends [AuthorizationTimeRecorderHook](/contracts/hooks/authorizat
 function check(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256,
-    address
+    address,
+    bytes calldata
 ) external view returns (bool allowed) {
     return !isDuringEscrowPeriod(paymentInfo);
 }
@@ -92,7 +93,7 @@ For freeze functionality, deploy a separate [Freeze](/contracts/conditions/freez
 
 ## Gas
 
-**Cost:** ~20k gas per `record()` call (one `SSTORE` for the timestamp). The `check()` call is a `view` function with one `SLOAD`.
+**Cost:** ~20k gas per `run()` call (one `SSTORE` for the timestamp). The `check()` call is a `view` function with one `SLOAD`.
 
 ## Next Steps
 

@@ -13,11 +13,9 @@ You can create custom conditions for specialized logic beyond what the built-in 
 From the `ICondition.sol` NatSpec:
 
 1. **MUST NOT revert**: return `false` to deny, never `revert`
-2. **Should be `view` or `pure`**: no state-changing operations
-3. **No external calls**: avoid calling other contracts to prevent reentrancy risks
-4. **Return `true` to allow, `false` to deny**
+2. **Return `true` to allow, `false` to deny**
 
-The operator converts a `false` return into a `ConditionNotMet` revert.
+The operator converts a `false` return into a `PreActionConditionNotMet` revert. Prefer `view` or `pure` implementations to keep call sites cheap and gas predictable.
 
 ## Example: TimeOfDayCondition
 
@@ -36,7 +34,8 @@ contract TimeOfDayCondition is ICondition {
     function check(
         PaymentInfo calldata payment,
         uint256,
-        address caller
+        address caller,
+        bytes calldata
     ) external view returns (bool) {
         uint256 hour = (block.timestamp / 3600) % 24;
         return hour >= startHour && hour < endHour;
@@ -84,13 +83,13 @@ contract TimeOfDayConditionTest is Test {
     function test_allowsDuringBusinessHours() public {
         // Set block.timestamp to 10 AM UTC
         vm.warp(10 * 3600);
-        assertTrue(condition.check(paymentInfo, 0, caller));
+        assertTrue(condition.check(paymentInfo, 0, caller, ""));
     }
 
     function test_deniesOutsideBusinessHours() public {
         // Set block.timestamp to 8 PM UTC
         vm.warp(20 * 3600);
-        assertFalse(condition.check(paymentInfo, 0, caller));
+        assertFalse(condition.check(paymentInfo, 0, caller, ""));
     }
 }
 ```

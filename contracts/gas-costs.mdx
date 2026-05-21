@@ -54,7 +54,7 @@ The PaymentOperator runs with pluggable conditions (checked before an action) an
 | Commerce Payments escrow (no operator) | 78,353 |: | Raw `AuthCaptureEscrow.authorize()`: validates payment, escrows tokens via `PreApprovalPaymentCollector` |
 | + PaymentOperator layer | 117,250 | **+38,897** | Operator dispatch, plugin slot checks, access control: all conditions, hooks, and fee calculator set to `address(0)` |
 | + Fee calculation | 135,961 | **+18,711** | `StaticFeeCalculator`: calculates protocol + operator fees, validates bounds, locks fees in `authorizedFees[hash]` |
-| + EscrowPeriod hook | 162,744 | **+26,783** | `EscrowPeriod.record()`: stores `authorizationTime[hash] = block.timestamp` (cold SSTORE to cross-contract slot) |
+| + EscrowPeriod hook | 162,744 | **+26,783** | `EscrowPeriod.run()`: stores `authorizationTime[hash] = block.timestamp` (cold SSTORE to cross-contract slot) |
 
 The EscrowPeriod hook is the single most expensive plugin on `authorize` because it writes to a new storage slot in the EscrowPeriod contract.
 
@@ -79,12 +79,12 @@ These operations only happen when a buyer disputes a payment. Most payments neve
 
 ### Off-chain resolution
 
-The refund request, evidence submission, and arbiter approval can all happen off-chain. The only on-chain steps are `freeze()` (to lock the payment during the escrow window) and `voidPayment()` (to return funds). The arbiter never submits a transaction; their approval is an EIP-712 signature that anyone can relay.
+The refund request, evidence submission, and arbiter approval can all happen off-chain. The only on-chain steps are `freeze()` (to lock the payment during the escrow window) and `void()` (to return funds). The arbiter never submits a transaction; their approval is an EIP-712 signature that anyone can relay.
 
 | On-chain step | Gas | vs transfer | Who Calls |
 |--------------|-----|------------|-----------|
 | `freeze()` | 44,651 | 4.3x | Buyer |
-| `voidPayment()` | 65,924 | 6.4x | Anyone |
+| `void()` | 65,924 | 6.4x | Anyone |
 | **Total** | **110,575** | **10.7x** | |
 
 Total dispute cost on Base with off-chain resolution: **< $0.005**.

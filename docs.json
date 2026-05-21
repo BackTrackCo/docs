@@ -21,15 +21,9 @@
             ]
           },
           {
-            "group": "authCapture Scheme",
+            "group": "auth-capture Scheme",
             "pages": [
               "x402-integration/auth-capture-scheme"
-            ]
-          },
-          {
-            "group": "Roadmap",
-            "pages": [
-              "roadmap"
             ]
           }
         ]

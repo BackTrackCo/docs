@@ -44,7 +44,7 @@ This guide walks you through setting up an Express server that accepts x402r esc
     import "dotenv/config";
     import express from "express";
     import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-    import { AuthCaptureServerScheme } from "@x402r/evm/authCapture/server";
+    import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/server";
     import { getChainConfig } from "@x402r/core";
     import { HTTPFacilitatorClient } from "@x402/core/server";
 
@@ -74,7 +74,7 @@ This guide walks you through setting up an Express server that accepts x402r esc
           "GET /weather": {
             accepts: [
               {
-                scheme: "authCapture",
+                scheme: "auth-capture",
                 price: "$0.01",
                 network: networkId,
                 payTo: address,
@@ -99,7 +99,7 @@ This guide walks you through setting up an Express server that accepts x402r esc
         },
         new x402ResourceServer(facilitatorClient).register(
           networkId,
-          new AuthCaptureServerScheme() as never,
+          new AuthCaptureEvmScheme(),
         ),
       ),
     );
@@ -132,13 +132,13 @@ This guide walks you through setting up an Express server that accepts x402r esc
     curl http://localhost:4021/weather
     ```
 
-    Without a valid payment header, the server responds with HTTP 402 and the authCapture payment requirements:
+    Without a valid payment header, the server responds with HTTP 402 and the auth-capture payment requirements:
 
     ```json
     {
       "x402Version": 2,
       "accepts": [{
-        "scheme": "authCapture",
+        "scheme": "auth-capture",
         "price": "$0.01",
         "network": "eip155:84532",
         "payTo": "0x...",
@@ -162,7 +162,7 @@ This guide walks you through setting up an Express server that accepts x402r esc
 ## How it works
 
 - **`extra` config** declares the captureAuthorizer, capture/refund deadlines, fee recipient, and fee bounds. The canonical `AuthCaptureEscrow` and token collector addresses are universal CREATE2 deploys, so routes do not need to repeat them.
-- **`AuthCaptureServerScheme`** registers the authCapture payment scheme with the x402 resource server so it can verify authCapture-backed payments.
+- **`AuthCaptureEvmScheme`** registers the auth-capture payment scheme with the x402 resource server so it can verify auth-capture-backed payments.
 - **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 when the caller has not provided one.
 - **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
 

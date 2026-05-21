@@ -5,19 +5,20 @@ description: "Forward settlement data to an arbiter service for quality evaluati
 icon: "arrow-right"
 ---
 
-The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and payment payload to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
+The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and reconstructed `PaymentInfoWire` to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
 
-- Only fires for successful **`authCapture`** scheme settlements
-- POSTs `{ responseBody, transaction, paymentPayload }` to `{arbiterUrl}/verify`
+- Only fires for successful **`auth-capture`** scheme settlements
+- POSTs `{ responseBody, transaction, paymentInfoWire }` to `{arbiterUrl}/verify`
 - The hook catches errors internally so an unreachable arbiter cannot break the payment flow
 
 ## Usage
 
 ```typescript
 import { forwardToArbiter } from '@x402r/helpers'
+import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register(networkId, new AuthCaptureServerScheme())
+  .register(networkId, new AuthCaptureEvmScheme())
   .onAfterSettle(
     forwardToArbiter('http://arbiter:3001'),
   )
@@ -50,35 +51,30 @@ interface ForwardToArbiterOptions {
 
 ## Payload shape
 
-When an `authCapture` settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
+When an `auth-capture` settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
 
 ```typescript
 {
-  responseBody: string         // UTF-8 encoded response body
-  transaction: string          // Settlement transaction hash
-  paymentPayload: {
-    x402Version: number
-    accepted: {
-      scheme: 'authCapture'
-      network: string          // e.g. "eip155:84532"
-      amount: string
-      asset: `0x${string}`
-      payTo: `0x${string}`
-      maxTimeoutSeconds: number
-      extra: AuthCaptureExtra  // captureAuthorizer, captureDeadline, refundDeadline, ...
-    }
-    payload:
-      | { authorization: { from, to, value, validAfter, validBefore, nonce }; signature; salt }     // EIP-3009
-      | { permit2Authorization: { from, permitted, spender, nonce, deadline }; signature; salt }    // Permit2
+  responseBody: string             // UTF-8 encoded response body
+  transaction: string              // Settlement transaction hash
+  paymentInfoWire: {
+    operator: `0x${string}`        // from extra.captureAuthorizer
+    payer: `0x${string}`           // recovered at settlement
+    receiver: `0x${string}`        // from requirements.payTo
+    token: `0x${string}`           // from requirements.asset
+    maxAmount: string              // from requirements.amount
+    preApprovalExpiry: number      // authorization.validBefore (EIP-3009) or permit2Authorization.deadline (Permit2)
+    authorizationExpiry: number    // from extra.captureDeadline
+    refundExpiry: number           // from extra.refundDeadline
+    minFeeBps: number              // from extra.minFeeBps
+    maxFeeBps: number              // from extra.maxFeeBps
+    feeReceiver: `0x${string}`     // from extra.feeRecipient
+    salt: string                   // from payload.salt
   }
 }
 ```
 
-The payload does not nest a `paymentInfo` object. The arbiter reconstructs `PaymentInfo` from `accepted.extra` + `payload.salt` + the recovered `payer` + the top-level requirements (`payTo`, `asset`, `amount`), the same way the facilitator does at settlement.
-
-<Tip>
-The arbiter can also resolve the `PaymentInfo` indirectly: derive `paymentInfoHash` from the wire data, then read the on-chain `PaymentInfo` from the escrow if it stores it, or simply forward the wire payload back into your own facilitator to verify.
-</Tip>
+The helper reconstructs `PaymentInfoWire` from the verified `SettleResultContext` using the `reconstructPaymentInfoWire()` helper. The arbiter consumes `req.body.paymentInfoWire` and runs it through `PaymentInfo.fromWire(...)` (from `@x402r/sdk` or `@x402r/core`) to get the `bigint`-typed `PaymentInfo` struct expected by SDK actions.
 
 ## Error handling
 
@@ -86,9 +82,10 @@ By default, the hook logs fetch errors with `console.warn`. Override this with a
 
 ```typescript
 import { forwardToArbiter } from '@x402r/helpers'
+import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
 
 const resourceServer = new x402ResourceServer(facilitatorClient)
-  .register(networkId, new AuthCaptureServerScheme())
+  .register(networkId, new AuthCaptureEvmScheme())
   .onAfterSettle(
     forwardToArbiter('http://arbiter:3001', {
       onError: (err) => sentry.captureException(err),
@@ -103,7 +100,7 @@ The hook wraps each error in an `X402rError` carrying the arbiter endpoint and r
 The hook returns without making a request when:
 
 - The settlement was not successful (`context.result.success === false`)
-- The scheme is not `authCapture`
+- The scheme is not `auth-capture`
 - No response body is available in the transport context
 
 ## Address re-exports

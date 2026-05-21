@@ -22,17 +22,17 @@ Core escrow contract for holding ERC-20 tokens during payments.
 
 **Features:**
 - Authorization-based deposits (no direct transfers)
-- Payment state machine: `NonExistent` → `InEscrow` → `Captured` → `Settled`
+- Per-payment state queried via `paymentState(hash)` → `(hasCollected, capturableAmount, ...)`
 - Void/reclaim for failed authorizations
 - CaptureAuthorizer-based access control
 
 **Key Methods:**
 ```solidity
-authorize(paymentId, payer, receiver, amount, token, operator)
-charge(paymentId, amount)
-capture(paymentInfo, amount)
-void(paymentId)
-reclaim(paymentId, receiver, amount)
+authorize(paymentInfo, amount, tokenCollector, collectorData)
+charge(paymentInfo, amount, tokenCollector, collectorData)
+capture(paymentInfo, amount, data)
+void(paymentInfo, data)
+reclaim(paymentInfo, data)
 ```
 
 ### ERC3009PaymentCollector

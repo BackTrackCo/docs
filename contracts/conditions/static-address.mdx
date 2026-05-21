@@ -20,7 +20,7 @@ contract StaticAddressCondition is ICondition {
         DESIGNATED_ADDRESS = _designatedAddress;
     }
 
-    function check(PaymentInfo calldata payment, uint256, address caller)
+    function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
         external view returns (bool)
     {
         return caller == DESIGNATED_ADDRESS;

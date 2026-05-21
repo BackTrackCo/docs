@@ -12,59 +12,70 @@ You can build custom hooks for specialized tracking beyond what the built-in hoo
 
 ```solidity
 interface IHook {
-    function record(
+    function run(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
+        address caller,
+        bytes calldata data
     ) external;
 }
 ```
 
+`data` is forwarded verbatim from the action call (signatures, proofs, attestations). Subclasses ignore parameters they do not need.
+
 ## Extending BaseHook
 
-Extend `BaseHook` to ensure only authorized operators can call `record()`:
+Extend `BaseHook` and call `_verifyAndHash(paymentInfo)` to enforce caller and payment-existence checks:
 
 ```solidity
 contract MyHook is BaseHook {
-    constructor(address _escrow) BaseHook(_escrow) {}
+    constructor(address escrow, bytes32 authorizedCodehash)
+        BaseHook(escrow, authorizedCodehash)
+    {}
 
-    function record(
+    function run(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
-    ) external onlyAuthorizedOperator {
-        // Your recording logic here
+        address /* caller */,
+        bytes calldata /* data */
+    ) external override {
+        bytes32 hash = _verifyAndHash(paymentInfo);
+        // Your recording logic here, keyed by `hash`
     }
 }
 ```
 
-## Example: ReleaseCountHook
+`authorizedCodehash` is the runtime codehash of an optional trusted caller (e.g. `HookCombinator`). Pass `bytes32(0)` to gate solely on `msg.sender == paymentInfo.operator`.
 
-Tracks the number and total amount of releases per payment:
+## Example: CaptureCountHook
+
+Tracks the number and total amount of captures per payment:
 
 ```solidity
-contract ReleaseCountHook is BaseHook {
-    mapping(bytes32 => uint256) public releaseCount;
-    mapping(bytes32 => uint256) public totalReleased;
+contract CaptureCountHook is BaseHook {
+    mapping(bytes32 => uint256) public captureCount;
+    mapping(bytes32 => uint256) public totalCaptured;
 
-    constructor(address _escrow) BaseHook(_escrow) {}
+    constructor(address escrow, bytes32 authorizedCodehash)
+        BaseHook(escrow, authorizedCodehash)
+    {}
 
-    function record(
-        PaymentInfo calldata payment,
+    function run(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
-    ) external onlyAuthorizedOperator {
-        bytes32 hash = escrow.getHash(payment);
-        releaseCount[hash]++;
-        totalReleased[hash] += amount;
+        address /* caller */,
+        bytes calldata /* data */
+    ) external override {
+        bytes32 hash = _verifyAndHash(paymentInfo);
+        captureCount[hash]++;
+        totalCaptured[hash] += amount;
     }
 
-    // Enable tracking partial releases
     function getStats(bytes32 paymentHash)
         external view
         returns (uint256 count, uint256 total)
     {
-        return (releaseCount[paymentHash], totalReleased[paymentHash]);
+        return (captureCount[paymentHash], totalCaptured[paymentHash]);
     }
 }
 ```
@@ -74,24 +85,27 @@ contract ReleaseCountHook is BaseHook {
 Test custom hooks with Forge:
 
 ```solidity
-contract ReleaseCountHookTest is Test {
-    ReleaseCountHook hook;
+contract CaptureCountHookTest is Test {
+    CaptureCountHook hook;
 
     function setUp() public {
-        hook = new ReleaseCountHook(address(escrow));
+        hook = new CaptureCountHook(address(escrow), bytes32(0));
     }
 
-    function test_incrementsOnRecord() public {
-        hook.record(paymentInfo, 100e6, caller);
+    function test_incrementsOnRun() public {
+        vm.prank(paymentInfo.operator);
+        hook.run(paymentInfo, 100e6, address(0), "");
         bytes32 hash = escrow.getHash(paymentInfo);
         (uint256 count, uint256 total) = hook.getStats(hash);
         assertEq(count, 1);
         assertEq(total, 100e6);
     }
 
-    function test_tracksMultipleReleases() public {
-        hook.record(paymentInfo, 50e6, caller);
-        hook.record(paymentInfo, 30e6, caller);
+    function test_tracksMultipleCaptures() public {
+        vm.startPrank(paymentInfo.operator);
+        hook.run(paymentInfo, 50e6, address(0), "");
+        hook.run(paymentInfo, 30e6, address(0), "");
+        vm.stopPrank();
         bytes32 hash = escrow.getHash(paymentInfo);
         (uint256 count, uint256 total) = hook.getStats(hash);
         assertEq(count, 2);
@@ -102,13 +116,13 @@ contract ReleaseCountHookTest is Test {
 
 ## Security Checklist
 
-- [ ] Extends `BaseHook` for operator access control
-- [ ] Handles edge cases (zero amounts, duplicate records)
+- [ ] Extends `BaseHook` and uses `_verifyAndHash` for caller and payment-existence checks
+- [ ] Returns early instead of reverting on business-logic edge cases (a reverting hook permanently bricks the surrounding action)
 - [ ] Gas-efficient storage layout
 - [ ] Full test coverage across the public surface
 
 <Warning>
-Unlike conditions, hooks **do mutate state**. Use `BaseHook` for access control to keep unauthorized writes out.
+Unlike conditions, hooks **do mutate state**. `BaseHook._verifyAndHash` enforces `msg.sender == paymentInfo.operator` (or matches `AUTHORIZED_CODEHASH`) plus payment existence in escrow. Calling `_verifyAndHash` is mandatory.
 </Warning>
 
 ## Next Steps
