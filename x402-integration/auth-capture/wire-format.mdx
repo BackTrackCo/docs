@@ -1,0 +1,149 @@
+---
+title: "Wire Format"
+description: "PaymentRequirements, PaymentPayload, and Extra-field reference for the auth-capture scheme"
+icon: "file-code"
+---
+
+## PaymentRequirements (402 Response)
+
+Server sends this to request payment:
+
+```json
+{
+  "x402Version": 2,
+  "accepts": [{
+    "scheme": "auth-capture",
+    "network": "eip155:8453",
+    "amount": "1000000",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0xReceiverAddress",
+    "maxTimeoutSeconds": 60,
+    "extra": {
+      "name": "USDC",
+      "version": "2",
+      "captureAuthorizer": "0xCaptureAuthorizerAddress",
+      "captureDeadline": 1740758554,
+      "refundDeadline": 1741276954,
+      "minFeeBps": 0,
+      "maxFeeBps": 1000,
+      "feeRecipient": "0xFeeRecipientAddress",
+      "autoCapture": false,
+      "assetTransferMethod": "eip3009"
+    }
+  }]
+}
+```
+
+A server MAY list more than one `accepts[]` entry with different `assetTransferMethod` values so clients can pick the method matching their token approvals.
+
+## PaymentPayload: EIP-3009 (default)
+
+Client sends this with a signed ERC-3009 authorization:
+
+```json
+{
+  "x402Version": 2,
+  "resource": {
+    "url": "https://api.example.com/resource",
+    "method": "GET"
+  },
+  "accepted": {
+    "scheme": "auth-capture",
+    "network": "eip155:8453",
+    "amount": "1000000",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "payTo": "0xReceiverAddress",
+    "maxTimeoutSeconds": 60,
+    "extra": { "..." }
+  },
+  "payload": {
+    "authorization": {
+      "from": "0xPayerAddress",
+      "to": "0xEIP3009TokenCollectorAddress",
+      "value": "1000000",
+      "validAfter": "0",
+      "validBefore": "1740675754",
+      "nonce": "0xf374...3480"
+    },
+    "signature": "0x2d6a...571c",
+    "salt": "0x0000000000000000000000000000000000000000000000000000000000000abc"
+  }
+}
+```
+
+## PaymentPayload: Permit2
+
+When `extra.assetTransferMethod === "permit2"`, the client signs a Permit2 `PermitTransferFrom`:
+
+```json
+{
+  "x402Version": 2,
+  "resource": { "url": "https://api.example.com/resource", "method": "GET" },
+  "accepted": { "scheme": "auth-capture", "...": "..." },
+  "payload": {
+    "permit2Authorization": {
+      "from": "0xPayerAddress",
+      "permitted": {
+        "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "amount": "1000000"
+      },
+      "spender": "0xPermit2TokenCollectorAddress",
+      "nonce": "11021048692073456...",
+      "deadline": "1740675754"
+    },
+    "signature": "0x2d6a...571c",
+    "salt": "0x0000000000000000000000000000000000000000000000000000000000000abc"
+  }
+}
+```
+
+The deterministic nonce binds the merchant address (no witness struct).
+
+## Field Reference
+
+### Required Extra Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | EIP-712 token-domain name (for example, `"USDC"`). Used for ERC-3009 signing only. |
+| `version` | string | EIP-712 token-domain version (for example, `"2"`). |
+| `captureAuthorizer` | address | Address that may call `authorize`, `capture`, `void`, `refund`, or `charge`. Committed on-chain as `PaymentInfo.operator`. |
+| `captureDeadline` | uint48 | Absolute Unix seconds: capture must occur before this. Encoded as `authorizationExpiry`. |
+| `refundDeadline` | uint48 | Absolute Unix seconds: refunds allowed until this. Encoded as `refundExpiry`. |
+| `feeRecipient` | address | Fee recipient. Set to `address(0)` to let the captureAuthorizer specify any non-zero recipient at capture/charge time. |
+| `minFeeBps` | uint16 | Lowest fee in basis points the captureAuthorizer must take. `0` = no floor. |
+| `maxFeeBps` | uint16 | Highest fee in basis points the captureAuthorizer can take. |
+
+### Optional Extra Fields
+
+| Field | Type | Description | Default |
+|---|---|---|---|
+| `autoCapture` | `bool` | `true` → facilitator calls `charge()` (atomic). `false` → `authorize()` (two-phase). | `false` |
+| `assetTransferMethod` | `"eip3009"` \| `"permit2"` | Which token collector to use. | `"eip3009"` |
+
+<Note>
+**Fee Configuration:** The escrow enforces fees on-chain via the `PaymentInfo` struct. The escrow rejects captures/charges that fall outside `[minFeeBps, maxFeeBps]`. If `feeRecipient` is non-zero, the actual fee recipient at capture/charge must match.
+</Note>
+
+## Nonce Derivation
+
+The signature nonce is the payer-agnostic `PaymentInfo` hash. The encoding zeros out the payer; every other field carries the value that will appear on-chain.
+
+```
+paymentInfoHash = keccak256(abi.encode(PAYMENT_INFO_TYPEHASH, paymentInfoWithZeroPayer))
+nonce           = keccak256(abi.encode(chainId, AUTH_CAPTURE_ESCROW_ADDRESS, paymentInfoHash))
+```
+
+The `salt` field enforces freshness: each signing call generates a fresh `bytes32` salt, so two payers signing concurrently produce distinct nonces with no collision risk.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Verification and Settlement" icon="shield-check" href="/x402-integration/auth-capture/verification-and-settlement">
+    The 13-step verification flow and error codes.
+  </Card>
+
+  <Card title="PaymentInfo Struct" icon="cube" href="/x402-integration/auth-capture/payment-info">
+    How wire fields map to the on-chain struct.
+  </Card>
+</CardGroup>

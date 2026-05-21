@@ -1,0 +1,72 @@
+---
+title: "PaymentInfo Struct"
+description: "On-chain PaymentInfo struct, expiry ordering, and safety guarantees"
+icon: "cube"
+---
+
+This is the on-chain Solidity struct. The JSON payload omits the `payer` field; the facilitator recovers it from the signature at settlement time. Wire-format `extra` uses spec-level field names; the on-chain struct keeps canonical names so the EIP-712 typehash matches the AuthCaptureEscrow contract byte-for-byte.
+
+```solidity
+struct PaymentInfo {
+    address operator;            // = extra.captureAuthorizer
+    address payer;               // payload-derived
+    address receiver;            // = requirements.payTo
+    address token;               // = requirements.asset
+    uint120 maxAmount;           // = requirements.amount
+    uint48  preApprovalExpiry;   // = now + maxTimeoutSeconds (client-derived)
+    uint48  authorizationExpiry; // = extra.captureDeadline
+    uint48  refundExpiry;        // = extra.refundDeadline
+    uint16  minFeeBps;
+    uint16  maxFeeBps;
+    address feeReceiver;         // = extra.feeRecipient
+    uint256 salt;                // = payload.salt (client-generated, fresh per request)
+}
+```
+
+## Expiry Ordering
+
+The contract enforces: `preApprovalExpiry <= authorizationExpiry <= refundExpiry`
+
+| Expiry | Wire field | Enforced At | Effect |
+|---|---|---|---|
+| `preApprovalExpiry` | derived | `authorize()` / `charge()` | Blocks settlement after this time |
+| `authorizationExpiry` | `captureDeadline` | `capture()` | Blocks capture; allows `reclaim()` |
+| `refundExpiry` | `refundDeadline` | `refund()` | Blocks refund requests |
+
+## Safety Guarantees
+
+The escrow contract enforces invariants on-chain:
+
+<CardGroup cols={2}>
+  <Card title="No Overcharging" icon="shield-check">
+    The client-signed `maxAmount` caps the settlement amount. Attempts to exceed the limit revert.
+  </Card>
+
+  <Card title="Replay Prevention" icon="lock">
+    Each payment has a unique nonce derived from `(chainId, escrowAddress, paymentInfoHash)`. The nonce is consumed on-chain at settlement.
+  </Card>
+
+  <Card title="Payer Reclaim" icon="clock">
+    After `captureDeadline`, the payer can reclaim escrowed funds directly without captureAuthorizer approval.
+  </Card>
+
+  <Card title="Fee Bounds" icon="receipt">
+    Min/max fee bounds in `PaymentInfo` are client-signed and enforced on-chain. The captureAuthorizer must respect these limits.
+  </Card>
+</CardGroup>
+
+<Warning>
+**CaptureAuthorizer Trust Required:** The captureAuthorizer controls when and how much to capture. Choose with intent and understand the capture policy. See [PaymentOperator](/contracts/payment-operator) for examples.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wire Format" icon="file-code" href="/x402-integration/auth-capture/wire-format">
+    Where each PaymentInfo field comes from on the wire.
+  </Card>
+
+  <Card title="Verification and Settlement" icon="shield-check" href="/x402-integration/auth-capture/verification-and-settlement">
+    The 13-step verification flow that enforces these invariants.
+  </Card>
+</CardGroup>

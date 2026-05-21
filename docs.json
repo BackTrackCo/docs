@@ -23,16 +23,14 @@
           {
             "group": "auth-capture Scheme",
             "pages": [
-              "x402-integration/auth-capture-scheme"
+              "x402-integration/auth-capture/index",
+              "x402-integration/auth-capture/wire-format",
+              "x402-integration/auth-capture/verification-and-settlement",
+              "x402-integration/auth-capture/payment-info"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Smart Contracts",
-        "groups": [
+          },
           {
-            "group": "Overview",
+            "group": "Contracts",
             "pages": [
               "contracts/overview",
               "contracts/architecture",
@@ -40,10 +38,7 @@
               "contracts/payment-operator",
               "contracts/factories",
               "contracts/fees",
-              "contracts/gas-costs",
-              "contracts/examples",
-              "contracts/audits",
-              "contracts/license"
+              "contracts/examples"
             ]
           },
           {
@@ -93,10 +88,9 @@
             ]
           },
           {
-            "group": "Marketplace",
+            "group": "Merchants",
             "pages": [
               "sdk/merchant/getting-started",
-              "sdk/helpers/forward-to-arbiter",
               "sdk/merchant/quickstart",
               "sdk/merchant/refund-handling"
             ]
@@ -105,15 +99,29 @@
             "group": "Delivery Protection",
             "pages": [
               "sdk/delivery-protection",
+              "sdk/helpers/forward-to-arbiter",
               "sdk/delivery-merchant",
               "sdk/delivery-arbiter"
             ]
           },
           {
-            "group": "Reference",
+            "group": "Tools",
             "pages": [
               "sdk/cli",
               "sdk/examples"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "contracts/gas-costs",
+              "contracts/audits",
+              "contracts/license"
             ]
           }
         ]
@@ -164,7 +172,11 @@
   "redirects": [
     {
       "source": "/x402-integration/escrow-scheme",
-      "destination": "/x402-integration/auth-capture-scheme"
+      "destination": "/x402-integration/auth-capture"
+    },
+    {
+      "source": "/x402-integration/auth-capture-scheme",
+      "destination": "/x402-integration/auth-capture"
     },
     {
       "source": "/contracts/periphery/refund-request",
@@ -176,7 +188,7 @@
     },
     {
       "source": "/x402-integration/comparison",
-      "destination": "/x402-integration/auth-capture-scheme"
+      "destination": "/x402-integration/auth-capture"
     }
   ]
 }
