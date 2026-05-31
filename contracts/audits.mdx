@@ -10,12 +10,12 @@ x402r extends the canonical [commerce-payments](https://github.com/base/commerce
 
 ### What's Audited (Upstream)
 
-Auditors covered the commerce-payments `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration):
+x402r runs the commerce-payments primitives at their canonical addresses, so their audit coverage applies directly with no fork to re-audit. Base maintains the authoritative, dated report list, defer to it rather than this page:
 
-- **Spearbit** (2 audits)
-- **Coinbase Protocol Security** (3 audits)
+- [commerce-payments `audits/` directory](https://github.com/base/commerce-payments/tree/main/audits) hosts the report PDFs.
+- [Security Audits section](https://github.com/base/commerce-payments#security-audits) of the upstream README lists each audit with its date and report link.
 
-These audits cover the core escrow lifecycle: `authorize`, `capture`, `void`, `reclaim`, and `refund`. The [commerce-payments repository](https://github.com/base/commerce-payments) hosts the audit reports.
+As of the latest published list, the `AuthCaptureEscrow` contract and its supporting infrastructure (TokenCollectors, TokenStore, Permit2 integration) were covered by five reports, three from Coinbase Protocol Security and two from Spearbit. These cover the core escrow lifecycle: `authorize`, `capture`, `void`, `reclaim`, and `refund`.
 
 ### What's Not Audited
 

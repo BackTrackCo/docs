@@ -146,6 +146,14 @@ forge test --match-path test/gas/GasBenchmark.t.sol -vv
 
 Each test logs its measured gas via `console.log` and the `--gas-report` summary tables list aggregate per-function statistics.
 
+<Note>
+A scheduled CI job in [x402r-contracts](https://github.com/BackTrackCo/x402r-contracts) re-runs `GasBenchmark.t.sol` and flags drift past threshold, so the numbers on this page are checked against the live benchmark rather than left to manual regen. When the benchmark moves, the pinned commit and figures above are refreshed.
+</Note>
+
+## Reference: upstream escrow costs
+
+The escrow layer these numbers build on is Base's audited [Commerce Payments Protocol](https://github.com/base/commerce-payments). For the baseline cost of the underlying `AuthCaptureEscrow` lifecycle (`authorize`, `capture`, `void`, `refund`) independent of x402r's condition and hook plugins, see the upstream contracts and their own benchmarks in the [commerce-payments repository](https://github.com/base/commerce-payments). The x402r figures above are the upstream escrow cost plus the per-plugin overhead detailed in the breakdown.
+
 <CardGroup cols={2}>
   <Card title="Fee System" icon="coins" href="./fees">
     How the operator calculates and distributes protocol and operator fees
