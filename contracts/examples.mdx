@@ -529,7 +529,7 @@ const config = {
   capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: daoCondition.address,  // DAO can refund if needed
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
-  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
   refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
@@ -601,7 +601,7 @@ const config = {
   capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: PAYER_CONDITION,   // Payer can cancel stream
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
-  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
   refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
@@ -670,7 +670,7 @@ const config = {
   capturePostActionHook: '0x0000000000000000000000000000000000000000',
   voidPreActionCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
   voidPostActionHook: '0x0000000000000000000000000000000000000000',
-  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
   refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
