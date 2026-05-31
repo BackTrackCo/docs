@@ -36,6 +36,26 @@ Server sends this to request payment:
 
 A server MAY list more than one `accepts[]` entry with different `assetTransferMethod` values so clients can pick the method matching their token approvals.
 
+## Signing the payload (client)
+
+Clients do not hand-build these payloads. The client half of the scheme ships in the x402 monorepo as `AuthCaptureEvmScheme` on the `@x402/evm/auth-capture/client` subpath. Register it on an `x402Client` and it reads the `extra` fields, reconstructs the PaymentInfo struct, derives the payer-agnostic nonce, and emits the ERC-3009 (default) or Permit2 payload shown below.
+
+```typescript
+import { AuthCaptureEvmScheme } from '@x402/evm/auth-capture/client'
+import { x402Client, wrapFetchWithPayment } from '@x402/fetch'
+import { privateKeyToAccount } from 'viem/accounts'
+
+const account = privateKeyToAccount(process.env.EVM_PRIVATE_KEY as `0x${string}`)
+
+const client = new x402Client()
+client.register('eip155:*', new AuthCaptureEvmScheme(account))
+
+// fetchWithPayment auto-signs any auth-capture 402 it receives
+const fetchWithPayment = wrapFetchWithPayment(fetch, client)
+```
+
+The signer only needs `address` and `signTypedData`, so a bare viem `LocalAccount` works with no `PublicClient`. The scheme selects ERC-3009 or Permit2 from `extra.assetTransferMethod`.
+
 ## PaymentPayload: EIP-3009 (default)
 
 Client sends this with a signed ERC-3009 authorization:
