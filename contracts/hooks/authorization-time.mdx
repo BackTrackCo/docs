@@ -1,0 +1,62 @@
+---
+title: "AuthorizationTimeRecorderHook"
+description: "Records authorization timestamp for time-based conditions"
+icon: "clock"
+---
+
+## Overview
+
+AuthorizationTimeRecorderHook stores `block.timestamp` at the moment the operator authorizes a payment. Time-based conditions like [EscrowPeriod](/contracts/conditions/escrow-period) read this timestamp to gate later actions.
+
+<Note>
+[EscrowPeriod](/contracts/conditions/escrow-period) **extends** AuthorizationTimeRecorderHook and adds an `ICondition` implementation. For escrow enforcement, use EscrowPeriod directly instead of deploying AuthorizationTimeRecorderHook on its own.
+</Note>
+
+## State
+
+```solidity
+mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTimes;
+```
+
+## Methods
+
+```solidity
+// Called after authorize()
+function run(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 /* amount */,
+    address /* caller */,
+    bytes calldata /* data */
+) external {
+    bytes32 hash = _verifyAndHash(paymentInfo);
+    authorizationTimes[hash] = block.timestamp;
+}
+
+// View function
+function getAuthorizationTime(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo
+) external view returns (uint256) {
+    return authorizationTimes[escrow.getHash(paymentInfo)];
+}
+```
+
+`amount`, `caller`, and `data` are unused; they exist to satisfy `IHook.run`.
+
+## When to Use
+
+Use AuthorizationTimeRecorderHook directly only if you need authorization timestamps **without** escrow period enforcement. For most use cases, [EscrowPeriod](/contracts/conditions/escrow-period) is the better choice since it includes this hook plus time-lock condition logic.
+
+## Gas
+
+**Cost:** ~20k gas per `run()` call (one `SSTORE` for the timestamp).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="EscrowPeriod" icon="clock" href="/contracts/conditions/escrow-period">
+    Combined hook + condition for escrow enforcement.
+  </Card>
+  <Card title="PaymentIndexRecorderHook" icon="list-ol" href="/contracts/hooks/payment-index">
+    Index payments for on-chain queries.
+  </Card>
+</CardGroup>

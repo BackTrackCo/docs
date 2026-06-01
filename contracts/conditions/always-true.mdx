@@ -6,18 +6,16 @@ icon: "check"
 
 ## Overview
 
-AlwaysTrueCondition allows anyone to call the action — no restrictions applied.
+AlwaysTrueCondition allows anyone to call the action, no restrictions applied.
 
-**Type:** Singleton (deployed once, reused by all operators)
+**Type:** Singleton, CREATE2 (deployed once, reused by all operators)
 
-**Address (Base Sepolia):** `0x785cC83DEa3d46D5509f3bf7496EAb26D42EE610`
-
-**Address (Base Mainnet):** `0xc9BbA6A2CF9838e7Dd8c19BC8B3BAC620B9D8178`
+**Address (all supported chains):** `0x2ef2A6162aEF9Df1022ff51c011af94D99AB4904`
 
 ## Logic
 
 ```solidity
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external pure returns (bool)
 {
     return true;
@@ -28,10 +26,10 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 
 | Slot | Use Case |
 |------|----------|
-| `AUTHORIZE_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Let anyone create payments (common for marketplace/e-commerce) |
 
 <Warning>
-**Use with caution for release/refund slots.** Setting `RELEASE_CONDITION` or `REFUND_IN_ESCROW_CONDITION` to AlwaysTrueCondition means anyone can release or refund funds. This is functionally equivalent to leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
+**Use with caution for capture/refund slots.** Setting `CAPTURE_PRE_ACTION_CONDITION` or `VOID_PRE_ACTION_CONDITION` to AlwaysTrueCondition means anyone can capture or refund funds. This matches leaving the slot as `address(0)` (the default behavior), but makes the intent explicit.
 </Warning>
 
 ## AlwaysTrueCondition vs `address(0)`
@@ -48,7 +46,7 @@ Use `address(0)` when you simply don't need a condition. Use AlwaysTrueCondition
 
 ## Gas
 
-**Cost:** Minimal — `pure` function returning a constant.
+**Cost:** Minimal, `pure` function returning a constant.
 
 ## Next Steps
 

@@ -4,57 +4,61 @@ description: "Runnable examples for every SDK operation."
 icon: "code"
 ---
 
-The [x402r-sdk repo](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) includes runnable examples for every role. Each example starts a local Anvil fork, deploys contracts, and runs. No wallet or testnet funds needed.
+The [x402r-sdk repository](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples) ships runnable example scripts organized by role plus end-to-end scenarios.
 
-### Running
+## Examples
 
-```bash
+<CardGroup cols={2}>
+  <Card title="payer" icon="user" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer">
+    Request a refund, freeze a payment, submit on-chain evidence (a placeholder CID; the integrator owns IPFS pinning). Three TypeScript scripts.
+  </Card>
+  <Card title="merchant" icon="store" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant">
+    Capture from escrow and charge directly. TypeScript scripts plus README.
+  </Card>
+  <Card title="arbiter" icon="gavel" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter">
+    Approve a refund, review on-chain evidence, distribute protocol fees.
+  </Card>
+  <Card title="scenarios" icon="route" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios">
+    End-to-end runners: happy-path capture, dispute resolution, atomic charge, partial refund flow. Wires payer + merchant + arbiter together against a local Anvil fork.
+  </Card>
+  <Card title="shared" icon="share-nodes" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/shared">
+    Shared setup utilities: Anvil-fork bootstrap, constants, common types.
+  </Card>
+</CardGroup>
+
+## Running examples
+
+<Info>
+All examples run against a local Anvil fork seeded by `shared/anvil-setup.ts`. You do not need a mainnet wallet or funding.
+</Info>
+
+<CodeGroup>
+```bash pnpm
 git clone https://github.com/BackTrackCo/x402r-sdk.git
 cd x402r-sdk
 pnpm install && pnpm build
 ```
-
-Then run any example:
-
-```bash
-# Per-action examples
-pnpm example:payer:request-refund
-pnpm example:merchant:charge
-pnpm example:arbiter:approve-refund
-
-# Multi-role scenarios
-pnpm scenario:release
-pnpm scenario:dispute
+```bash bun
+git clone https://github.com/BackTrackCo/x402r-sdk.git
+cd x402r-sdk
+bun install && bun run build
 ```
+</CodeGroup>
 
-### Payer
+The SDK uses pnpm workspaces (`pnpm@10.23.0`). The `npm` runtime is fine for application code that consumes published `@x402r/*` packages, but the workspace clone above expects pnpm or a workspace-aware install.
 
-| Example | What it does |
-|---------|-------------|
-| [`payer/request-refund.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/request-refund.ts) | Request a refund for a payment in escrow |
-| [`payer/submit-evidence.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/submit-evidence.ts) | Submit an IPFS evidence CID for a dispute |
-| [`payer/freeze-payment.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/payer/freeze-payment.ts) | Freeze a payment to block release during investigation |
+See each example directory's README on GitHub for the exact run command for that script.
 
-### Merchant
+## Next steps
 
-| Example | What it does |
-|---------|-------------|
-| [`merchant/charge-payment.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant/charge-payment.ts) | Charge an authorized payment (no escrow) |
-| [`merchant/release-escrow.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/merchant/release-escrow.ts) | Release remaining funds after escrow expires |
-
-### Arbiter
-
-| Example | What it does |
-|---------|-------------|
-| [`arbiter/approve-refund.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/approve-refund.ts) | Approve a payer's refund request |
-| [`arbiter/review-evidence.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/review-evidence.ts) | Review all submitted evidence for a dispute |
-| [`arbiter/distribute-fees.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/arbiter/distribute-fees.ts) | Distribute accumulated protocol fees |
-
-### Scenarios
-
-Full multi-role integration tests running against a local Anvil fork.
-
-| Scenario | What it does |
-|----------|-------------|
-| [`scenarios/happy-path-release.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/happy-path-release.ts) | Authorize, wait for escrow, release (2 roles: payer + merchant) |
-| [`scenarios/dispute-resolution.ts`](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/scenarios/dispute-resolution.ts) | Full dispute lifecycle with evidence and arbitration (3 roles) |
+<CardGroup cols={2}>
+  <Card title="Deploy an operator" icon="rocket" href="/sdk/deploy-operator">
+    Walk through `deployMarketplaceOperator()` and `deployDeliveryProtectionOperator()`.
+  </Card>
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward `auth-capture` settlements to an arbiter service.
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/BackTrackCo/x402r-sdk/tree/main/examples">
+    Browse every example.
+  </Card>
+</CardGroup>

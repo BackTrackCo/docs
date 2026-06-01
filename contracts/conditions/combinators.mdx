@@ -6,7 +6,7 @@ icon: "puzzle-piece"
 
 ## Overview
 
-Combinator conditions compose multiple conditions with logical operators. Deploy each via its respective factory.
+Combinator conditions compose two or more conditions with logical operators. Deploy each via its respective factory.
 
 ## AndCondition
 
@@ -19,25 +19,25 @@ const comboAddress = await andConditionFactory.write.deploy([
 ]);
 
 // Use in operator config
-config.releaseCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
-**Example:** Release requires receiver AND escrow period passed.
+**Example:** Capture requires receiver AND escrow period passed.
 
 ## OrCondition
 
 At least one condition must pass (`A || B`).
 
 ```typescript
-// Receiver OR Arbiter can release
+// Receiver OR Arbiter can capture
 const comboAddress = await orConditionFactory.write.deploy([
   [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-config.releaseCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
-**Example:** Either receiver or arbiter can release.
+**Example:** Either receiver or arbiter can capture.
 
 ## NotCondition
 
@@ -47,7 +47,7 @@ Inverts a condition (`!A`).
 // Anyone EXCEPT payer can call
 const comboAddress = await notConditionFactory.write.deploy([PAYER_CONDITION]);
 
-config.releaseCondition = comboAddress;
+config.capturePreActionCondition = comboAddress;
 ```
 
 **Example:** Prevent payer from releasing their own payment.
@@ -62,11 +62,11 @@ const receiverOrArbiter = await orConditionFactory.write.deploy([
   [RECEIVER_CONDITION, ARBITER_CONDITION]
 ]);
 
-const releaseCondition = await andConditionFactory.write.deploy([
+const capturePreActionCondition = await andConditionFactory.write.deploy([
   [receiverOrArbiter, ESCROW_PERIOD_ADDRESS]
 ]);
 
-config.releaseCondition = releaseCondition;
+config.capturePreActionCondition = capturePreActionConditionAddress;
 ```
 
 **Logic Tree:**
@@ -85,7 +85,7 @@ flowchart TD
 ## Limits
 
 <Warning>
-**Max 10 conditions per combinator.** Keep combinators simple — deeply nested trees increase gas costs and make debugging harder.
+**Max 10 conditions per combinator.** Keep combinators simple. Nested trees increase gas costs and make debugging harder.
 </Warning>
 
 ## Gas
@@ -100,7 +100,7 @@ OrCondition([A, B])  // ~25K gas per check
 OrCondition([A, B, C, D])  // ~45K gas per check
 ```
 
-Each additional condition adds one external call. Prefer fewer conditions where possible.
+Each extra condition adds one external call. Prefer fewer conditions where possible.
 
 ## Next Steps
 
@@ -109,7 +109,7 @@ Each additional condition adds one external call. Prefer fewer conditions where 
     Time-based condition for escrow windows.
   </Card>
   <Card title="Freeze" icon="snowflake" href="/contracts/conditions/freeze">
-    Block releases when payments are frozen.
+    Block releases on frozen payments.
   </Card>
   <Card title="Examples" icon="code" href="/contracts/examples">
     See combinators in real configurations.

@@ -6,18 +6,16 @@ icon: "wrench"
 
 ## Overview
 
-You can create custom conditions for specialized logic beyond what the built-in conditions provide. Implement the `ICondition` interface and follow the security rules below.
+You can create custom conditions for specialized logic beyond what the built-in conditions provide. Build against the `ICondition` interface and follow the security rules below.
 
 ## ICondition Rules
 
 From the `ICondition.sol` NatSpec:
 
-1. **MUST NOT revert** — return `false` to deny, never `revert`
-2. **Should be `view` or `pure`** — no state-changing operations
-3. **No external calls** — avoid calling other contracts to prevent reentrancy risks
-4. **Return `true` to allow, `false` to deny**
+1. **MUST NOT revert**: return `false` to deny, never `revert`
+2. **Return `true` to allow, `false` to deny**
 
-The operator converts a `false` return into a `ConditionNotMet` revert.
+The operator converts a `false` return into a `PreActionConditionNotMet` revert. Prefer `view` or `pure` implementations to keep call sites cheap and gas predictable.
 
 ## Example: TimeOfDayCondition
 
@@ -36,7 +34,8 @@ contract TimeOfDayCondition is ICondition {
     function check(
         PaymentInfo calldata payment,
         uint256,
-        address caller
+        address caller,
+        bytes calldata
     ) external view returns (bool) {
         uint256 hour = (block.timestamp / 3600) % 24;
         return hour >= startHour && hour < endHour;
@@ -44,14 +43,14 @@ contract TimeOfDayCondition is ICondition {
 }
 ```
 
-Usage — deploy via a factory and use in operator config:
+Usage, deploy via a factory and use in operator config:
 
 ```typescript
 // Deploy via your custom factory
 const businessHours = await timeOfDayConditionFactory.write.deploy([9, 17]);
 
 // Use in operator config
-config.releaseCondition = businessHours;
+config.capturePreActionCondition = businessHours;
 ```
 
 ## Security Checklist
@@ -63,10 +62,10 @@ Before deploying a custom condition:
 - [ ] No external calls to untrusted contracts
 - [ ] No state modifications
 - [ ] Handles edge cases (zero address, zero amount, uninitialized payments)
-- [ ] Comprehensive test coverage with Forge tests
+- [ ] Full test coverage with Forge tests
 
 <Warning>
-Custom conditions with bugs can lead to **permanently locked funds** (if `check()` always returns `false`) or **unauthorized access** (if `check()` always returns `true`). Test thoroughly on testnet before mainnet deployment.
+Custom conditions with bugs can lead to **permanently locked funds** (if `check()` always returns `false`) or **unauthorized access** (if `check()` always returns `true`). Test on Base Sepolia before mainnet deployment.
 </Warning>
 
 ## Testing
@@ -84,13 +83,13 @@ contract TimeOfDayConditionTest is Test {
     function test_allowsDuringBusinessHours() public {
         // Set block.timestamp to 10 AM UTC
         vm.warp(10 * 3600);
-        assertTrue(condition.check(paymentInfo, 0, caller));
+        assertTrue(condition.check(paymentInfo, 0, caller, ""));
     }
 
     function test_deniesOutsideBusinessHours() public {
         // Set block.timestamp to 8 PM UTC
         vm.warp(20 * 3600);
-        assertFalse(condition.check(paymentInfo, 0, caller));
+        assertFalse(condition.check(paymentInfo, 0, caller, ""));
     }
 }
 ```
@@ -101,7 +100,7 @@ contract TimeOfDayConditionTest is Test {
   <Card title="Conditions Overview" icon="filter" href="/contracts/conditions/overview">
     Review the condition system architecture.
   </Card>
-  <Card title="Custom Recorders" icon="database" href="/contracts/recorders/custom">
-    Build custom state recorders.
+  <Card title="Custom Hooks" icon="database" href="/contracts/hooks/custom">
+    Build custom state hooks.
   </Card>
 </CardGroup>

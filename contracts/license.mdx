@@ -4,15 +4,15 @@ description: "BUSL-1.1 licensing terms, permissions, and restrictions for x402r 
 icon: "scale-balanced"
 ---
 
-## Why BUSL-1.1?
+## Why BUSL-1.1
 
-We want the code to be fully readable and usable on-chain — you can integrate with deployed x402r contracts, build on top of them, and inspect every line of source. The license protects against forks that compete with or commoditize the protocol (e.g., stripping fees and redeploying), so that protocol fees can continue funding development, audits, and new features for everyone building on x402r.
+The code is fully readable and usable on-chain. You can integrate with deployed x402r contracts, build on top of them, and inspect every line of source. The license protects against forks that compete with or commoditize the protocol (for example, stripping fees and redeploying), so that protocol fees can keep funding development, audits, and new features for everyone building on x402r.
 
-BUSL-1.1 protects against that while keeping the code open. After the Change Date, everything converts to MIT and is fully permissionless. This is the same approach used by Uniswap, Aave, and other major DeFi protocols.
+BUSL-1.1 protects against that while keeping the code open. After the Change Date, everything converts to MIT and is fully permissionless. Uniswap, Aave, and other major DeFi protocols use the same approach.
 
 ## License Terms
 
-All Solidity source files in `x402r-contracts/src/` are licensed under the **Business Source License 1.1**.
+The **Business Source License 1.1** covers all Solidity source files in `x402r-contracts/src/`.
 
 | Parameter | Value |
 |-----------|-------|
@@ -24,41 +24,41 @@ All Solidity source files in `x402r-contracts/src/` are licensed under the **Bus
 | **Change Date** | December 9, 2029 |
 | **Change License** | MIT License |
 
-## What Can You Do?
+## What you can do
 
-### On-Chain
+### On-chain
 
-You can freely interact with x402r contracts that are already deployed:
+You can interact with deployed x402r contracts:
 
-- **Integrate** — call x402r contracts from your own contracts or dApps
-- **Build** — create applications, services, and protocols on top of x402r
-- **Deploy via factories** — use x402r's official factories (e.g., `PaymentOperatorFactory`, `EscrowPeriodFactory`) to deploy your own operator instances with your own configuration
+- **Integrate**: call x402r contracts from your own contracts or dApps
+- **Build**: create applications, services, and protocols on top of x402r
+- **Deploy via factories**: use x402r's official factories (for example, `PaymentOperatorFactory` and `EscrowPeriodFactory`) to deploy your own operator instances with your own configuration
 
-### Off-Chain
+### Off-chain
 
-You can freely work with the source code:
+You can work with the source code:
 
 - **Read and learn** from the code
-- **Fork and modify** for local development and testing
+- **Fork and adapt** for local development and testing
 - **Redistribute** the source code
-- **Deploy locally** — spin up Anvil, Hardhat, or any local/test environment for integration testing
+- **Deploy locally**: spin up Anvil, Hardhat, or any local or test environment for integration testing
 
-### The One Restriction
+### The one restriction
 
 <Warning>
-Do not deploy x402r contracts outside of the official factories — whether modified or unmodified.
+Do not deploy x402r contracts outside of the official factories, whether modified or unmodified.
 </Warning>
 
 Deploying through x402r's factories is the intended path and is always allowed. What you cannot do:
 - Take the source code and deploy your own instances outside of the factories
-- Deploy a modified fork (e.g., removing fees, changing parameters) to any production chain
-- Remove or modify the license notice
+- Deploy a modified fork (for example, removing fees or changing parameters) to any production chain
+- Remove or change the license notice
 
 Deploying to local chains, testnets, and private forks for **development and testing** is fine.
 
 ### Change Date
 
-On **December 9, 2029** (or 4 years after the first public release of each version, whichever comes first), the license automatically converts to the **MIT License** — at which point you can deploy, fork, and do anything you want.
+On **December 9, 2029** (or 4 years after the first public release of each version, whichever comes first), the license automatically converts to the **MIT License**, at which point you can deploy, fork, and do anything you want.
 
 ## Summary
 

@@ -12,23 +12,23 @@ Think of it as "Stripe for the programmable internet" - agents, robots, and auto
 
 ## Payment Schemes
 
-X402 v2 supports multiple payment schemes:
+X402 v2 supports two payment schemes:
 
 <CardGroup cols={2}>
   <Card title="exact" icon="bolt">
-    Immediate settlement - payment happens instantly when request is made.
+    Immediate settlement - payment clears the moment the client sends the request.
 
     **Best for:** Simple purchases, low-value transactions, trusted services
   </Card>
 
   <Card title="escrow" icon="lock">
-    Deferred settlement - funds locked until conditions are met.
+    Deferred settlement - funds stay locked until conditions clear.
 
     **Best for:** High-value transactions, usage-based billing, long-running tasks
   </Card>
 </CardGroup>
 
-## Why Escrow?
+## Why Escrow
 
 The `exact` scheme works well for immediate-delivery payments, but creates friction for:
 
@@ -39,7 +39,7 @@ The `exact` scheme works well for immediate-delivery payments, but creates frict
 Client pays $500 → Server crashes → Money lost
 ```
 
-**Escrow Solution:** Funds held until work is verified
+**Escrow Solution:** Escrow holds funds until the captureAuthorizer verifies the work
 
 ```
 Client authorizes $500 → Work completes → Operator releases → Server receives
@@ -53,7 +53,7 @@ Consider an LLM agent making API calls:
 - Can't pay exact amount in advance
 - Server needs guarantee of payment
 
-**Escrow Solution:** Authorize max amount, capture actual usage
+**Escrow Solution:** Lock a max amount, capture actual usage
 
 ```
 Client authorizes $10 → Uses $6.50 → Operator captures $6.50 → Refund $3.50
@@ -66,10 +66,10 @@ Client authorizes $10 → Uses $6.50 → Operator captures $6.50 → Refund $3.5
 Client pays for video rendering → 48 hours later → How to verify completion?
 ```
 
-**Escrow Solution:** Conditional release with verification
+**Escrow Solution:** Conditional capture with verification
 
 ```
-Client authorizes → Work progresses → Client verifies → Release on approval
+Client authorizes → Work progresses → Client verifies → Capture on approval
 ```
 
 ### Multi-Request Sessions
@@ -80,15 +80,15 @@ Agent makes 1,000 API calls at $0.01 each
 = 1,000 signatures + 1,000 on-chain transactions
 ```
 
-**Escrow Solution:** One authorization, multiple captures
+**Escrow Solution:** One authorization, many captures
 
 ```
-Client authorizes $10 once → Server tracks usage → Periodic batch capture
+Client authorizes $10 once → Server tracks usage → Server batches captures on a schedule
 ```
 
 ## How x402r Extends X402
 
-x402r provides the **escrow scheme implementation** for x402:
+x402r provides the **auth-capture scheme implementation** for x402:
 
 1. **Base Commerce Payments Integration**
    - Audited escrow contracts from Base
@@ -96,10 +96,10 @@ x402r provides the **escrow scheme implementation** for x402:
    - On-chain safety guarantees
 
 2. **Operator Contracts**
-   - Conditional release logic
+   - Conditional capture logic
    - Dispute resolution
    - Fee distribution
-   - Time-based release
+   - Time-based capture
 
 3. **Payment Facilitator**
    - Validates ERC-3009 signatures
@@ -113,28 +113,7 @@ x402r provides the **escrow scheme implementation** for x402:
 
 ## Payment Flow
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
-    participant Facilitator
-    participant Operator
-    participant Escrow
-
-    Client->>Server: GET /resource
-    Server-->>Client: 402 Payment Required
-    Note over Client: Signs ERC-3009 authorization
-    Client->>Server: Payment payload
-    Server->>Facilitator: Verify & settle
-    Facilitator->>Operator: authorize(paymentInfo, amount, tokenCollector, signature)
-    Operator->>Escrow: Lock funds in escrow
-    Facilitator-->>Server: Settlement confirmed
-    Server-->>Client: 200 OK + resource
-
-    Note over Operator,Escrow: Later: capture or void
-    Operator->>Escrow: release(paymentInfo, amount)
-    Note over Escrow: Funds released to receiver (minus fees)
-```
+The auth-capture scheme is two-phase: the facilitator first authorizes (locks the client's signed funds in escrow at the 402 settlement), then later captures to the receiver or voids back to the payer per policy. For the full HTTP and on-chain sequence diagrams, see the [auth-capture flow](/x402-integration/auth-capture) and the [on-chain payment sequence](/contracts/architecture#payment-flow-sequence).
 
 ## Use Cases
 
@@ -187,7 +166,7 @@ sequenceDiagram
 Lock funds in escrow without immediate transfer. Client signs an ERC-3009 authorization allowing the escrow contract to pull tokens.
 
 ### Capture
-Release authorized funds to the receiver. The operator contract decides when and how much to release based on configured conditions.
+Capture authorized funds to the receiver. The operator contract decides when and how much to capture based on configured conditions.
 
 ### Void
 Return funds to payer before capture. Used for full refunds during the escrow period.
@@ -197,20 +176,16 @@ Safety valve for payer. If authorization expires without capture, payer can recl
 
 ### Operator
 Smart contract that controls capture/void logic. Different operators enable different payment patterns:
-- **Time-locked**: Release after period expires
-- **Arbiter-controlled**: Third party decides release
+- **Time-locked**: Capture after period expires
+- **Arbiter-controlled**: Third party decides capture
 - **Usage-based**: Capture proportional to consumption
 - **Immediate**: Behaves like `exact` scheme
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Escrow Scheme Spec" icon="file-contract" href="/x402-integration/escrow-scheme">
-    Complete technical specification for the escrow payment scheme.
-  </Card>
-
-  <Card title="Comparison" icon="scale-balanced" href="/x402-integration/comparison">
-    Detailed comparison of escrow vs exact schemes.
+  <Card title="auth-capture Scheme Spec" icon="file-contract" href="/x402-integration/auth-capture">
+    Complete technical specification for the auth-capture payment scheme.
   </Card>
 
   <Card title="Smart Contracts" icon="code" href="/contracts/overview">

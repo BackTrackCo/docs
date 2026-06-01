@@ -17,24 +17,20 @@
             "group": "Getting Started",
             "pages": [
               "index",
-              "x402-integration/overview",
-              "x402-integration/escrow-scheme",
-              "x402-integration/comparison"
+              "x402-integration/overview"
             ]
           },
           {
-            "group": "Roadmap",
+            "group": "auth-capture Scheme",
             "pages": [
-              "roadmap"
+              "x402-integration/auth-capture/index",
+              "x402-integration/auth-capture/wire-format",
+              "x402-integration/auth-capture/verification-and-settlement",
+              "x402-integration/auth-capture/payment-info"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Smart Contracts",
-        "groups": [
+          },
           {
-            "group": "Overview",
+            "group": "Contracts",
             "pages": [
               "contracts/overview",
               "contracts/architecture",
@@ -42,17 +38,13 @@
               "contracts/payment-operator",
               "contracts/factories",
               "contracts/fees",
-              "contracts/gas-costs",
-              "contracts/examples",
-              "contracts/audits",
-              "contracts/license"
+              "contracts/examples"
             ]
           },
           {
             "group": "Periphery",
             "pages": [
               "contracts/periphery/overview",
-              "contracts/periphery/refund-request",
               "contracts/periphery/refund-request-evidence",
               "contracts/periphery/receiver-refund-collector"
             ]
@@ -72,13 +64,14 @@
             ]
           },
           {
-            "group": "Recorders",
+            "group": "Hooks",
             "pages": [
-              "contracts/recorders/overview",
-              "contracts/recorders/authorization-time",
-              "contracts/recorders/payment-index",
-              "contracts/recorders/combinator",
-              "contracts/recorders/custom"
+              "contracts/hooks/overview",
+              "contracts/hooks/authorization-time",
+              "contracts/hooks/payment-index",
+              "contracts/hooks/combinator",
+              "contracts/hooks/refund-request",
+              "contracts/hooks/custom"
             ]
           }
         ]
@@ -90,30 +83,45 @@
             "group": "Getting Started",
             "pages": [
               "sdk/overview",
+              "sdk/create-client",
               "sdk/deploy-operator"
             ]
           },
           {
-            "group": "Marketplace",
+            "group": "Merchants",
             "pages": [
-              "sdk/merchant",
-              "sdk/payer",
-              "sdk/arbiter"
+              "sdk/merchant/getting-started",
+              "sdk/merchant/quickstart",
+              "sdk/merchant/refund-handling"
             ]
           },
           {
             "group": "Delivery Protection",
             "pages": [
               "sdk/delivery-protection",
+              "sdk/helpers/forward-to-arbiter",
               "sdk/delivery-merchant",
               "sdk/delivery-arbiter"
             ]
           },
           {
-            "group": "Reference",
+            "group": "Tools",
             "pages": [
-              "sdk/create-client",
+              "sdk/cli",
               "sdk/examples"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "contracts/gas-costs",
+              "contracts/audits",
+              "contracts/license"
             ]
           }
         ]
@@ -160,5 +168,27 @@
       "x": "https://x.com/x402rorg",
       "github": "https://github.com/BackTrackCo"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/x402-integration/escrow-scheme",
+      "destination": "/x402-integration/auth-capture"
+    },
+    {
+      "source": "/x402-integration/auth-capture-scheme",
+      "destination": "/x402-integration/auth-capture"
+    },
+    {
+      "source": "/contracts/periphery/refund-request",
+      "destination": "/contracts/hooks/refund-request"
+    },
+    {
+      "source": "/contracts/recorders/:slug",
+      "destination": "/contracts/hooks/:slug"
+    },
+    {
+      "source": "/x402-integration/comparison",
+      "destination": "/x402-integration/auth-capture"
+    }
+  ]
 }

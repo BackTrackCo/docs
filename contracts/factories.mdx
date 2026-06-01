@@ -8,7 +8,7 @@ icon: "industry"
 
 x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic contract deployments. Factories enable on-demand instance creation with predictable addresses.
 
-## Why Factories?
+## Why factories
 
 <AccordionGroup>
   <Accordion title="Deterministic Addresses (CREATE2)">
@@ -19,17 +19,17 @@ x402r uses the factory pattern with CREATE2 for gas-efficient, deterministic con
   </Accordion>
 
   <Accordion title="Shared Configuration">
-    Multiple instances can share immutable configuration:
+    Many instances can share immutable configuration:
     - Lower deployment costs
     - Consistent behavior across instances
     - Centralized ownership control
   </Accordion>
 
   <Accordion title="Idempotent Deployments">
-    Calling factory with same parameters returns existing contract:
-    - Safe to call multiple times
+    Calling a factory with the same parameters returns the existing contract:
+    - Safe to call again
     - No duplicate deployments
-    - Automatic deduplication
+    - Built-in deduplication
   </Accordion>
 
   <Accordion title="Gas Optimization">
@@ -46,26 +46,26 @@ Deploys PaymentOperator instances with deterministic addresses.
 
 ### Contract Address
 
-All factories use unified CREATE3 addresses (same on every chain).
+All factories use universal CREATE2 addresses (same on every chain).
 
-**PaymentOperatorFactory:** `0x4D9BC2Ba2D0d9AFb6B63E3afBbfC95143E6E8Da9`
+**PaymentOperatorFactory:** `0xa0d4734842df1690a5B33Cb21828c946e39D55a2`
 
 ### Configuration Structure
 
 ```solidity
 struct OperatorConfig {
-    address feeRecipient;             // Who receives operator fees
+    address feeReceiver;             // Who receives operator fees
     address feeCalculator;            // Operator fee calculator (IFeeCalculator)
-    address authorizeCondition;
-    address authorizeRecorder;
-    address chargeCondition;
-    address chargeRecorder;
-    address releaseCondition;
-    address releaseRecorder;
-    address refundInEscrowCondition;
-    address refundInEscrowRecorder;
-    address refundPostEscrowCondition;
-    address refundPostEscrowRecorder;
+    address authorizePreActionCondition;
+    address authorizePostActionHook;
+    address chargePreActionCondition;
+    address chargePostActionHook;
+    address capturePreActionCondition;
+    address capturePostActionHook;
+    address voidPreActionCondition;
+    address voidPostActionHook;
+    address refundPreActionCondition;
+    address refundPostActionHook;
 }
 ```
 
@@ -78,10 +78,10 @@ function deployOperator(
 ```
 
 **Parameters (in config):**
-- `feeRecipient` - Who receives operator fees (arbiter, service provider, treasury, etc.)
-- `authorizeCondition` through `refundPostEscrowRecorder` - 10-slot configuration
+- `feeReceiver` - Who receives operator fees (arbiter, service provider, or treasury)
+- `authorizePreActionCondition` through `refundPostActionHook` - 10-slot configuration
 
-**Note:** `maxFeeBps` and `protocolFeePct` are set at factory level (shared across all operators)
+**Note:** the factory sets `maxFeeBps` and `protocolFeePct` (shared across all operators)
 
 **Returns:** Address of deployed operator (or existing if already deployed)
 
@@ -98,8 +98,8 @@ function computeAddress(
 **Usage:**
 ```typescript
 const config = {
-  feeRecipient: arbiterAddress,
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
+  feeReceiver: arbiterAddress,
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
   // ... rest of config
 };
 
@@ -121,9 +121,9 @@ assert(deployedAddress === predictedAddress);
 import { createWalletClient, http, getContract, zeroAddress } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { PaymentOperatorABI } from '@x402r/core/abis';
+import { paymentOperatorAbi } from '@x402r/core';
 
-const FACTORY_ADDRESS = '0x...'; // Replace with actual factory address
+const FACTORY_ADDRESS = '0xa0d4734842df1690a5B33Cb21828c946e39D55a2';
 
 const account = privateKeyToAccount('0x...');
 const walletClient = createWalletClient({
@@ -134,7 +134,7 @@ const walletClient = createWalletClient({
 
 const factory = getContract({
   address: FACTORY_ADDRESS,
-  abi: PaymentOperatorABI,
+  abi: paymentOperatorAbi,
   client: walletClient
 });
 
@@ -142,26 +142,26 @@ const factory = getContract({
 const arbiterConditionHash = await staticAddressConditionFactory.write.deploy([arbiterAddress]);
 const arbiterConditionAddress = /* get from receipt */;
 
-// Deploy release condition: arbiter AND escrow period passed
-const releaseConditionHash = await andConditionFactory.write.deploy([
+// Deploy capture condition: arbiter AND escrow period passed
+const capturePreActionConditionHash = await andConditionFactory.write.deploy([
   [arbiterConditionAddress, escrowPeriodAddress]
 ]);
-const releaseConditionAddress = /* get from receipt */;
+const captureConditionAddress = /* get from receipt */;
 
 // Define configuration
 const config = {
-  feeRecipient: arbiterAddress,  // Arbiter earns fees
+  feeReceiver: arbiterAddress,  // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriodAddress,
-  chargeCondition: zeroAddress,  // Default allow
-  chargeRecorder: zeroAddress,   // No recording
-  releaseCondition: releaseConditionAddress,
-  releaseRecorder: zeroAddress,
-  refundInEscrowCondition: arbiterConditionAddress,
-  refundInEscrowRecorder: zeroAddress,
-  refundPostEscrowCondition: arbiterConditionAddress,
-  refundPostEscrowRecorder: zeroAddress
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriodAddress,
+  chargePreActionCondition: zeroAddress,  // Default allow
+  chargePostActionHook: zeroAddress,   // No recording
+  capturePreActionCondition: captureConditionAddress,
+  capturePostActionHook: zeroAddress,
+  voidPreActionCondition: arbiterConditionAddress,
+  voidPostActionHook: zeroAddress,
+  refundPreActionCondition: arbiterConditionAddress,
+  refundPostActionHook: zeroAddress
 };
 
 // Deploy operator
@@ -179,17 +179,17 @@ console.log("Deployed marketplace operator at:", operatorAddress);
 const providerCondition = await new StaticAddressCondition(serviceProviderAddress);
 
 const config = {
-  feeRecipient: serviceProviderAddress,  // Provider earns fees
-  authorizeCondition: PAYER_CONDITION,
-  authorizeRecorder: zeroAddress,
-  chargeCondition: providerCondition.address,
-  chargeRecorder: zeroAddress,
-  releaseCondition: providerCondition.address,
-  releaseRecorder: zeroAddress,
-  refundInEscrowCondition: zeroAddress,  // No refunds
-  refundInEscrowRecorder: zeroAddress,
-  refundPostEscrowCondition: zeroAddress,
-  refundPostEscrowRecorder: zeroAddress
+  feeReceiver: serviceProviderAddress,  // Provider earns fees
+  authorizePreActionCondition: PAYER_CONDITION,
+  authorizePostActionHook: zeroAddress,
+  chargePreActionCondition: providerCondition.address,
+  chargePostActionHook: zeroAddress,
+  capturePreActionCondition: providerCondition.address,
+  capturePostActionHook: zeroAddress,
+  voidPreActionCondition: zeroAddress,  // No refunds
+  voidPostActionHook: zeroAddress,
+  refundPreActionCondition: zeroAddress,
+  refundPostActionHook: zeroAddress
 };
 
 const hash = await factory.write.deployOperator([config]);
@@ -204,11 +204,11 @@ If you call `deployOperator()` with the same configuration twice, the factory re
 
 ## Escrow Period Factory
 
-Deploys `EscrowPeriod` contracts - combined recorder and condition for time-based release logic.
+Deploys `EscrowPeriod` contracts - combined hook and condition for time-based capture logic.
 
 ### Contract Address
 
-**EscrowPeriodFactory:** `0x15DB06aADEB3a39D47756Bf864a173cc48bafe24`
+**EscrowPeriodFactory:** `0xe72D2014ebC48F1d92521e8629574918E8030548`
 
 ### Deployment Method
 
@@ -220,7 +220,7 @@ function deploy(
 ```
 
 **Parameters:**
-- `escrowPeriod` - Duration in seconds (e.g., `7 * 24 * 60 * 60` for 7 days)
+- `escrowPeriod` - Duration in seconds (for example, `7 * 24 * 60 * 60` for 7 days)
 - `authorizedCodehash` - Runtime codehash of authorized caller (`bytes32(0)` = operator-only)
 
 **Returns:** Address of deployed EscrowPeriod contract
@@ -228,22 +228,22 @@ function deploy(
 ### How It Works
 
 The factory deploys a single **EscrowPeriod** contract that:
-- Extends `AuthorizationTimeRecorder` (implements `IRecorder`)
+- Extends `AuthorizationTimeRecorderHook` (implements `IHook`)
 - Implements `ICondition`
-- Records authorization timestamp when used as recorder
+- Records authorization timestamp when used as hook
 - Checks if escrow period has passed when used as condition
 
 **Architecture:**
 
 ```mermaid
 flowchart LR
-    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorderHook]
     EP -->|implements| IC[ICondition]
-    ATR -->|implements| IR[IRecorder]
+    ATR -->|implements| IR[IHook]
 ```
 
 <Note>
-Use the SAME `EscrowPeriod` address for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots on the operator. For freeze functionality, deploy a separate `Freeze` condition and compose via `AndCondition([escrowPeriod, freeze])`.
+Use the SAME `EscrowPeriod` address for both `AUTHORIZE_POST_ACTION_HOOK` and `CAPTURE_PRE_ACTION_CONDITION` slots on the operator. For freeze functionality, deploy a separate `Freeze` condition and compose via `AndCondition([escrowPeriod, freeze])`.
 </Note>
 
 ### Example Deployment
@@ -268,13 +268,13 @@ const escrowPeriodAddress = receipt.logs[0].address;
 
 console.log("EscrowPeriod:", escrowPeriodAddress);
 
-// Use SAME address for both recorder and condition
+// Use SAME address for both hook and condition
 const config = {
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriodAddress,     // Record auth time
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriodAddress,     // Record auth time
   // ...
-  releaseCondition: escrowPeriodAddress,      // Check escrow passed
-  releaseRecorder: zeroAddress,               // No additional recording needed
+  capturePreActionCondition: escrowPeriodAddress,      // Check escrow passed
+  capturePostActionHook: zeroAddress,               // No additional recording needed
   // ...
 };
 ```
@@ -293,11 +293,11 @@ const config = {
 
 ## Freeze Factory
 
-Deploys `Freeze` condition contracts that block release when a payment is frozen.
+Deploys `Freeze` condition contracts that block capture when the payer freezes a payment.
 
 ### Contract Address
 
-**FreezeFactory:** `0xdf129EFFE040c3403aca597c0F0bb704859a78Fd`
+**FreezeFactory:** `0xeC092cf1215DB44af0Abe87c1157E304FEa5d0Eb`
 
 ### Deployment Method
 
@@ -311,8 +311,8 @@ function deploy(
 ```
 
 **Parameters:**
-- `freezeCondition` - ICondition that authorizes freeze calls (e.g., PayerCondition)
-- `unfreezeCondition` - ICondition that authorizes unfreeze calls (e.g., PayerCondition, ArbiterCondition)
+- `freezeCondition` - ICondition that gates freeze calls (for example, PayerCondition)
+- `unfreezeCondition` - ICondition that gates unfreeze calls (for example, PayerCondition or ArbiterCondition)
 - `freezeDuration` - How long freeze lasts in seconds (`0` = permanent until unfrozen)
 - `escrowPeriodContract` - Address of EscrowPeriod contract (`address(0)` = freeze unconstrained by time)
 
@@ -335,34 +335,28 @@ const freeze = await freezeFactory.write.deploy([
   escrowPeriod          // Link to EscrowPeriod (or zeroAddress for unconstrained)
 ]);
 
-// Step 3: Compose with EscrowPeriod for release condition
-const releaseCondition = await andConditionFactory.write.deploy([
+// Step 3: Compose with EscrowPeriod for capture condition
+const capturePreActionCondition = await andConditionFactory.write.deploy([
   [escrowPeriod, freeze]
 ]);
 
 // Use in operator config
 const config = {
   // ...
-  releaseCondition: releaseCondition,
+  capturePreActionCondition: capturePreActionCondition,
   // ...
 };
 ```
 
 ### Condition Singletons
 
-Use these pre-deployed condition contracts:
-
-| Condition | Address (all chains) | Description |
-|-----------|---------------------|-------------|
-| PayerCondition | `0x33F5F1154A02d0839266EFd23Fd3b85a3505bB4B` | Only payer can call |
-| ReceiverCondition | `0xF41974A853940Ff4c18d46B6565f973c1180E171` | Only receiver can call |
-| AlwaysTrueCondition | `0xb295df7E7f786fd84D614AB26b1f2e86026C3483` | Anyone can call |
+Reference the pre-deployed condition singletons (PayerCondition, ReceiverCondition, AlwaysTrueCondition) by their canonical addresses. The full address registry lives on [Periphery Overview: Condition Singletons](/contracts/periphery/overview#condition-singletons), identical across every supported chain.
 
 ### Example Deployments
 
 <Tabs>
   <Tab title="Payer Freeze">
-    Payer can freeze, arbiter can unfreeze (or auto-expires after 3 days):
+    Payer can freeze, arbiter can unfreeze (or it expires after 3 days):
 
     ```typescript
     const freeze = await freezeFactory.deploy(
@@ -375,7 +369,7 @@ Use these pre-deployed condition contracts:
   </Tab>
 
   <Tab title="Receiver Freeze">
-    Receiver can freeze, arbiter can unfreeze (or auto-expires after 5 days):
+    Receiver can freeze, arbiter can unfreeze (or it expires after 5 days):
 
     ```typescript
     const freeze = await freezeFactory.deploy(
@@ -437,7 +431,7 @@ Freeze duration should balance payer protection with receiver UX. Too long and r
 
 ## Factory Ownership
 
-All factories are owned by a multisig wallet for security.
+A multisig wallet owns all factories for security.
 
 ### Owner Capabilities
 
@@ -447,7 +441,7 @@ Factory owners can:
 - Transfer ownership (2-step process)
 
 Factory owners **cannot:**
-- Modify deployed instances
+- Change deployed instances
 - Pause or stop operations
 - Access funds in deployed operators
 
@@ -470,7 +464,7 @@ Approximate gas costs for factory deployments (Base Sepolia):
 | Operation | Gas Cost | USD (at 0.1 gwei, $3000 ETH) |
 |-----------|----------|------------------------------|
 | Deploy PaymentOperator | ~2.5M gas | ~$0.75 |
-| Deploy EscrowPeriod (condition + recorder) | ~1.8M gas | ~$0.54 |
+| Deploy EscrowPeriod (condition + hook) | ~1.8M gas | ~$0.54 |
 | Deploy Freeze | ~1.0M gas | ~$0.30 |
 | Predict address (view call) | 0 gas | $0.00 |
 
@@ -488,19 +482,19 @@ Each factory uses different salt strategies:
 
 **PaymentOperatorFactory:**
 ```solidity
-bytes32 key = keccak256(abi.encodePacked(
-    config.feeRecipient,
+bytes32 key = keccak256(abi.encode(
+    config.feeReceiver,
     config.feeCalculator,
-    config.authorizeCondition,
-    config.authorizeRecorder,
-    config.chargeCondition,
-    config.chargeRecorder,
-    config.releaseCondition,
-    config.releaseRecorder,
-    config.refundInEscrowCondition,
-    config.refundInEscrowRecorder,
-    config.refundPostEscrowCondition,
-    config.refundPostEscrowRecorder
+    config.authorizePreActionCondition,
+    config.authorizePostActionHook,
+    config.chargePreActionCondition,
+    config.chargePostActionHook,
+    config.capturePreActionCondition,
+    config.capturePostActionHook,
+    config.voidPreActionCondition,
+    config.voidPostActionHook,
+    config.refundPreActionCondition,
+    config.refundPostActionHook
 ));
 ```
 
@@ -518,37 +512,7 @@ bytes32 salt = keccak256(abi.encodePacked("freeze", key));
 
 ### Cross-Chain Addresses
 
-Same configuration on different chains = same address:
-
-```typescript
-import { createPublicClient } from 'viem';
-import { baseSepolia, optimismSepolia } from 'viem/chains';
-
-// Deploy on Base Sepolia
-const baseFactory = getContract({
-  address: FACTORY_ADDRESS,
-  abi: PaymentOperatorFactory.abi,
-  client: baseWalletClient
-});
-
-const baseHash = await baseFactory.write.deployOperator([config]);
-const baseReceipt = await baseWalletClient.waitForTransactionReceipt({ hash: baseHash });
-const addressBaseSepolia = baseReceipt.logs[0].address;
-
-// Deploy on Optimism Sepolia with identical params
-const opFactory = getContract({
-  address: FACTORY_ADDRESS,
-  abi: PaymentOperatorFactory.abi,
-  client: opWalletClient
-});
-
-const opHash = await opFactory.write.deployOperator([config]);
-const opReceipt = await opWalletClient.waitForTransactionReceipt({ hash: opHash });
-const addressOptimismSepolia = opReceipt.logs[0].address;
-
-// Addresses are identical!
-console.assert(addressBaseSepolia === addressOptimismSepolia);
-```
+Because the factory uses CREATE2, the same configuration produces the same operator address on any chain where the factory itself lives at the canonical address. As supported chains expand beyond Base, an operator deployed with identical config will land at the same address on each new chain without the integrator needing per-chain bookkeeping.
 
 This enables:
 - Consistent addressing across chains
@@ -577,14 +541,14 @@ Don't deploy new PayerCondition/ReceiverCondition - use existing singletons:
 ```typescript
 // ✅ Good: Reuse singleton
 const config = {
-  authorizeCondition: PAYER_CONDITION,  // Pre-deployed singleton
+  authorizePreActionCondition: PAYER_CONDITION,  // Pre-deployed singleton
   // ...
 };
 
 // ❌ Bad: Deploy new instance
 const payerCondition = await new PayerCondition();
 const config = {
-  authorizeCondition: payerCondition.address,  // Wastes gas
+  authorizePreActionCondition: payerCondition.address,  // Wastes gas
   // ...
 };
 ```
@@ -598,11 +562,11 @@ Deploy on testnet with same configuration before mainnet:
 const testHash = await testnetFactory.write.deployOperator([config]);
 // ... test thoroughly ...
 
-// Deploy on mainnet with identical config (same address!)
+// Deploy on mainnet with identical config (same address)
 const mainnetHash = await mainnetFactory.write.deployOperator([config]);
 ```
 
-### 4. Document Your Config
+### 4. Document your config
 
 Keep a record of your deployed configurations:
 

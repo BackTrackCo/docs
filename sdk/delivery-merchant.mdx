@@ -7,63 +7,73 @@ icon: "store"
 ### Prerequisites
 
 * A deployed delivery protection operator (see [Deploy an Operator](/sdk/deploy-operator#delivery-protection-operator))
-* An arbiter service URL (see [Arbiter Setup](/sdk/delivery-arbiter))
+* An arbiter service endpoint (see [Arbiter Setup](/sdk/delivery-arbiter))
 
-### 1. Install Dependencies
+<Steps>
+  <Step title="Install dependencies">
+    <CodeGroup>
+    ```bash npm
+    npm install @x402r/helpers
+    ```
+    ```bash pnpm
+    pnpm add @x402r/helpers
+    ```
+    ```bash bun
+    bun add @x402r/helpers
+    ```
+    </CodeGroup>
+  </Step>
 
-<CodeGroup>
-```bash npm
-npm install @x402r/helpers
-```
-```bash pnpm
-pnpm add @x402r/helpers
-```
-```bash bun
-bun add @x402r/helpers
-```
-</CodeGroup>
+  <Step title="Configure forwardToArbiter()">
+    Add the `forwardToArbiter()` hook to your x402 resource server. After every successful `auth-capture` settlement, it POSTs to your arbiter service fire-and-forget:
 
-### 2. Configure forwardToArbiter()
+    ```typescript
+    import { forwardToArbiter } from '@x402r/helpers'
+    import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
 
-Add the `forwardToArbiter()` hook to your x402 resource server. After every payment settlement, it POSTs the HTTP response body to your arbiter service:
+    const resourceServer = new x402ResourceServer(facilitatorConfig)
+      .register(networkId, new AuthCaptureEvmScheme())
+      .onAfterSettle(
+        forwardToArbiter('http://your-arbiter:3001', {
+          onError: (err) => console.error('Arbiter unreachable:', err),
+        }),
+      )
+    ```
 
-```typescript
-import { forwardToArbiter } from '@x402r/helpers'
+    The hook POSTs to `{arbiterUrl}/verify` with:
 
-const resourceServer = new x402ResourceServer(facilitatorConfig)
-registerCommerceEvmScheme(resourceServer)
+    ```json
+    {
+      "responseBody": "the HTTP response body as a string",
+      "transaction": "0xsettlement_tx_hash",
+      "paymentInfoWire": {
+        "operator": "0x...",
+        "payer": "0x...",
+        "receiver": "0x...",
+        "token": "0x...",
+        "maxAmount": "10000",
+        "preApprovalExpiry": 1740758554,
+        "authorizationExpiry": 1740762154,
+        "refundExpiry": 1741276954,
+        "minFeeBps": 0,
+        "maxFeeBps": 500,
+        "feeReceiver": "0x...",
+        "salt": "0x..."
+      }
+    }
+    ```
 
-resourceServer.onAfterSettle(
-  forwardToArbiter('http://your-arbiter:3001', {
-    onError: (err) => console.error('Arbiter unreachable:', err),
-  })
-)
-```
+    The helper reconstructs `PaymentInfoWire` from the verified `SettleResultContext`. The arbiter consumes `req.body.paymentInfoWire` and runs it through `PaymentInfo.fromWire(...)` to recover the `bigint`-typed struct expected by SDK actions. See [forwardToArbiter() docs](/sdk/helpers/forward-to-arbiter) for the full payload shape.
 
-The hook POSTs to `{arbiterUrl}/verify` with:
+    <Warning>
+    `forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
+    </Warning>
+  </Step>
 
-```json
-{
-  "responseBody": "the HTTP response body as a string",
-  "transaction": "0xsettlement_tx_hash",
-  "paymentPayload": {
-    "x402Version": 1,
-    "scheme": "commerce",
-    "accepted": { "network": "eip155:84532", ... },
-    "payload": { "paymentInfo": { ... }, ... }
-  }
-}
-```
-
-The arbiter uses `parseForwardedPayload()` from `@x402r/helpers` to extract `paymentInfo` and `network` from the nested structure.
-
-<Warning>
-`forwardToArbiter()` is fire-and-forget. If the arbiter service is unreachable, funds stay in escrow until timeout. Add monitoring for arbiter availability.
-</Warning>
-
-### 3. Share Addresses with the Arbiter
-
-The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from your [deployment](/sdk/deploy-operator#delivery-protection-operator) to create its SDK client. Share these via config, environment variables, or a shared registry.
+  <Step title="Share addresses with the arbiter">
+    The arbiter service needs `operatorAddress` and `escrowPeriodAddress` from your [deployment](/sdk/deploy-operator#delivery-protection-operator) to construct its SDK client. Share these via config, environment variables, or a shared registry.
+  </Step>
+</Steps>
 
 ## Next Steps
 

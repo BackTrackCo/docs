@@ -1,0 +1,88 @@
+---
+title: "PaymentIndexRecorderHook"
+description: "Index payments by sequential count for on-chain queries and repeated refund requests"
+icon: "list-ol"
+---
+
+## Overview
+
+PaymentIndexRecorderHook indexes payments by payer and receiver and stores the full `PaymentInfo` struct keyed by `paymentInfoHash`. Wire it into `AUTHORIZE_POST_ACTION_HOOK` on a `HookCombinator` (or directly when authorize is the only hook slot you use) so each new authorization registers itself for on-chain lookups.
+
+## When to use
+
+- You need on-chain payment lookups **without a subgraph**
+- Other contracts need to read the full `PaymentInfo` for a hash, or page through every payment by payer / receiver
+- You want a single chain-singleton index that aggregates across every operator routing through `HookCombinator`
+
+**Skip when:** you're using a subgraph for payment queries, since the subgraph can derive indexes from events without the on-chain gas cost.
+
+## State
+
+```solidity
+mapping(bytes32 paymentInfoHash => AuthCaptureEscrow.PaymentInfo) private paymentInfoStore;
+mapping(address payer    => mapping(uint256 index => bytes32 hash)) private payerPayments;
+mapping(address payer    => uint256 count)                        public  payerPaymentCount;
+mapping(address receiver => mapping(uint256 index => bytes32 hash)) private receiverPayments;
+mapping(address receiver => uint256 count)                        public  receiverPaymentCount;
+```
+
+## Methods
+
+```solidity
+function run(
+    AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+    uint256 /* amount */,
+    address /* caller */,
+    bytes calldata /* data */
+) external {
+    bytes32 hash = escrow.getHash(paymentInfo);
+    paymentInfoStore[hash] = paymentInfo;
+    payerPayments[paymentInfo.payer][payerPaymentCount[paymentInfo.payer]++] = hash;
+    receiverPayments[paymentInfo.receiver][receiverPaymentCount[paymentInfo.receiver]++] = hash;
+}
+
+function getPaymentInfo(
+    bytes32 paymentInfoHash
+) external view returns (AuthCaptureEscrow.PaymentInfo memory);
+
+function getPayerPayments(
+    address payer,
+    uint256 offset,
+    uint256 count
+) external view returns (AuthCaptureEscrow.PaymentInfo[] memory, uint256 total);
+
+function getReceiverPayments(
+    address receiver,
+    uint256 offset,
+    uint256 count
+) external view returns (AuthCaptureEscrow.PaymentInfo[] memory, uint256 total);
+```
+
+`amount`, `caller`, and `data` are unused; they exist to satisfy `IHook.run`.
+
+## Querying
+
+```typescript
+const info = await paymentIndex.read.getPaymentInfo([paymentInfoHash])
+
+const [payerInfos, total] = await paymentIndex.read.getPayerPayments([
+  payer,
+  0n,
+  10n,
+])
+```
+
+## Gas
+
+**Cost:** ~175k gas per authorization (payer index + receiver index + full `PaymentInfo` SSTORE).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="HookCombinator" icon="layer-group" href="/contracts/hooks/combinator">
+    Combine with other hooks in a single slot.
+  </Card>
+  <Card title="Hooks Overview" icon="database" href="/contracts/hooks/overview">
+    Compare recording strategies.
+  </Card>
+</CardGroup>

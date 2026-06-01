@@ -1,12 +1,40 @@
 ---
-title: "Deploy an Operator"
+title: "Deploy an operator"
 description: "Deploy a PaymentOperator with escrow, freeze, and dispute resolution in one call"
 icon: "rocket"
 ---
 
-## Marketplace Operator
+The `@x402r/core` package includes deployment presets that handle the full lifecycle of deploying a PaymentOperator and all its supporting contracts.
 
-A marketplace operator deployment includes: EscrowPeriod, Freeze, StaticAddressCondition (arbiter), OrCondition (receiver OR arbiter for refunds), optional StaticFeeCalculator, and the PaymentOperator itself. All deployed via CREATE3 factories.
+## Presets
+
+The SDK ships two deployment presets. Pick the one that matches your use case:
+
+| Preset | Use case | Freeze | Fees | RefundRequest |
+|--------|----------|--------|------|---------------|
+| `deployMarketplaceOperator` | General marketplace with dispute resolution | Yes (optional) | Yes (optional) | Yes |
+| `deployDeliveryProtectionOperator` | Garbage detection / delivery verification | No | No | No |
+
+All contracts ship via CREATE2 factories, so identical configurations produce identical addresses across deployments.
+
+## Marketplace operator
+
+A complete marketplace operator deployment includes:
+
+1. **EscrowPeriod**: Records authorization time, enforces waiting period before capture
+2. **Freeze**: Allows payer to freeze payment during escrow, receiver to unfreeze
+3. **ReceiverCondition**: Gates voids to the merchant (receiver)
+4. **RefundRequest (`IHook`)**: Wired as `voidPostActionHook`, flips pending refund requests to `Approved` during `voidPayment()`
+5. **StaticFeeCalculator**: Optional operator fee (basis points)
+6. **PaymentOperator**: The main contract tying everything together
+
+## Deploy your operator
+
+**Prerequisites:**
+- Node.js 20+, pnpm 9.15+
+- A private key with Base Sepolia ETH ([get Sepolia ETH](https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet))
+
+Call `deployMarketplaceOperator` from `@x402r/core` with a viem wallet client. Because every contract uses CREATE2, deploys are idempotent: re-running with the same parameters reuses any existing contract at the predicted address and skips it.
 
 ```typescript
 import { createPublicClient, createWalletClient, http } from 'viem';
@@ -26,44 +54,166 @@ const walletClient = createWalletClient({
   transport: http(),
 })
 
-const result = await deployMarketplaceOperator(walletClient, publicClient, {
-  chainId: 84532,                         // Base Sepolia
-  feeRecipient: account.address,          // receives operator fees
-  arbiter: '0xArbiterAddress...',         // dispute resolver
-  escrowPeriodSeconds: 604_800n,          // 7 days
-  freezeDurationSeconds: 259_200n,        // 3 days max freeze
-  operatorFeeBps: 100n,                   // 1% fee (optional)
-})
+const result = await deployMarketplaceOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,                        // Base Sepolia
+    feeReceiver: account.address,         // receives operator fees
+    arbiter: '0xArbiterAddress...',         // dispute resolver
+    escrowPeriodSeconds: 604800n,           // 7 days
+    freezeDurationSeconds: 259200n,         // 3 days max freeze
+    operatorFeeBps: 100n,                   // 1% fee (optional)
+  }
+);
 
-console.log('Operator:', result.operatorAddress)
-console.log('EscrowPeriod:', result.escrowPeriodAddress)
-console.log('RefundRequest:', result.refundRequestAddress)
-console.log('Freeze:', result.freezeAddress)
-console.log('New deployments:', result.summary.newCount)
-console.log('Existing (reused):', result.summary.existingCount)
+console.log('Operator:', result.operatorAddress);
+console.log('EscrowPeriod:', result.escrowPeriodAddress);
+console.log('Freeze:', result.freezeAddress);
+console.log('New deployments:', result.summary.newCount);
+console.log('Existing (reused):', result.summary.existingCount);
 ```
 
-## Configuration Options
+## Configuration options
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `feeRecipient` | `Address` | Address that receives operator fees |
+| `chainId` | `number` | Target chain ID (for example, `84532` for Base Sepolia) |
+| `feeReceiver` | `Address` | Address that receives operator fees |
 | `arbiter` | `Address` | Arbiter address for dispute resolution |
-| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (e.g., `604800n` for 7 days) |
+| `escrowPeriodSeconds` | `bigint` | Escrow waiting period (for example, `604800n` for 7 days) |
 | `freezeDurationSeconds` | `bigint` | How long freezes last. Default: `0n` (permanent until unfrozen) |
 | `operatorFeeBps` | `bigint` | Fee in basis points. Default: `0n` (no fee). `100n` = 1% |
+| `authorizedCodehash` | `Hex` | Optional. Restricts which contract codehashes can record. Defaults to `bytes32(0)` (no restriction) |
+
+## Deployment result
+
+```typescript
+interface MarketplaceOperatorDeployment {
+  operatorAddress: Address                    // The PaymentOperator
+  escrowPeriodAddress: Address                // EscrowPeriod hook/condition
+  freezeAddress: Address | null               // Freeze condition (null if disabled)
+  refundRequestAddress: Address               // RefundRequest contract
+  refundRequestEvidenceAddress: Address       // RefundRequestEvidence contract
+  voidConditionAddress: Address      // OR(Receiver, Arbiter)
+  feeCalculatorAddress: Address | null        // null if no fee
+  operatorConfig: OperatorConfig              // Full operator slot configuration
+  deployments: DeployResult[]                 // Per-contract deploy details
+  summary: {
+    newCount: number                          // Newly deployed contracts
+    existingCount: number                     // Reused existing contracts
+    txHashes: `0x${string}`[]                 // All deployment tx hashes
+  }
+}
+```
+
+<Tip>
+Because all contracts use CREATE2, redeploying with the same parameters is idempotent. The tooling skips any contract that already exists at the predicted address. The `summary` tells you what was new vs reused.
+</Tip>
+
+## Preview addresses (no deploy)
+
+```typescript
+import { previewMarketplaceOperator } from '@x402r/core'
+
+const preview = await previewMarketplaceOperator(publicClient, {
+  chainId: 84532,
+  feeReceiver: account.address,
+  arbiter: '0xArbiterAddress...',
+  escrowPeriodSeconds: 604800n,
+})
+
+console.log('Operator will be at:', preview.operatorAddress)
+console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
+```
+
+## Marketplace operator slot configuration
+
+The deployed marketplace operator has the following slot configuration:
+
+| Slot | Contract | Purpose |
+|---|---|---|
+| `AUTHORIZE_PRE_ACTION_CONDITION` | (none) | Default: anyone with a valid signature can authorize |
+| `AUTHORIZE_POST_ACTION_HOOK` | EscrowPeriod | Records authorization timestamp |
+| `CHARGE_PRE_ACTION_CONDITION` | (none) | No restrictions on charge |
+| `CAPTURE_PRE_ACTION_CONDITION` | EscrowPeriod (or AND(EscrowPeriod, Freeze) if freeze enabled) | Blocks capture during escrow period |
+| `VOID_PRE_ACTION_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
+| `VOID_POST_ACTION_HOOK` | RefundRequest | Tracks refund request state |
+| `REFUND_PRE_ACTION_CONDITION` | Receiver | Only receiver after escrow |
+| `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee (if configured) |
+| `FEE_RECEIVER` | Your address | Receives fees |
+
+---
+
+## Network support
+
+The deploy presets target the chains in `@x402r/core`'s `x402rChains` (Base and Base Sepolia today). See [Network support](/sdk/overview#network-support) for chain IDs, EIP-155 IDs, and token addresses.
+
+<Warning>
+Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can fund a wallet from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).
+</Warning>
+
+## Delivery Protection Operator
+
+For programmatic quality verification (AI garbage detection, schema validation), use the delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter or payer can capture funds, and the arbiter can issue immediate refunds without waiting for escrow expiry.
+
+```typescript
+import { createPublicClient, createWalletClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { deployDeliveryProtectionOperator } from '@x402r/core'
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+})
+
+const deployment = await deployDeliveryProtectionOperator(
+  walletClient,
+  publicClient,
+  {
+    chainId: 84532,
+    arbiter: '0xArbiterServiceAddress',
+    feeReceiver: account.address,
+    escrowPeriodSeconds: 300n,           // 5 minutes
+  },
+)
+
+console.log('Operator:', deployment.operatorAddress)
+console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
+console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
+console.log('ReleaseCondition:', deployment.captureConditionAddress)
+console.log('AuthorizeHook:', deployment.authorizeHookAddress)
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `chainId` | `number` | Target chain |
+| `arbiter` | `Address` | Arbiter address for capture and refund decisions |
+| `feeReceiver` | `Address` | Receives protocol fees |
+| `escrowPeriodSeconds` | `bigint` | Verification window before automatic refund |
+| `authorizedCodehash` | `Hex` | Override the default `hookCombinatorCodehash`. Optional |
+| `paymentIndexRecorderHookAddress` | `Address` | Override the default PaymentIndexRecorderHook. Pass `zeroAddress` to skip on-chain payment indexing. Optional |
+| `allowArbiterRefund` | `boolean` | Lets the arbiter refund immediately during escrow. Default: `false` |
 
 <AccordionGroup>
   <Accordion title="Deployment Result Type">
     ```typescript
-    interface MarketplaceOperatorDeployment {
+    interface DeliveryProtectionOperatorDeployment {
       operatorAddress: Address
       escrowPeriodAddress: Address
-      freezeAddress: Address | null
-      refundRequestAddress: Address
-      refundRequestEvidenceAddress: Address
-      refundInEscrowConditionAddress: Address   // OR(Receiver, Arbiter)
-      feeCalculatorAddress: Address | null      // null if no fee
+      arbiterConditionAddress: Address
+      captureConditionAddress: Address           // OrCondition([arbiter, payer])
+      voidConditionAddress: Address    // OrCondition([escrowPeriod, receiver, arbiter])
+      authorizeHookAddress: Address          // HookCombinator([escrowPeriod, paymentIndexRecorderHook])
+      paymentIndexRecorderHookAddress: Address
       operatorConfig: OperatorConfig
       deployments: DeployResult[]
       summary: {
@@ -74,99 +224,53 @@ console.log('Existing (reused):', result.summary.existingCount)
     }
     ```
 
-    Redeploying with the same parameters is idempotent (CREATE3). It detects existing contracts and skips them. Check `summary` for what was new vs reused.
+    Deploys 6 contracts by default: EscrowPeriod, StaticAddressCondition(arbiter), OrCondition(release), OrCondition(refund), HookCombinator, and the Operator. If you pass `paymentIndexRecorderHookAddress: zeroAddress`, the HookCombinator is skipped (5 contracts).
+
+    Redeploying with the same parameters is idempotent (CREATE2). The tooling reuses any contract that already exists at the predicted address.
   </Accordion>
 
   <Accordion title="Preview Addresses (No Deploy)">
     Compute addresses without deploying:
 
     ```typescript
-    import { previewMarketplaceOperator } from '@x402r/core'
+    import { previewDeliveryProtectionOperator } from '@x402r/core'
 
-    const preview = await previewMarketplaceOperator(publicClient, {
+    const preview = await previewDeliveryProtectionOperator(publicClient, {
       chainId: 84532,
-      feeRecipient: '0xYourAddress...',
-      arbiter: '0xArbiterAddress...',
-      escrowPeriodSeconds: 604_800n,
+      arbiter: '0xArbiterServiceAddress',
+      feeReceiver: account.address,
+      escrowPeriodSeconds: 300n,
     })
 
     console.log('Operator will be at:', preview.operatorAddress)
     console.log('EscrowPeriod will be at:', preview.escrowPeriodAddress)
+    console.log('AuthorizeHook will be at:', preview.authorizeHookAddress)
     ```
   </Accordion>
 
-  <Accordion title="Marketplace Slot Configuration">
+  <Accordion title="Delivery Protection Slot Configuration">
     | Slot | Contract | Purpose |
     |------|----------|---------|
-    | `AUTHORIZE_CONDITION` | UsdcTvlLimit | Safety limit on authorization |
-    | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization timestamp |
-    | `CHARGE_CONDITION` | (none) | No restrictions on charge |
-    | `RELEASE_CONDITION` | EscrowPeriod | Blocks release during escrow period |
-    | `REFUND_IN_ESCROW_CONDITION` | OR(Receiver, Arbiter) | Receiver or arbiter can approve |
-    | `REFUND_POST_ESCROW_CONDITION` | Receiver | Only receiver after escrow |
-    | `FEE_CALCULATOR` | StaticFeeCalculator | Fixed percentage fee |
-    | `FEE_RECIPIENT` | Your address | Receives fees |
+    | `CAPTURE_PRE_ACTION_CONDITION` | OrCondition([SAC(arbiter), PayerCondition]) | Arbiter or satisfied payer can capture |
+    | `AUTHORIZE_POST_ACTION_HOOK` | HookCombinator([EscrowPeriod, PaymentIndexRecorderHook]) | Records authorization time and indexes payments on-chain |
+    | `VOID_PRE_ACTION_CONDITION` | OrCondition([EscrowPeriod, ReceiverCondition, SAC(arbiter)]) | Escrow expiry, receiver voluntary refund, or arbiter immediate refund |
+    | `REFUND_PRE_ACTION_CONDITION` | ReceiverCondition | Only receiver after escrow |
   </Accordion>
 </AccordionGroup>
-
-Deployment is supported on all [supported chains](/sdk/overview#supported-chains). Pass the numeric `chainId` in the options.
-
-<Warning>
-Deployment requires gas fees. Ensure your wallet has ETH on the target network. On Base Sepolia, you can get testnet ETH from [Base network faucets](https://docs.base.org/base-chain/tools/network-faucets).
-</Warning>
-
-## Delivery Protection Operator
-
-For automated quality verification (AI garbage detection, schema validation), use the simpler delivery protection preset. No RefundRequest, Evidence, or Freeze contracts. The arbiter is the only address that can release funds.
-
-```typescript
-import { deployDeliveryProtectionOperator } from '@x402r/core'
-
-const deployment = await deployDeliveryProtectionOperator(
-  walletClient,
-  publicClient,
-  {
-    chainId: 84532,
-    arbiter: '0xArbiterServiceAddress',
-    feeRecipient: account.address,
-    escrowPeriodSeconds: 300n,           // 5 minutes
-  },
-)
-
-console.log('Operator:', deployment.operatorAddress)
-console.log('EscrowPeriod:', deployment.escrowPeriodAddress)
-console.log('ArbiterCondition:', deployment.arbiterConditionAddress)
-```
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `chainId` | `number` | Target chain |
-| `arbiter` | `Address` | Only address that can call `release()` |
-| `feeRecipient` | `Address` | Receives protocol fees |
-| `escrowPeriodSeconds` | `bigint` | Verification window before auto-refund |
-
-<Accordion title="Delivery Protection Slot Configuration">
-  | Slot | Contract | Purpose |
-  |------|----------|---------|
-  | `RELEASE_CONDITION` | StaticAddressCondition(arbiter) | Only arbiter can release |
-  | `AUTHORIZE_RECORDER` | EscrowPeriod | Records authorization time |
-  | `REFUND_IN_ESCROW_CONDITION` | EscrowPeriod | Anyone can refund after escrow expires |
-  | `REFUND_POST_ESCROW_CONDITION` | Receiver | Receiver can refund post-escrow |
-</Accordion>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Merchant Guide" icon="store" href="/sdk/merchant">
-    Accept payments, release funds from escrow.
-  </Card>
-  <Card title="Payer Guide" icon="user" href="/sdk/payer">
-    Request refunds, freeze payments, submit evidence.
+  <Card title="Merchant Guide" icon="store" href="/sdk/merchant/quickstart">
+    Accept payments, capture funds from escrow.
   </Card>
   <Card title="Examples" icon="code" href="/sdk/examples">
-    Runnable examples for every SDK operation.
+    See working merchant and client examples.
+  </Card>
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
-    On-chain architecture, conditions, and recorders.
+    On-chain architecture, conditions, and hooks.
   </Card>
 </CardGroup>

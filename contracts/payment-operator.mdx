@@ -10,15 +10,15 @@ The main payment operator contract with pluggable conditions for flexible author
 
 - **Type:** Operator instance (one per fee recipient + configuration)
 - **Deployment:** Via PaymentOperatorFactory
-- **Immutability:** Cannot be paused or upgraded
-- **Configuration:** 10 slots for conditions and recorders
+- **Immutability:** No pause switch, no upgrade path
+- **Configuration:** 10 slots for conditions and hooks
 - **Use Cases:** Marketplace, subscriptions, streaming, grants, custom flows
 
 ## Immutable Fields
 
 ```solidity
 address public immutable ESCROW;              // AuthCaptureEscrow address
-address public immutable FEE_RECIPIENT;       // Operator fee recipient
+address public immutable FEE_RECEIVER;       // Operator fee recipient
 ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG; // Shared protocol fee config
 IFeeCalculator public immutable FEE_CALCULATOR; // Operator fee calculator
 ```
@@ -36,21 +36,21 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ## 10-Slot Configuration
 
 <Accordion title="Condition Slots (Before Actions)">
-1. **AUTHORIZE_CONDITION** - Who can authorize payments
-2. **CHARGE_CONDITION** - Who can charge partial amounts
-3. **RELEASE_CONDITION** - Who can release from escrow
-4. **REFUND_IN_ESCROW_CONDITION** - Who can refund during escrow
-5. **REFUND_POST_ESCROW_CONDITION** - Who can refund after release
+1. **AUTHORIZE_PRE_ACTION_CONDITION** - Who can authorize payments
+2. **CHARGE_PRE_ACTION_CONDITION** - Who can charge partial amounts
+3. **CAPTURE_PRE_ACTION_CONDITION** - Who can capture funds from escrow
+4. **VOID_PRE_ACTION_CONDITION** - Who can refund during escrow
+5. **REFUND_PRE_ACTION_CONDITION** - Who can refund after capture
 
 **Default:** `address(0)` = always allow
 </Accordion>
 
-<Accordion title="Recorder Slots (After Actions)">
-1. **AUTHORIZE_RECORDER** - Record authorization (e.g., timestamp)
-2. **CHARGE_RECORDER** - Record charge event
-3. **RELEASE_RECORDER** - Record release
-4. **REFUND_IN_ESCROW_RECORDER** - Record in-escrow refund
-5. **REFUND_POST_ESCROW_RECORDER** - Record post-escrow refund
+<Accordion title="Hook Slots (After Actions)">
+1. **AUTHORIZE_POST_ACTION_HOOK** - Record authorization (for example, timestamp)
+2. **CHARGE_POST_ACTION_HOOK** - Record charge event
+3. **CAPTURE_POST_ACTION_HOOK** - Record capture
+4. **VOID_POST_ACTION_HOOK** - Record void
+5. **REFUND_POST_ACTION_HOOK** - Record refund
 
 **Default:** `address(0)` = no recording (no-op)
 </Accordion>
@@ -77,17 +77,17 @@ function authorize(
 - `collectorData` - Data to pass to the token collector
 
 **Flow:**
-1. Check `AUTHORIZE_CONDITION` (if set)
-2. Validate fee bounds compatibility
+1. Check `AUTHORIZE_PRE_ACTION_CONDITION` (if set)
+2. Check fee bounds compatibility
 3. Store fees at authorization time (prevents protocol fee changes from breaking capture)
 4. Call `escrow.authorize()`
-5. Call `AUTHORIZE_RECORDER` (if set)
-6. Emit `AuthorizationCreated`
+5. Call `AUTHORIZE_POST_ACTION_HOOK` (if set)
+6. Emit `AuthorizeExecuted`
 
-**Access:** Controlled by `AUTHORIZE_CONDITION` (default: anyone)
+**Access:** Controlled by `AUTHORIZE_PRE_ACTION_CONDITION` (default: anyone)
 
 <Tip>
-**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to allow the payer to reclaim funds after expiry. This is useful for subscription-based payments where you want to limit the authorization window.
+**Authorization Expiry:** The `PaymentInfo` struct includes an `authorizationExpiry` field (from base commerce-payments). Set this to `type(uint48).max` for no expiry, or specify a timestamp to let the payer reclaim funds after expiry. Subscription-based payments use this to bound the authorization window.
 </Tip>
 
 ### charge()
@@ -110,43 +110,45 @@ function charge(
 - `collectorData` - Data to pass to the token collector
 
 **Flow:**
-1. Check `CHARGE_CONDITION` (if set)
-2. Validate fee bounds compatibility
+1. Check `CHARGE_PRE_ACTION_CONDITION` (if set)
+2. Check fee bounds compatibility
 3. Call `escrow.charge()` - funds go directly to receiver
 4. Accumulate protocol fees for later distribution
-5. Call `CHARGE_RECORDER` (if set)
+5. Call `CHARGE_POST_ACTION_HOOK` (if set)
 6. Emit `ChargeExecuted`
 
-**Access:** Controlled by `CHARGE_CONDITION` (default: anyone)
+**Access:** Controlled by `CHARGE_PRE_ACTION_CONDITION` (default: anyone)
 
 <Note>
-Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refundPostEscrow()`.
+Unlike `authorize()`, funds go directly to receiver without escrow hold. Refunds are only possible via `refund()`.
 </Note>
 
-### release()
+### capture()
 
 Releases funds from escrow to receiver (capture).
 
 ```solidity
-function release(
+function capture(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint256 amount
+    uint256 amount,
+    bytes calldata data
 ) external nonReentrant
 ```
 
 **Parameters:**
 - `paymentInfo` - Payment info struct
-- `amount` - Amount to release
+- `amount` - Amount to capture
+- `data` - Optional pass-through data for the pre/post action plugins
 
 **Flow:**
-1. Check `RELEASE_CONDITION` (if set)
+1. Check `CAPTURE_PRE_ACTION_CONDITION` (if set)
 2. Use fees stored at authorization time
 3. Call `escrow.capture()`
 4. Accumulate protocol fees for later distribution
-5. Call `RELEASE_RECORDER` (if set)
-6. Emit `ReleaseExecuted`
+5. Call `CAPTURE_POST_ACTION_HOOK` (if set)
+6. Emit `CaptureExecuted`
 
-**Access:** Controlled by `RELEASE_CONDITION`
+**Access:** Controlled by `CAPTURE_PRE_ACTION_CONDITION`
 
 <Note>
 **Marketplace example:** Receiver OR StaticAddressCondition(arbiter) + escrow passed
@@ -154,42 +156,46 @@ function release(
 **DAO example:** StaticAddressCondition(daoMultisig)
 </Note>
 
-### refundInEscrow()
+### void()
 
-Refunds payment while still in escrow (partial void).
+Returns all escrowed funds to the payer before capture. Full-only: `escrow.void()` empties the authorization in one transaction.
 
 ```solidity
-function refundInEscrow(
+function void(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
-    uint120 amount
+    bytes calldata data
 ) external nonReentrant
 ```
 
 **Parameters:**
 - `paymentInfo` - Payment info struct
-- `amount` - Amount to return to payer
+- `data` - Optional pass-through data for the pre/post action plugins
 
 **Flow:**
-1. Check `REFUND_IN_ESCROW_CONDITION` (if set)
-2. Call `escrow.partialVoid()` to return funds to payer
-3. Call `REFUND_IN_ESCROW_RECORDER` (if set)
-4. Emit `RefundInEscrowExecuted`
+1. Check `VOID_PRE_ACTION_CONDITION` (if set)
+2. Call `escrow.void()` to return escrowed funds to payer
+3. Call `VOID_POST_ACTION_HOOK` (if set)
+4. Emit `VoidExecuted`
 
-**Access:** Controlled by `REFUND_IN_ESCROW_CONDITION`
+**Access:** Controlled by `VOID_PRE_ACTION_CONDITION`
 
 <Note>
-**Marketplace example:** StaticAddressCondition(arbiter) - disputes
+**Marketplace example:** StaticAddressCondition(arbiter) for disputes
 **Return policy example:** Receiver OR StaticAddressCondition(arbiter)
 **DAO example:** StaticAddressCondition(daoMultisig)
-**Subscription example:** address(0) - no refunds
+**Subscription example:** address(0), no voids allowed
 </Note>
 
-### refundPostEscrow()
+<Tip>
+For a partial return, call `capture()` for the amount to keep. Then `void()` the unused authorization, or let the payer reclaim it after `captureDeadline`.
+</Tip>
 
-Refunds payment after it has been released (captured).
+### refund()
+
+Refunds a payment after capture (after the receiver has the funds).
 
 ```solidity
-function refundPostEscrow(
+function refund(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256 amount,
     address tokenCollector,
@@ -201,20 +207,20 @@ function refundPostEscrow(
 - `paymentInfo` - Payment info struct
 - `amount` - Amount to refund to payer
 - `tokenCollector` - Address of the token collector that will source the refund
-- `collectorData` - Data to pass to the token collector (e.g., signatures)
+- `collectorData` - Data to pass to the token collector (for example, signatures)
 
 **Flow:**
-1. Check `REFUND_POST_ESCROW_CONDITION` (if set)
+1. Check `REFUND_PRE_ACTION_CONDITION` (if set)
 2. Call `escrow.refund()` - token collector enforces permission
-3. Call `REFUND_POST_ESCROW_RECORDER` (if set)
-4. Emit `RefundPostEscrowExecuted`
+3. Call `REFUND_POST_ACTION_HOOK` (if set)
+4. Emit `RefundExecuted`
 
-**Access:** Controlled by `REFUND_POST_ESCROW_CONDITION`. Permission is also enforced by the token collector (e.g., receiver must have approved it, or collectorData contains receiver's signature).
+**Access:** Controlled by `REFUND_PRE_ACTION_CONDITION`. The token collector also enforces permission (for example, the receiver must have approved it, or `collectorData` contains the receiver's signature).
 
 <Note>
 **Marketplace example:** StaticAddressCondition(arbiter) - post-delivery disputes
 **Return policy example:** Receiver - voluntary returns
-**Most configurations:** address(0) - no post-escrow refunds
+**Most configurations:** address(0) - no refunds
 </Note>
 
 ## Fee System (Modular, Additive)
@@ -231,23 +237,17 @@ ProtocolFeeConfig public immutable PROTOCOL_FEE_CONFIG;
 IFeeCalculator public immutable FEE_CALCULATOR;
 
 // Fee recipients
-address public immutable FEE_RECIPIENT;  // Operator fee recipient
+address public immutable FEE_RECEIVER;  // Operator fee recipient
 // Protocol fee recipient is on ProtocolFeeConfig
 
 // Fee tracking for accurate distribution
 mapping(address token => uint256) public accumulatedProtocolFees;
 ```
 
-**Example Fee Calculation (Additive):**
-
-For a 1000 USDC payment:
-- **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC -> goes to `protocolFeeRecipient`
-- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC -> goes to `FEE_RECIPIENT`
-- **Total Fee:** 5 bps (0.05%) = 0.50 USDC
-- **Receiver Gets:** 999.50 USDC
+Fees are additive: `totalFee = protocolFee + operatorFee`, split between `protocolFeeRecipient` and the operator's `FEE_RECEIVER`. For a worked example with concrete amounts, see the [Fee System](/contracts/fees#example-calculation).
 
 **Fee Locking:**
-Fees are calculated and stored at `authorize()` time in `authorizedFees[hash]`. This prevents protocol fee changes from breaking capture of already-authorized payments.
+The operator calculates fees at `authorize()` time and stores them in `authorizedFees[hash]`. This stops later protocol fee changes from breaking capture of already-authorized payments.
 
 ```solidity
 struct AuthorizedFees {
@@ -257,7 +257,7 @@ struct AuthorizedFees {
 mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 ```
 
-**FEE_RECIPIENT** can be:
+**FEE_RECEIVER** can be:
 - Arbiter (marketplace with disputes)
 - Service Provider (subscriptions)
 - Platform Treasury (platform-controlled)
@@ -265,28 +265,18 @@ mapping(bytes32 paymentInfoHash => AuthorizedFees) public authorizedFees;
 
 ### Fee Distribution
 
-Fees accumulate in the operator contract and are distributed via `distributeFees(token)`:
+Fees accumulate in the operator contract. Call `distributeFees(token)` to disburse them:
 
 ```solidity
 // Anyone can call to distribute fees for a token
 operator.distributeFees(usdcAddress);
 // Protocol share -> protocolFeeRecipient
-// Operator share -> FEE_RECIPIENT
+// Operator share -> FEE_RECEIVER
 ```
 
 ### Protocol Fee Changes (7-day Timelock)
 
-Protocol fee calculator changes require a 7-day timelock on `ProtocolFeeConfig`:
-
-```solidity
-// Step 1: Queue new calculator
-protocolFeeConfig.queueCalculator(newCalculatorAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-protocolFeeConfig.executeCalculator();
-```
+Protocol fee calculator and recipient changes require a 7-day timelock on `ProtocolFeeConfig`. See [Fee System: 7-day timelock](/contracts/fees#calculator-changes-7-day-timelock) for the full queue, wait, execute workflow.
 
 <Warning>
 Protocol fee changes require 7-day timelock. Operator fees are immutable (set at deploy time).
@@ -297,7 +287,7 @@ Protocol fee changes require 7-day timelock. Operator fees are immutable (set at
 - **ReentrancyGuardTransient** - EIP-1153 transient storage for gas-efficient reentrancy protection
 - **Ownership** - Solady's Ownable with 2-step transfer
 - **Timelock** - 7-day delay on protocol fee changes (operator fees are immutable)
-- **Immutable Core** - Escrow, conditions, and fee configuration cannot be changed
+- **Immutable Core** - Escrow, conditions, and fee configuration stay fixed after deployment
 
 ## Next Steps
 

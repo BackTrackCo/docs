@@ -4,17 +4,19 @@ description: "Pluggable condition system for flexible payment authorization and 
 icon: "filter"
 ---
 
-## What Are Conditions?
+## What conditions do
 
-Conditions are pluggable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots** — one per action:
+Conditions are swappable contracts that control who can perform actions on a PaymentOperator. Each operator has **5 condition slots**, one per action:
 
 | Slot | Controls |
 |------|----------|
-| `AUTHORIZE_CONDITION` | Who can authorize payments |
-| `CHARGE_CONDITION` | Who can charge partial amounts |
-| `RELEASE_CONDITION` | Who can release from escrow |
-| `REFUND_IN_ESCROW_CONDITION` | Who can refund during escrow |
-| `REFUND_POST_ESCROW_CONDITION` | Who can refund after release |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Who can create payments |
+| `CHARGE_PRE_ACTION_CONDITION` | Who can charge partial amounts |
+| `CAPTURE_PRE_ACTION_CONDITION` | Who can capture funds from escrow |
+| `VOID_PRE_ACTION_CONDITION` | Who can refund during escrow |
+| `REFUND_PRE_ACTION_CONDITION` | Who can refund after capture |
+
+These are the condition half of the operator's 10 slots. For the full slot layout alongside the post-action hooks, see [PaymentOperator: 10-slot configuration](/contracts/payment-operator#10-slot-configuration).
 
 ## ICondition Interface
 
@@ -23,23 +25,25 @@ interface ICondition {
     function check(
         AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
         uint256 amount,
-        address caller
+        address caller,
+        bytes calldata data
     ) external view returns (bool allowed);
 }
 ```
 
 **Parameters:**
-- `paymentInfo` — The payment information struct
-- `amount` — The amount involved in the action (0 for authorization-only checks like refund request status updates)
-- `caller` — The address attempting the action
+- `paymentInfo`, The payment information struct
+- `amount`, The amount involved in the action (0 for authorization-only checks like refund request status updates)
+- `caller`, The address attempting the action
+- `data`, Arbitrary data forwarded from the caller (signatures, proofs, attestations)
 
-**Return:** `true` if the caller is authorized, `false` otherwise.
+**Return:** `true` if the caller can proceed, `false` otherwise.
 
 ## Default Behavior
 
-**Condition slot = `address(0)`** — always returns `true` (allow). The action is unrestricted.
+**Condition slot = `address(0)`**: always returns `true` (allow). The action has no restrictions.
 
-This means you only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
+You only need to set conditions for slots you want to restrict. Leave the rest as `address(0)`.
 
 ## Singleton vs Per-Deployment
 
@@ -52,24 +56,24 @@ This means you only need to set conditions for slots you want to restrict. Leave
 ## Security Rules
 
 <Warning>
-**Conditions MUST NOT revert.** Return `false` to deny — never `revert`. The operator converts `false` into a `ConditionNotMet` error.
+**Conditions MUST NOT revert.** Return `false` to deny, never `revert`. The operator converts `false` into a `ConditionNotMet` error.
 </Warning>
 
 - Conditions should be `view` or `pure` to prevent reentrancy attacks
 - Never make external state-changing calls inside a condition
-- Test thoroughly — edge cases in authorization logic can lead to locked funds
+- Cover edge cases in tests. Bugs in authorization logic can lock funds
 
 ## Configuration Patterns
 
 Conditions compose to create flexible authorization policies. Here are common patterns:
 
-### Open Authorization, Restricted Release
+### Open Authorization, Restricted Capture
 
 ```solidity
 config = {
-    authorizeCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
-    authorizeRecorder: escrowRecorder,          // Record time
-    releaseCondition: releaseCondition,         // Restricted
+    authorizePreActionCondition: ALWAYS_TRUE_CONDITION,  // Anyone can authorize
+    authorizePostActionHook: escrowHook,          // Record time
+    capturePreActionCondition: capturePreActionCondition,         // Restricted
     // ...
 };
 ```
@@ -78,8 +82,8 @@ config = {
 
 ```solidity
 config = {
-    authorizeCondition: PAYER_CONDITION,        // Only payer
-    releaseCondition: PAYER_CONDITION,          // Only payer
+    authorizePreActionCondition: PAYER_CONDITION,        // Only payer
+    capturePreActionCondition: PAYER_CONDITION,          // Only payer
     // ...
 };
 ```
@@ -88,11 +92,11 @@ config = {
 
 ```solidity
 config = {
-    authorizeCondition: ARBITER_CONDITION,      // Only arbiter
-    chargeCondition: ARBITER_CONDITION,         // Only arbiter
-    releaseCondition: ARBITER_CONDITION,        // Only arbiter
-    refundInEscrowCondition: ARBITER_CONDITION, // Only arbiter
-    refundPostEscrowCondition: ARBITER_CONDITION,
+    authorizePreActionCondition: ARBITER_CONDITION,      // Only arbiter
+    chargePreActionCondition: ARBITER_CONDITION,         // Only arbiter
+    capturePreActionCondition: ARBITER_CONDITION,        // Only arbiter
+    voidPreActionCondition: ARBITER_CONDITION, // Only arbiter
+    refundPreActionCondition: ARBITER_CONDITION,
     // ...
 };
 ```
@@ -103,12 +107,12 @@ For complete configuration examples, see the [Examples](/contracts/examples) pag
 
 ### Singleton Reuse
 
-Singleton conditions are deployed once and reused by all operators. Reference the existing addresses — don't deploy new instances:
+All operators reuse the same singleton conditions. Reference the existing addresses, don't deploy new instances:
 
 ```typescript
 // Good: Reference the singleton address
-const config1 = { authorizeCondition: PAYER_CONDITION };
-const config2 = { authorizeCondition: PAYER_CONDITION }; // Same address
+const config1 = { authorizePreActionCondition: PAYER_CONDITION };
+const config2 = { authorizePreActionCondition: PAYER_CONDITION }; // Same address
 ```
 
 ### Stateless Conditions
@@ -117,14 +121,14 @@ Prefer stateless conditions when possible:
 
 ```solidity
 // Stateless: No storage reads (pure)
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external pure returns (bool)
 {
     return caller == payment.receiver;  // Pure computation
 }
 
 // Stateful: Storage reads cost gas (view)
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external view returns (bool)
 {
     return allowList[caller];  // SLOAD costs gas
@@ -134,7 +138,7 @@ function check(PaymentInfo calldata payment, uint256, address caller)
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Recorders" icon="database" href="/contracts/recorders/overview">
+  <Card title="Hooks" icon="database" href="/contracts/hooks/overview">
     Learn about the state recording system.
   </Card>
   <Card title="Combinators" icon="puzzle-piece" href="/contracts/conditions/combinators">

@@ -1,0 +1,137 @@
+---
+title: "Custom Hooks"
+description: "Build your own hook contracts for specialized state tracking"
+icon: "wrench"
+---
+
+## Overview
+
+You can build custom hooks for specialized tracking beyond what the built-in hooks provide. Use the `IHook` interface and extend `BaseHook` for operator access control.
+
+## `IHook` interface
+
+```solidity
+interface IHook {
+    function run(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
+        address caller,
+        bytes calldata data
+    ) external;
+}
+```
+
+`data` is forwarded verbatim from the action call (signatures, proofs, attestations). Subclasses ignore parameters they do not need.
+
+## Extending BaseHook
+
+Extend `BaseHook` and call `_verifyAndHash(paymentInfo)` to enforce caller and payment-existence checks:
+
+```solidity
+contract MyHook is BaseHook {
+    constructor(address escrow, bytes32 authorizedCodehash)
+        BaseHook(escrow, authorizedCodehash)
+    {}
+
+    function run(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
+        address /* caller */,
+        bytes calldata /* data */
+    ) external override {
+        bytes32 hash = _verifyAndHash(paymentInfo);
+        // Your recording logic here, keyed by `hash`
+    }
+}
+```
+
+`authorizedCodehash` is the runtime codehash of an optional trusted caller (e.g. `HookCombinator`). Pass `bytes32(0)` to gate solely on `msg.sender == paymentInfo.operator`.
+
+## Example: CaptureCountHook
+
+Tracks the number and total amount of captures per payment:
+
+```solidity
+contract CaptureCountHook is BaseHook {
+    mapping(bytes32 => uint256) public captureCount;
+    mapping(bytes32 => uint256) public totalCaptured;
+
+    constructor(address escrow, bytes32 authorizedCodehash)
+        BaseHook(escrow, authorizedCodehash)
+    {}
+
+    function run(
+        AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
+        uint256 amount,
+        address /* caller */,
+        bytes calldata /* data */
+    ) external override {
+        bytes32 hash = _verifyAndHash(paymentInfo);
+        captureCount[hash]++;
+        totalCaptured[hash] += amount;
+    }
+
+    function getStats(bytes32 paymentHash)
+        external view
+        returns (uint256 count, uint256 total)
+    {
+        return (captureCount[paymentHash], totalCaptured[paymentHash]);
+    }
+}
+```
+
+## Testing
+
+Test custom hooks with Forge:
+
+```solidity
+contract CaptureCountHookTest is Test {
+    CaptureCountHook hook;
+
+    function setUp() public {
+        hook = new CaptureCountHook(address(escrow), bytes32(0));
+    }
+
+    function test_incrementsOnRun() public {
+        vm.prank(paymentInfo.operator);
+        hook.run(paymentInfo, 100e6, address(0), "");
+        bytes32 hash = escrow.getHash(paymentInfo);
+        (uint256 count, uint256 total) = hook.getStats(hash);
+        assertEq(count, 1);
+        assertEq(total, 100e6);
+    }
+
+    function test_tracksMultipleCaptures() public {
+        vm.startPrank(paymentInfo.operator);
+        hook.run(paymentInfo, 50e6, address(0), "");
+        hook.run(paymentInfo, 30e6, address(0), "");
+        vm.stopPrank();
+        bytes32 hash = escrow.getHash(paymentInfo);
+        (uint256 count, uint256 total) = hook.getStats(hash);
+        assertEq(count, 2);
+        assertEq(total, 80e6);
+    }
+}
+```
+
+## Security Checklist
+
+- [ ] Extends `BaseHook` and uses `_verifyAndHash` for caller and payment-existence checks
+- [ ] Returns early instead of reverting on business-logic edge cases (a reverting hook permanently bricks the surrounding action)
+- [ ] Gas-efficient storage layout
+- [ ] Full test coverage across the public surface
+
+<Warning>
+Unlike conditions, hooks **do mutate state**. `BaseHook._verifyAndHash` enforces `msg.sender == paymentInfo.operator` (or matches `AUTHORIZED_CODEHASH`) plus payment existence in escrow. Calling `_verifyAndHash` is mandatory.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Hooks Overview" icon="database" href="/contracts/hooks/overview">
+    Compare recording strategies.
+  </Card>
+  <Card title="Custom Conditions" icon="filter" href="/contracts/conditions/custom">
+    Build custom condition contracts.
+  </Card>
+</CardGroup>

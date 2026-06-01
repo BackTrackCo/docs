@@ -1,0 +1,153 @@
+---
+title: "forwardToArbiter()"
+sidebarTitle: "forwardToArbiter helper"
+description: "Forward settlement data to an arbiter service for quality evaluation"
+icon: "arrow-right"
+---
+
+The `forwardToArbiter()` function creates an `onAfterSettle` hook that forwards the response body and reconstructed `PaymentInfoWire` to an arbiter service. It runs fire-and-forget so it never blocks the response to the client.
+
+- Only fires for successful **`auth-capture`** scheme settlements
+- POSTs `{ responseBody, transaction, paymentInfoWire }` to `{arbiterUrl}/verify`
+- The hook catches errors internally so an unreachable arbiter cannot break the payment flow
+
+## Usage
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers'
+import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new AuthCaptureEvmScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001'),
+  )
+```
+
+## Function signature
+
+```typescript
+function forwardToArbiter(
+  arbiterUrl: string,
+  options?: ForwardToArbiterOptions,
+): (context: SettleResultContext) => Promise<void>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `arbiterUrl` | `string` | Base endpoint of your arbiter service (for example, `http://arbiter:3001`) |
+| `options` | `ForwardToArbiterOptions` | Optional configuration (see below) |
+
+### Options
+
+```typescript
+interface ForwardToArbiterOptions {
+  /** Custom error handler. Defaults to `console.warn`. */
+  onError?: (error: unknown) => void
+}
+```
+
+## Payload shape
+
+When an `auth-capture` settlement succeeds, the hook POSTs the following JSON to `{arbiterUrl}/verify`:
+
+```typescript
+{
+  responseBody: string             // UTF-8 encoded response body
+  transaction: string              // Settlement transaction hash
+  paymentInfoWire: {
+    operator: `0x${string}`        // from extra.captureAuthorizer
+    payer: `0x${string}`           // recovered at settlement
+    receiver: `0x${string}`        // from requirements.payTo
+    token: `0x${string}`           // from requirements.asset
+    maxAmount: string              // from requirements.amount
+    preApprovalExpiry: number      // authorization.validBefore (EIP-3009) or permit2Authorization.deadline (Permit2)
+    authorizationExpiry: number    // from extra.captureDeadline
+    refundExpiry: number           // from extra.refundDeadline
+    minFeeBps: number              // from extra.minFeeBps
+    maxFeeBps: number              // from extra.maxFeeBps
+    feeReceiver: `0x${string}`     // from extra.feeRecipient
+    salt: string                   // from payload.salt
+  }
+}
+```
+
+The helper reconstructs `PaymentInfoWire` from the verified `SettleResultContext` using the `reconstructPaymentInfoWire()` helper. The arbiter consumes `req.body.paymentInfoWire` and runs it through `PaymentInfo.fromWire(...)` (from `@x402r/sdk` or `@x402r/core`) to get the `bigint`-typed `PaymentInfo` struct expected by SDK actions.
+
+## Error handling
+
+By default, the hook logs fetch errors with `console.warn`. Override this with a custom handler:
+
+```typescript
+import { forwardToArbiter } from '@x402r/helpers'
+import { AuthCaptureEvmScheme } from '@x402r/evm/auth-capture/server'
+
+const resourceServer = new x402ResourceServer(facilitatorClient)
+  .register(networkId, new AuthCaptureEvmScheme())
+  .onAfterSettle(
+    forwardToArbiter('http://arbiter:3001', {
+      onError: (err) => sentry.captureException(err),
+    }),
+  )
+```
+
+The hook wraps each error in an `X402rError` carrying the arbiter endpoint and request details for easier debugging.
+
+## Skipped scenarios
+
+The hook returns without making a request when:
+
+- The settlement was not successful (`context.result.success === false`)
+- The scheme is not `auth-capture`
+- No response body is available in the transport context
+
+## Address re-exports
+
+The `@x402r/helpers` package re-exports chain-invariant address constants from `@x402r/core` for convenience:
+
+```typescript
+import {
+  authCaptureEscrow,
+  tokenCollector,
+  protocolFeeConfig,
+  receiverRefundCollector,
+  factories,
+  conditions,
+  getChainConfig,
+  supportedChainIds,
+} from '@x402r/helpers'
+```
+
+Plus the `@x402r/evm` wire-format types and guards:
+
+```typescript
+import {
+  type AuthCaptureExtra,
+  type AuthCapturePayload,
+  type Eip3009Payload,
+  type Permit2Payload,
+  type PaymentInfoStruct,
+  isAuthCaptureExtra,
+  isAuthCapturePayload,
+  isEip3009Payload,
+  isPermit2Payload,
+} from '@x402r/helpers'
+```
+
+And the `x402rDefaults` builder for hand-constructing `extra` in `PaymentRequirements`:
+
+```typescript
+import { type X402rDefaultsInput, x402rDefaults } from '@x402r/helpers'
+```
+
+`x402rDefaults(input)` returns an `AuthCaptureExtra` populated with sensible defaults, useful when you want to build `PaymentRequirements` outside the merchant client.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Examples" icon="code" href="/sdk/examples">
+    See working merchant server examples.
+  </Card>
+</CardGroup>

@@ -1,20 +1,17 @@
 ---
 title: "Merchant Server Quickstart"
+sidebarTitle: "Express server setup"
 description: "Accept escrow-backed refundable payments on your Express server in 5 minutes"
 icon: "store"
 ---
 
 This guide walks you through setting up an Express server that accepts x402r escrow-backed payments. By the end, you'll have a paid API endpoint protected by the x402 payment middleware with refundable escrow support.
 
-<Tip>
-The full source code for this example is available on [GitHub](https://github.com/BackTrackCo/x402r-sdk/tree/main/examples/servers/express).
-</Tip>
-
 ## Prerequisites
 
 - Node.js 20+
 - A deployed PaymentOperator contract ([Deploy Operator](/sdk/deploy-operator))
-- A running facilitator service ([Facilitator Quickstart](/sdk/facilitator/getting-started))
+- A running facilitator service
 - Base Sepolia ETH for testing
 
 ## Setup
@@ -24,7 +21,7 @@ The full source code for this example is available on [GitHub](https://github.co
     ```bash
     mkdir merchant-server && cd merchant-server
     npm init -y
-    npm install express @x402/core @x402/express @x402r/evm @x402r/helpers dotenv
+    npm install express @x402/core @x402/express @x402r/evm dotenv
     ```
   </Step>
 
@@ -32,8 +29,10 @@ The full source code for this example is available on [GitHub](https://github.co
     Create a `.env` file in the project root:
 
     ```bash
-    ADDRESS=0xYourMerchantAddress
-    OPERATOR_ADDRESS=0xYourPaymentOperatorAddress
+    # Replace ADDRESS with your merchant address.
+    ADDRESS=0x321651df4593DA57C413579c5b611D1A90168a3A
+    # Replace OPERATOR_ADDRESS with the operator you deployed.
+    OPERATOR_ADDRESS=0xa0d4734842df1690a5B33Cb21828c946e39D55a2
     FACILITATOR_URL=http://localhost:4022
     ```
   </Step>
@@ -45,8 +44,8 @@ The full source code for this example is available on [GitHub](https://github.co
     import "dotenv/config";
     import express from "express";
     import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-    import { EscrowServerScheme } from "@x402r/evm/escrow/server";
-    import { refundable } from "@x402r/helpers";
+    import { AuthCaptureEvmScheme } from "@x402r/evm/auth-capture/server";
+    import { getChainConfig } from "@x402r/core";
     import { HTTPFacilitatorClient } from "@x402/core/server";
 
     const address = process.env.ADDRESS as `0x${string}`;
@@ -63,30 +62,44 @@ The full source code for this example is available on [GitHub](https://github.co
     }
     const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 
+    const networkId = "eip155:84532";
+
     const app = express();
+
+    const now = Math.floor(Date.now() / 1000);
 
     app.use(
       paymentMiddleware(
         {
           "GET /weather": {
             accepts: [
-              refundable(
-                {
-                  scheme: "escrow",
-                  price: "$0.01",
-                  network: "eip155:84532",
-                  payTo: address,
+              {
+                scheme: "auth-capture",
+                price: "$0.01",
+                network: networkId,
+                payTo: address,
+                maxTimeoutSeconds: 60,
+                extra: {
+                  name: "USDC",
+                  version: "2",
+                  captureAuthorizer: operatorAddress,
+                  captureDeadline: now + 60 * 60,         // capture within 1 hour
+                  refundDeadline: now + 24 * 60 * 60,     // refund window 24 hours
+                  feeRecipient: operatorAddress,
+                  minFeeBps: 0,
+                  maxFeeBps: 500,
+                  // assetTransferMethod defaults to "eip3009"
+                  // autoCapture defaults to false (two-phase)
                 },
-                operatorAddress,
-              ),
+              },
             ],
             description: "Weather data",
             mimeType: "application/json",
           },
         },
         new x402ResourceServer(facilitatorClient).register(
-          "eip155:84532",
-          new EscrowServerScheme() as never,
+          networkId,
+          new AuthCaptureEvmScheme(),
         ),
       ),
     );
@@ -119,22 +132,26 @@ The full source code for this example is available on [GitHub](https://github.co
     curl http://localhost:4021/weather
     ```
 
-    Without a valid payment header, the server responds with HTTP 402 and the escrow payment requirements:
+    Without a valid payment header, the server responds with HTTP 402 and the auth-capture payment requirements:
 
     ```json
     {
       "x402Version": 2,
       "accepts": [{
-        "scheme": "escrow",
+        "scheme": "auth-capture",
         "price": "$0.01",
         "network": "eip155:84532",
         "payTo": "0x...",
+        "maxTimeoutSeconds": 60,
         "extra": {
-          "escrowAddress": "0x...",
-          "operatorAddress": "0x...",
-          "tokenCollector": "0x...",
+          "name": "USDC",
+          "version": "2",
+          "captureAuthorizer": "0x...",
+          "captureDeadline": 1740758554,
+          "refundDeadline": 1741276954,
+          "feeRecipient": "0x...",
           "minFeeBps": 0,
-          "maxFeeBps": 1000
+          "maxFeeBps": 500
         }
       }]
     }
@@ -144,24 +161,21 @@ The full source code for this example is available on [GitHub](https://github.co
 
 ## How it works
 
-- **`refundable()`** wraps a standard x402 payment option with escrow configuration (contract addresses, fee bounds) from the network config.
-- **`EscrowServerScheme`** registers the escrow payment scheme with the x402 resource server so it can validate escrow-backed payments.
-- **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 if no payment is provided.
+- **`extra` config** declares the captureAuthorizer, capture/refund deadlines, fee recipient, and fee bounds. The canonical `AuthCaptureEscrow` and token collector addresses are universal CREATE2 deploys, so routes do not need to repeat them.
+- **`AuthCaptureEvmScheme`** registers the auth-capture payment scheme with the x402 resource server so it can verify auth-capture-backed payments.
+- **`paymentMiddleware`** intercepts requests, checks for a valid payment header, and returns 402 when the caller has not provided one.
 - **`HTTPFacilitatorClient`** connects to the facilitator service that verifies and settles payments on-chain.
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="refundable()" icon="wrench" href="/sdk/helpers/refundable">
-    Configure escrow options and fee bounds.
+  <Card title="forwardToArbiter()" icon="wrench" href="/sdk/helpers/forward-to-arbiter">
+    Forward escrow settlements to an arbiter service.
   </Card>
   <Card title="Merchant SDK" icon="store" href="/sdk/merchant/quickstart">
-    Release payments, handle refunds, and manage escrow.
+    Capture payments, handle refunds, and manage escrow.
   </Card>
   <Card title="Deploy Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy your own PaymentOperator contract.
-  </Card>
-  <Card title="Facilitator Quickstart" icon="server" href="/sdk/facilitator/getting-started">
-    Run your own facilitator service.
   </Card>
 </CardGroup>

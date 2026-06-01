@@ -6,15 +6,15 @@ icon: "house"
 
 **x402r** is a refundable payments protocol extension for [x402](https://www.x402.org/). It enables secure, reversible transactions with built-in buyer protection through smart contract escrow on Base.
 
-## Why x402r?
+## Why x402r
 
 Standard x402 payments are immediate and irreversible. x402r adds:
 
-- **Escrow deposits** — Funds held in smart contracts until conditions are met
-- **Refund windows** — Configurable time periods for buyers to request refunds
-- **Dispute resolution** — Arbiter system for handling contested transactions
+- **Escrow deposits**: smart contracts hold funds until conditions clear
+- **Refund windows**: configurable time periods for buyers to request refunds
+- **Dispute resolution**: arbiter system for handling contested transactions
 
-## How It Works
+## How it works
 
 ```mermaid
 sequenceDiagram
@@ -27,7 +27,7 @@ sequenceDiagram
     Escrow-->>Merchant: Payment notification
 
     alt Happy path
-        Merchant->>Escrow: Release funds
+        Merchant->>Escrow: Capture funds
         Escrow->>Merchant: Transfer
     else Refund requested
         Client->>Escrow: Request refund
@@ -38,21 +38,15 @@ sequenceDiagram
     end
 ```
 
-## Who Is This For?
+## Who this is for
 
 <CardGroup cols={3}>
-  <Card title="Clients (Payers)" icon="user" href="/sdk/client/quickstart">
-    Request refunds, freeze suspicious payments, and track payment state.
-  </Card>
   <Card title="Merchants (Receivers)" icon="store" href="/sdk/examples">
-    Release funds, process refunds, and manage escrow periods.
-  </Card>
-  <Card title="Arbiters" icon="gavel" href="/sdk/arbiter/quickstart">
-    Resolve disputes and approve/deny refund requests.
+    Capture funds, process refunds, and manage escrow periods.
   </Card>
 </CardGroup>
 
-## Get Started
+## Get started
 
 <CardGroup cols={2}>
   <Card title="Protocol Overview" icon="diagram-project" href="/x402-integration/overview">
@@ -75,29 +69,17 @@ x402r consists of these core components:
 
 | Component | Purpose |
 |-----------|---------|
-| **PaymentOperator** | Manages payment authorization, release, charge, and refunds with pluggable conditions |
+| **PaymentOperator** | Manages payment authorization, capture, charge, void, and refunds with pluggable conditions |
 | **AuthCaptureEscrow** | Holds ERC-20 tokens during the payment lifecycle (from commerce-payments) |
-| **Conditions & Recorders** | Pluggable authorization checks (before action) and state updates (after action) |
-| **EscrowPeriod & Freeze** | Time-based release and freeze policies for buyer protection |
+| **Conditions & Hooks** | Pluggable authorization checks (before action) and state updates (after action) |
+| **EscrowPeriod & Freeze** | Time-based capture and freeze policies for buyer protection |
 | **RefundRequest** | Handles refund request lifecycle and approvals |
 
-All protocol contracts use unified CREATE3 addresses — same address on every supported chain.
+All protocol contracts use universal CREATE2 addresses, same address on every supported chain.
 
-## Supported Networks
+## Supported networks
 
-| Network | Chain ID | Status |
-|---------|----------|--------|
-| Base | 8453 | Supported |
-| Ethereum | 1 | Supported |
-| Polygon | 137 | Supported |
-| Arbitrum One | 42161 | Supported |
-| Optimism | 10 | Supported |
-| Celo | 42220 | Supported |
-| Avalanche C-Chain | 43114 | Supported |
-| Monad | 143 | Supported |
-| Linea | 59144 | Supported |
-| Base Sepolia | 84532 | Testnet |
-| Ethereum Sepolia | 11155111 | Testnet |
+Today, the supported chains in `@x402r/core` are **Base** and **Base Sepolia**. More EVMs land as canonical `base/commerce-payments@v1.0.0` coverage extends. See [Network support](/sdk/overview#network-support) for chain IDs and USDC token addresses.
 
 ## Resources
 

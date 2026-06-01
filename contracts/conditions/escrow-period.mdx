@@ -6,12 +6,12 @@ icon: "clock"
 
 ## Overview
 
-EscrowPeriod is a dual-purpose contract — it functions as both a **recorder** and a **condition**:
+EscrowPeriod is a dual-purpose contract, it functions as both a **hook** and a **condition**:
 
-- **As a recorder:** Records the `block.timestamp` when a payment is authorized
+- **As a hook:** Records the `block.timestamp` at payment authorization
 - **As a condition:** Returns `true` only after the escrow period has elapsed
 
-Use the **same address** for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` slots on the operator.
+Use the **same address** for both `AUTHORIZE_POST_ACTION_HOOK` and `CAPTURE_PRE_ACTION_CONDITION` slots on the operator.
 
 **Type:** Per-deployment via [EscrowPeriodFactory](/contracts/factories)
 
@@ -19,21 +19,22 @@ Use the **same address** for both `AUTHORIZE_RECORDER` and `RELEASE_CONDITION` s
 
 ```mermaid
 flowchart LR
-    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorder]
+    EP[EscrowPeriod] -->|extends| ATR[AuthorizationTimeRecorderHook]
     EP -->|implements| IC[ICondition]
-    ATR -->|implements| IR[IRecorder]
+    ATR -->|implements| IR[IHook]
 ```
 
-EscrowPeriod extends [AuthorizationTimeRecorder](/contracts/recorders/authorization-time) and adds `ICondition` implementation. You don't need to deploy AuthorizationTimeRecorder separately — use EscrowPeriod directly.
+EscrowPeriod extends [AuthorizationTimeRecorderHook](/contracts/hooks/authorization-time) and adds `ICondition` implementation. You don't need to deploy AuthorizationTimeRecorderHook on its own, use EscrowPeriod directly.
 
 ## Logic
 
 ```solidity
-// ICondition — returns true when escrow period has passed
+// ICondition, returns true when escrow period has passed
 function check(
     AuthCaptureEscrow.PaymentInfo calldata paymentInfo,
     uint256,
-    address
+    address,
+    bytes calldata
 ) external view returns (bool allowed) {
     return !isDuringEscrowPeriod(paymentInfo);
 }
@@ -50,7 +51,7 @@ function isDuringEscrowPeriod(
 ```
 
 **Checks:**
-1. Payment was authorized (has a recorded timestamp)
+1. The payment has a recorded authorization timestamp
 2. Current time >= authorization time + escrow period
 
 ## Deployment
@@ -68,31 +69,25 @@ Then configure the operator:
 
 ```typescript
 const config = {
-  authorizeRecorder: escrowPeriodAddress,   // Record auth time
-  releaseCondition: escrowPeriodAddress,    // Check escrow passed
+  authorizePostActionHook: escrowPeriodAddress,   // Record auth time
+  capturePreActionCondition: escrowPeriodAddress,    // Check escrow passed
   // ...
 };
 ```
 
 ## Composition with Freeze
 
-For freeze functionality, deploy a separate [Freeze](/contracts/conditions/freeze) condition and compose via [AndCondition](/contracts/conditions/combinators):
-
-```solidity
-// Escrow period only:  releaseCondition = escrowPeriod
-// Freeze only:         releaseCondition = freeze
-// Both:                releaseCondition = AndCondition([escrowPeriod, freeze])
-```
+Compose this condition with a separate [Freeze](/contracts/conditions/freeze) condition via [AndCondition](/contracts/conditions/combinators) to gate capture on both escrow elapsed **and** not frozen. See [Composition Patterns](/contracts/conditions/freeze#composition-patterns) for the wiring.
 
 ## Use Cases
 
-- **Time-lock releases** — 7-day escrow for e-commerce
-- **Delayed fund access** — Grace period before receiver can access funds
-- **Buyer protection** — Give payers time to freeze or request refunds
+- **Time-lock releases**: 7-day escrow for e-commerce
+- **Delayed fund access**: Grace period before receiver can access funds
+- **Buyer protection**: Give payers time to freeze or request refunds
 
 ## Gas
 
-**Cost:** ~20k gas per `record()` call (one `SSTORE` for the timestamp). The `check()` call is a `view` function with one `SLOAD`.
+**Cost:** ~20k gas per `run()` call (one `SSTORE` for the timestamp). The `check()` call is a `view` function with one `SLOAD`.
 
 ## Next Steps
 

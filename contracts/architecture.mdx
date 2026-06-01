@@ -23,26 +23,26 @@ flowchart TB
     subgraph Operator["PaymentOperator (per config)"]
         Auth[authorize]
         Charge[charge]
-        Release[release]
-        RefundIE[refundInEscrow]
-        RefundPE[refundPostEscrow]
+        Capture[capture]
+        Void[void]
+        Refund[refund]
     end
 
-    subgraph Plugins["Conditions & Recorders"]
+    subgraph Plugins["Conditions & Hooks"]
         Cond["ICondition<br/>(check before action)"]
-        Rec["IRecorder<br/>(record after action)"]
+        Hook["IHook<br/>(run after action)"]
         EP[EscrowPeriod]
         Freeze[Freeze]
         And[AndCondition]
         Or[OrCondition]
+        RR[RefundRequest]
     end
 
     Escrow[AuthCaptureEscrow]
-    RR[RefundRequest]
 
     Payer -->|authorize / freeze| Operator
-    Receiver -->|release / charge| Operator
-    DesAddr -->|refund / release| Operator
+    Receiver -->|capture / charge| Operator
+    DesAddr -->|void / refund / capture| Operator
     Payer -->|requestRefund| RR
 
     POF -->|deploys| Operator
@@ -50,47 +50,47 @@ flowchart TB
     FF -->|deploys| Freeze
 
     Operator -->|checks| Cond
-    Operator -->|calls| Rec
-    Operator -->|locks/releases funds| Escrow
+    Operator -->|calls| Hook
+    Operator -->|locks/captures funds| Escrow
 
     EP -.->|implements| Cond
-    EP -.->|implements| Rec
+    EP -.->|implements| Hook
     Freeze -.->|implements| Cond
+    RR -.->|implements| Hook
     And -.->|composes| Cond
     Or -.->|composes| Cond
 ```
 
-For additional visual diagrams, see the [x402r-contracts repository](https://github.com/BackTrackCo/x402r-contracts#architecture).
+For more visual diagrams, see the [x402r-contracts repository](https://github.com/BackTrackCo/x402r-contracts#architecture).
 
 ## Payment Flow Sequence
 
 ### Standard Payment (Happy Path)
 
 1. **Payer** calls `operator.authorize(paymentInfo, amount, tokenCollector, collectorData)`
-2. **Operator** checks `AUTHORIZE_CONDITION` (if set)
+2. **Operator** checks `AUTHORIZE_PRE_ACTION_CONDITION` (if set)
 3. **Operator** validates fee bounds and stores fees at authorization time
 4. **Operator** calls `escrow.authorize()` to lock funds
-5. **Operator** calls `AUTHORIZE_RECORDER` to record timestamp
-6. **Escrow period** begins (e.g., 7 days) - if configured
-7. After escrow period: **Authorized address(es)** call `operator.release(paymentInfo, amount)` (e.g., receiver, designated address, or both)
-8. **Operator** checks `RELEASE_CONDITION` (configurable - can include time checks, role checks, etc.)
+5. **Operator** calls `AUTHORIZE_POST_ACTION_HOOK` to record timestamp
+6. **Escrow period** begins (for example, 7 days) if configured
+7. After escrow period: **Authorized addresses** call `operator.capture(paymentInfo, amount)` (for example, receiver, designated address, or both)
+8. **Operator** checks `CAPTURE_PRE_ACTION_CONDITION` (configurable, can include time checks or role checks)
 9. **Operator** calls `escrow.capture()` to transfer funds to receiver
 10. **Operator** accumulates protocol fees for later distribution
-11. **Operator** calls `RELEASE_RECORDER` to update state
+11. **Operator** calls `CAPTURE_POST_ACTION_HOOK` to update state
 
-### Refund Flow (In-Escrow)
+### Void Flow (before capture)
 
 **Example: Marketplace with arbiter dispute resolution**
 
-1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount, nonce)`
+1. **Payer** calls `refundRequest.requestRefund(paymentInfo, amount)`
 2. **RefundRequest** creates request with status `Pending`
-3. **Designated address** (e.g., arbiter, DAO multisig) reviews dispute
-4. **Designated address** calls `refundRequest.updateStatus(paymentInfo, nonce, Approved)`
-5. **Designated address** calls `operator.refundInEscrow(paymentInfo, amount)`
-6. **Operator** checks `REFUND_IN_ESCROW_CONDITION` (configured per operator)
-7. **Operator** calls `escrow.partialVoid()` to return funds to payer
-8. **Operator** calls `REFUND_IN_ESCROW_RECORDER`
-9. Funds transferred back to payer
+3. **Designated address** (for example, arbiter or DAO multisig) reviews dispute
+4. **Designated address** calls `operator.void(paymentInfo)`
+5. **Operator** checks `VOID_PRE_ACTION_CONDITION` (configured per operator)
+6. **Operator** calls `escrow.void()` to return all escrowed funds to payer
+7. **Operator** calls `VOID_POST_ACTION_HOOK` (RefundRequest flips status to `Approved`)
+8. Funds transferred back to payer
 
 <Note>
 Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-allowed (return policy), DAO-controlled (governance), or disabled (subscriptions).
@@ -104,10 +104,10 @@ Refund conditions are configurable. Can be arbiter-only (marketplace), receiver-
 - **Day 0:** Payment authorized, escrow period begins
 - **Day 0-7:** Payer can freeze if suspicious (per Freeze contract configuration)
 - **Day 3:** Payer freezes payment (freeze lasts 3 days per configuration)
-- **Day 3-6:** Payment frozen, release blocked
+- **Day 3-6:** Payment frozen, capture blocked
 - **Day 6:** Freeze expires automatically (or authorized address unfreezes early)
 - **Day 7:** Escrow period ends
-- **Day 7+:** Authorized address(es) can release (if not frozen)
+- **Day 7+:** Authorized addresses can capture (if not frozen)
 
 <Note>
 Freeze policies are optional and configurable. Define who can freeze, who can unfreeze, and how long freeze lasts.
@@ -121,18 +121,18 @@ Freeze policies are optional and configurable. Define who can freeze, who can un
 
 ### Authorization Check (Before Action)
 
-When an action is called (e.g., `release()`):
+When you invoke an action (for example, `capture()`):
 
 1. **Load Condition** - Get the condition address from operator slot
-2. **Evaluate Condition** - Call `condition.check(paymentInfo, amount, caller)`
-   - Check if caller matches required role (e.g., receiver, arbiter)
-   - Check state (e.g., escrow period passed, not frozen)
-   - Check other requirements (e.g., time constraints)
+2. **Check Condition** - Call `condition.check(paymentInfo, amount, caller, data)`
+   - Check if caller matches required role (for example, receiver or arbiter)
+   - Check state (for example, escrow period passed, not frozen)
+   - Check other requirements (for example, time constraints)
 3. **Result:**
    - `true` → Proceed to execute action
-   - `false` → Revert with `ConditionNotMet` error
+   - `false` → Revert with `PreActionConditionNotMet` error
 4. **Execute Action** - Call escrow method
-5. **Call Recorder** - Update state after successful execution
+5. **Call Hook** - Run the matching `*_POST_ACTION_HOOK` after successful execution
 
 ### Combinator Example
 
@@ -141,7 +141,7 @@ When an action is called (e.g., `release()`):
 - If not receiver, checks if caller is arbiter: Yes → PASS
 - If neither: FAIL
 
-**AndCondition([OrCondition(...), EscrowPeriod])**
+**AndCondition([OrCondition, EscrowPeriod])**
 - First checks OrCondition: PASS (caller is receiver or arbiter)
 - Then checks EscrowPeriod: PASS (escrow period elapsed)
 - Both passed → PASS (action allowed)
@@ -189,7 +189,7 @@ mapping(address token => uint256) public accumulatedProtocolFees;
 ### EscrowPeriod Recording
 
 ```solidity
-// In EscrowPeriod (extends AuthorizationTimeRecorder)
+// In EscrowPeriod (extends AuthorizationTimeRecorderHook)
 mapping(bytes32 paymentInfoHash => uint256 authorizedAt) public authorizationTimes;
 ```
 
@@ -202,17 +202,11 @@ mapping(bytes32 paymentInfoHash => uint256 frozenUntil) public frozenUntil;
 
 ### Fee Distribution (Additive Model)
 
-Fees are **additive**: `totalFee = protocolFee + operatorFee`
+Fees are **additive**: `totalFee = protocolFee + operatorFee`. They are split between the protocol fee recipient (on ProtocolFeeConfig) and the operator's `FEE_RECEIVER`. For a worked example with concrete amounts, see the [Fee System](/contracts/fees#example-calculation).
 
-For a 1000 USDC payment with 3 bps protocol fee + 2 bps operator fee:
-- **Protocol Fee:** 0.30 USDC (3 bps) → `protocolFeeRecipient` on ProtocolFeeConfig
-- **Operator Fee:** 0.20 USDC (2 bps) → `FEE_RECIPIENT` on operator
-- **Total Fee:** 0.50 USDC (5 bps)
-- **Receiver Gets:** 999.50 USDC
+Fees accumulate in the operator. Anyone can call `distributeFees(token)` to disburse them.
 
-Fees accumulate in the operator and are distributed via `distributeFees(token)`.
-
-**FEE_RECIPIENT** can be:
+**FEE_RECEIVER** can be:
 - Arbiter address (marketplace with disputes)
 - Service provider address (subscriptions, APIs)
 - Platform treasury (platform-controlled)
@@ -223,12 +217,12 @@ Fees accumulate in the operator and are distributed via `distributeFees(token)`.
 | Role | Capabilities | Restrictions |
 |------|-------------|--------------|
 | **Payer** | `authorize()`, `freeze()`, `unfreeze()`, `requestRefund()`, `cancelRefundRequest()` | Can only act on own payments |
-| **Receiver** | `release()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
-| **Designated Address** | Any action per conditions (e.g., `refundInEscrow()`, `release()`, `updateStatus()`) | Defined by StaticAddressCondition (arbiter, DAO, service provider, etc.) |
+| **Receiver** | `capture()` (if condition allows), `charge()`, `requestRefund()` | Can only act on payments where they are receiver |
+| **Designated Address** | Any action per conditions (for example, `void()`, `capture()`, or `refund()`) | Defined by StaticAddressCondition (arbiter, DAO, or service provider) |
 | **Protocol Owner** | `queueCalculator()`, `executeCalculator()`, `queueRecipient()`, `executeRecipient()` | 7-day timelock on ProtocolFeeConfig changes |
 
 <Note>
-"Designated Address" is configured per operator via StaticAddressCondition. Can be:
+Each operator sets its "Designated Address" via StaticAddressCondition. Common roles include:
 - **Arbiter** (marketplace with disputes)
 - **Service Provider** (subscriptions, APIs)
 - **DAO Multisig** (governance-controlled)
@@ -247,32 +241,10 @@ All state-changing functions use `ReentrancyGuardTransient` (EIP-1153):
 
 ### Timelock Protection
 
-Protocol fee calculator changes require 7-day delay on `ProtocolFeeConfig`:
-
-```typescript
-// Step 1: Queue new calculator
-await protocolFeeConfig.queueCalculator(newCalculatorAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-await protocolFeeConfig.executeCalculator();
-```
-
-Protocol fee recipient changes also require 7-day timelock:
-
-```typescript
-// Step 1: Queue new recipient
-await protocolFeeConfig.queueRecipient(newRecipientAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-await protocolFeeConfig.executeRecipient();
-```
+Protocol fee calculator and recipient changes require a 7-day delay on `ProtocolFeeConfig` (queue, wait, execute). See [Fee System: 7-day timelock](/contracts/fees#calculator-changes-7-day-timelock) for the full workflow with events and the cancel path.
 
 <Note>
-Operator fees are **immutable** - set at deploy time via `IFeeCalculator`. Only protocol fees can be changed (with 7-day timelock).
+Operator fees are **immutable**: set at deploy time via `IFeeCalculator`. Only protocol fees can change, and only after a 7-day timelock.
 </Note>
 
 ### Two-Step Ownership
@@ -289,15 +261,15 @@ Ownership transfers use Solady's Ownable pattern:
 
 ```solidity
 // Payment lifecycle (PaymentOperator events)
-event AuthorizationCreated(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
-event ChargeExecuted(bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount, uint256 timestamp);
-event ReleaseExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, uint256 amount, uint256 timestamp);
-event RefundInEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
-event RefundPostEscrowExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, address indexed payer, uint256 amount);
+event AuthorizeExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount);
+event ChargeExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount);
+event CaptureExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount);
+event VoidExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver);
+event RefundExecuted(AuthCaptureEscrow.PaymentInfo paymentInfo, bytes32 indexed paymentInfoHash, address indexed payer, address indexed receiver, uint256 amount);
 
 // Fee distribution
-event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 arbiterAmount);
-event OperatorDeployed(address indexed operator, address indexed feeRecipient, address indexed releaseCondition);
+event FeesDistributed(address indexed token, uint256 protocolAmount, uint256 operatorAmount);
+event OperatorDeployed(address indexed operator, address indexed deployer, address indexed feeReceiver);
 
 // Freeze state (Freeze contract events)
 event PaymentFrozen(bytes32 indexed paymentInfoHash, uint40 frozenAt);
@@ -317,8 +289,5 @@ These events enable off-chain monitoring and indexing.
   </Card>
   <Card title="Deploy an Operator" icon="rocket" href="/sdk/deploy-operator">
     Deploy a PaymentOperator using the SDK.
-  </Card>
-  <Card title="SDK Concepts" icon="lightbulb" href="/sdk/concepts">
-    Understand how the SDK maps to contract architecture.
   </Card>
 </CardGroup>

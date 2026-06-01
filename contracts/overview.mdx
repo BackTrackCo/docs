@@ -4,9 +4,9 @@ description: "Introduction to x402r smart contracts and their relationship to co
 icon: "circle-info"
 ---
 
-## What is x402r?
+## What is x402r
 
-x402r is a smart contract extension for HTTP-native refundable payments. It builds on [commerce-payments](https://github.com/BackTrackCo/commerce-payments) to add dispute resolution, escrow periods, and flexible refund capabilities.
+x402r builds on the canonical [Commerce Payments Protocol](https://github.com/base/commerce-payments) to add dispute resolution, escrow periods, and refund capabilities. For the protocol-level introduction and the payer/merchant/arbiter model, see [What is x402r](/). This page covers the contract layer.
 
 ## Architecture Layers
 
@@ -14,11 +14,7 @@ See the [system architecture diagrams](https://github.com/BackTrackCo/x402r-cont
 
 ## Commerce Payments (Base Layer)
 
-[Commerce Payments](https://github.com/BackTrackCo/commerce-payments) provides the foundational payment infrastructure.
-
-<Note>
-x402r uses a [fork of commerce-payments](https://github.com/BackTrackCo/commerce-payments) that adds **partial void** support for handling partially completed orders and partial refunds.
-</Note>
+The audited [Commerce Payments Protocol](https://github.com/base/commerce-payments) provides the foundational payment infrastructure. x402r uses the canonical contracts directly (no fork) at their universal CREATE2 addresses.
 
 ### AuthCaptureEscrow
 
@@ -26,18 +22,17 @@ Core escrow contract for holding ERC-20 tokens during payments.
 
 **Features:**
 - Authorization-based deposits (no direct transfers)
-- Payment state machine: `NonExistent` → `InEscrow` → `Released` → `Settled`
+- Per-payment state queried via `paymentState(hash)` → `(hasCollected, capturableAmount, ...)`
 - Void/reclaim for failed authorizations
-- **Partial void support** (x402r addition) - Refund partial amounts during escrow
-- Operator-based access control
+- CaptureAuthorizer-based access control
 
 **Key Methods:**
 ```solidity
-authorize(paymentId, payer, receiver, amount, token, operator)
-charge(paymentId, amount)
-release(paymentId)
-void(paymentId)
-reclaim(paymentId, receiver, amount)
+authorize(paymentInfo, amount, tokenCollector, collectorData)
+charge(paymentInfo, amount, tokenCollector, collectorData)
+capture(paymentInfo, amount, data)
+void(paymentInfo, data)
+reclaim(paymentInfo, data)
 ```
 
 ### ERC3009PaymentCollector
@@ -73,19 +68,19 @@ x402r extends commerce-payments with flexible payment capabilities:
 - Fee recipient for protocol and operator fee distribution
 - Configurable authorization via conditions (not hardcoded roles)
 - Refund request states: `Pending` → `Approved`/`Denied`/`Cancelled`
-- In-escrow refunds (during escrow period)
-- Post-escrow refunds (after release)
+- Voids (during escrow period)
+- Refunds (after capture)
 - Support for marketplace, subscription, streaming, and custom flows
 
 ### 2. Pluggable Condition System
 
 **Conditions (ICondition)** - Authorization checks before actions
 
-**Recorders (IRecorder)** - State updates after actions
+**Hooks (IHook)** - State updates after actions
 
 **10-slot configuration per operator:**
-- 5 condition slots (before action): authorize, charge, release, refundInEscrow, refundPostEscrow
-- 5 recorder slots (after action): state tracking for each action
+- 5 condition slots (before action): `authorize`, `charge`, `capture`, `void`, `refund`
+- 5 hook slots (after action): state tracking for each action
 
 **Benefits:**
 - Configure operator behavior without redeploying
@@ -95,14 +90,14 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 ### 3. Time-Based Escrow & Freeze Policies
 
-**EscrowPeriod** - Combined recorder and condition that tracks authorization time and enforces escrow period
+**EscrowPeriod** - Combined hook and condition that tracks authorization time and enforces escrow period
 
-**Freeze** - Standalone condition that blocks release when payment is frozen (with configurable freeze/unfreeze authorization)
+**Freeze** - Standalone condition that blocks capture while a freeze remains active (with configurable freeze/unfreeze authorization)
 
 **Key features:**
-- Configurable escrow periods (e.g., 7 days, 14 days)
+- Configurable escrow periods (for example, 7 days or 14 days)
 - Payer-initiated freezes to stop suspicious releases
-- Time-limited freeze durations (e.g., 3 days)
+- Time-limited freeze durations (for example, 3 days)
 - MEV protection via private mempool support
 - Composable via `AndCondition([escrowPeriod, freeze])`
 
@@ -112,15 +107,15 @@ x402r extends commerce-payments with flexible payment capabilities:
 
 ### 5. Factory Pattern
 
-**PaymentOperatorFactory** - Deploys operators with deterministic CREATE3 addresses
+**PaymentOperatorFactory** - Deploys operators with deterministic CREATE2 addresses
 
 **EscrowPeriodFactory** - Deploys EscrowPeriod contracts
 
 **FreezeFactory** - Deploys Freeze condition contracts
 
-Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, RecorderCombinator.
+Plus factories for: StaticFeeCalculator, StaticAddressCondition, AndCondition, OrCondition, NotCondition, HookCombinator.
 
-All factories use **unified CREATE3 addresses** — same address on every supported chain.
+All factories use **universal CREATE2 addresses**: same address on every supported chain.
 
 **Benefits:**
 - Predictable addresses for off-chain address generation
@@ -134,13 +129,13 @@ All factories use **unified CREATE3 addresses** — same address on every suppor
 | Feature | Commerce Payments | x402r |
 |---------|------------------|-------|
 | **Refunds** | Manual void/reclaim | Structured refund requests with configurable approval |
-| **Escrow Period** | Not enforced | Configurable time-lock before release |
+| **Escrow Period** | Not enforced | Configurable time-lock before capture |
 | **Dispute Resolution** | Not built-in | Arbiter workflow via conditions, signatures, and evidence |
 | **Authorization** | Operator-based only | Pluggable conditions (access, time, signature, combinators) |
 | **Freeze Mechanism** | Not available | Configurable freeze during escrow period |
-| **Deployment** | Direct deployment | Factory pattern with unified CREATE3 (same address every chain) |
+| **Deployment** | Direct deployment | Factory pattern with universal CREATE2 (same address every chain) |
 | **Fees** | Not enforced | Additive protocol + operator fees with 7-day timelock |
-| **Multi-chain** | Per-chain deployment | Unified CREATE3 addresses across 11 chains |
+| **Multi-chain** | Per-chain deployment | Universal CREATE2 addresses on supported chains |
 
 ## Use Cases
 
@@ -163,7 +158,7 @@ All factories use **unified CREATE3 addresses** — same address on every suppor
 <Accordion title="Immutability by Default">
 Most contracts are immutable to prevent rug pulls and ensure trustlessness:
 - **PaymentOperator** - Cannot pause or upgrade
-- **EscrowPeriod** - Cannot modify escrow period
+- **EscrowPeriod** - Cannot change escrow period
 - **Freeze** - Cannot change freeze rules after deployment
 
 Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelock). Operator fees are immutable.
@@ -173,21 +168,21 @@ Protocol fee configuration is mutable via `ProtocolFeeConfig` (with 7-day timelo
 - Condition singletons deployed once, reused everywhere
 - CREATE2 for deterministic addresses (no registry lookups)
 - Minimal storage in operators (conditions are stateless)
-- Recorder pattern separates state from logic
+- Hook pattern separates state from logic
 </Accordion>
 
 <Accordion title="Composability">
-- Conditions can be combined with And/Or/Not logic
+- Conditions compose with And/Or/Not logic
 - Operators can share condition implementations
 - Factories enable on-demand instance deployment
-- Stateless conditions work across multiple operators
+- Stateless conditions work across many operators
 </Accordion>
 
 <Accordion title="Security First">
 - Reentrancy guards on all state changes
 - 7-day timelock on protocol fee changes
 - Two-step ownership transfers
-- Comprehensive event logging for monitoring
+- Detailed event logging for monitoring
 </Accordion>
 
 ## Architecture Overview

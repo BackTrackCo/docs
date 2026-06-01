@@ -5,12 +5,12 @@ icon: "code"
 ---
 
 <Note>
-The configuration examples below use simplified pseudo-code (e.g., `new StaticAddressCondition(...)`, `new AndCondition(...)`) to illustrate the logical composition of conditions. In practice, deploy conditions via their respective [factory contracts](/contracts/factories) using viem. See the [SDK quickstart](/sdk/client/quickstart) for executable code.
+The configuration examples below use simplified pseudo-code (for example, `new StaticAddressCondition(args)` or `new AndCondition([list])`) to illustrate how conditions compose. In practice, deploy conditions via their respective [factory contracts](/contracts/factories) using viem. See the [Deploy an operator guide](/sdk/deploy-operator) for executable code.
 </Note>
 
 ## Example 1: Standard E-Commerce with 7-Day Escrow
 
-**Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can release after escrow.
+**Use Case:** Online marketplace with buyer protection. 7-day escrow period, payer can freeze for 3 days, receiver or arbiter can capture after escrow.
 
 ### Complete Configuration
 
@@ -22,34 +22,30 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
     ```
   </Step>
 
-  <Step title="Deploy Freeze Policy">
+  <Step title="Deploy EscrowPeriod">
     ```typescript
-    // Payer can freeze, arbiter can unfreeze (or wait for expiry)
-    const freezePolicy = await freezePolicyFactory.deploy(
-      PAYER_CONDITION,              // Only payer can freeze
-      arbiterCondition.address,     // Only arbiter can unfreeze
-      3 * 24 * 60 * 60              // 3 days (auto-expires)
-    );
-    ```
-  </Step>
-
-  <Step title="Deploy EscrowPeriod and Freeze">
-    ```typescript
-    // 7-day escrow period (combined recorder + condition)
+    // 7-day escrow period (combined hook + condition)
     const escrowPeriod = await escrowPeriodFactory.deploy(
       7 * 24 * 60 * 60,    // 7 days
       zeroHash             // bytes32(0) = operator-only
     );
+    ```
+  </Step>
 
-    // Freeze condition linked to escrow period
+  <Step title="Deploy Freeze">
+    ```typescript
+    // Payer can freeze, arbiter can unfreeze (or wait for 3-day expiry),
+    // linked to the 7-day escrow period.
     const freeze = await freezeFactory.deploy(
-      freezePolicy,
-      escrowPeriod         // Link to escrow period for time constraint
+      PAYER_CONDITION,              // freezeCondition: only payer can freeze
+      arbiterCondition.address,     // unfreezeCondition: only arbiter can unfreeze
+      3 * 24 * 60 * 60,             // freezeDuration: 3 days (auto-expires; 0 = permanent)
+      escrowPeriod                  // escrowPeriodContract: restricts freeze() to the escrow window (address(0) = unconstrained)
     );
     ```
   </Step>
 
-  <Step title="Create Release Condition">
+  <Step title="Create capture condition">
     ```typescript
     // (Receiver OR Arbiter) AND (EscrowPassed AND NotFrozen)
     const receiverOrArbiter = await new OrCondition([
@@ -63,7 +59,7 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
       freeze               // Not frozen
     ]);
 
-    const releaseCondition = await new AndCondition([
+    const capturePreActionCondition = await new AndCondition([
       receiverOrArbiter,
       escrowAndFreeze
     ]);
@@ -73,18 +69,18 @@ The configuration examples below use simplified pseudo-code (e.g., `new StaticAd
   <Step title="Deploy Operator">
     ```typescript
     const config = {
-      feeRecipient: arbiterAddress,         // Arbiter earns fees for dispute resolution
+      feeReceiver: arbiterAddress,         // Arbiter earns fees for dispute resolution
       feeCalculator: feeCalculatorAddress,  // Operator fee calculator
-      authorizeCondition: ALWAYS_TRUE_CONDITION,
-      authorizeRecorder: escrowPeriod,      // Same address for recording auth time
-      chargeCondition: RECEIVER_CONDITION,
-      chargeRecorder: '0x0000000000000000000000000000000000000000',
-      releaseCondition: releaseCondition,
-      releaseRecorder: '0x0000000000000000000000000000000000000000',
-      refundInEscrowCondition: arbiterCondition.address,
-      refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-      refundPostEscrowCondition: arbiterCondition.address,
-      refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+      authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+      authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
+      chargePreActionCondition: RECEIVER_CONDITION,
+      chargePostActionHook: '0x0000000000000000000000000000000000000000',
+      capturePreActionCondition: capturePreActionCondition,
+      capturePostActionHook: '0x0000000000000000000000000000000000000000',
+      voidPreActionCondition: arbiterCondition.address,
+      voidPostActionHook: '0x0000000000000000000000000000000000000000',
+      refundPreActionCondition: arbiterCondition.address,
+      refundPostActionHook: '0x0000000000000000000000000000000000000000'
     };
 
     const operator = await operatorFactory.deployOperator(config);
@@ -115,9 +111,9 @@ sequenceDiagram
     Note over Buyer,Seller: Day 8 - Freeze Expires
     Note over Operator: Freeze automatically expires
 
-    Note over Buyer,Seller: Day 9 - Release
-    Seller->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    Note over Buyer,Seller: Day 9 - Capture
+    Seller->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>Seller: 99.95 USDC
     Escrow->>Operator: 0.05 USDC
 ```
@@ -126,7 +122,7 @@ sequenceDiagram
 
 ## Example 2: Instant Payment (Using Charge)
 
-**Use Case:** Digital goods or services where immediate payment to seller is expected.
+**Use Case:** Digital goods or services where the seller expects immediate payment.
 
 ### Configuration
 
@@ -135,18 +131,18 @@ sequenceDiagram
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: RECEIVER_CONDITION,        // Only receiver can charge
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Fallback to release remaining
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: '0x0000000000000000000000000000000000000000',             // Not used (charge handles auth)
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: RECEIVER_CONDITION,        // Only receiver can charge
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Fallback to capture remaining
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -160,11 +156,11 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 ```
 
 **Trade-offs:**
-- ✅ Single transaction - no separate authorize step
-- ✅ Instant delivery for digital goods
-- ✅ Better UX - seller gets paid immediately
-- ❌ No buyer protection escrow period
-- ❌ Payment immediately moves to post-escrow state
+- Single transaction, no separate `authorize` step
+- Instant delivery for digital goods
+- Better UX: seller gets paid immediately
+- No buyer protection escrow period
+- Payment moves to the captured state right away
 
 ---
 
@@ -178,41 +174,40 @@ Buyer approves tokens → Seller calls charge() → Funds transferred in one tx
 // Deploy arbiter condition
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
-// Receiver can freeze for 5 days, arbiter can unfreeze
-const freezePolicy = await freezePolicyFactory.deploy(
-  RECEIVER_CONDITION,           // Receiver can freeze (product defect)
-  arbiterCondition.address,     // Arbiter can unfreeze (dispute resolution)
-  5 * 24 * 60 * 60              // 5 days (auto-expires)
-);
-
 // 14-day escrow (shipping + inspection)
 const escrowPeriod = await escrowPeriodFactory.deploy(
   14 * 24 * 60 * 60,   // 14 days
   zeroHash             // bytes32(0) = operator-only
 );
 
-// Deploy Freeze linked to escrow period
-const freeze = await freezeFactory.deploy(freezePolicy, escrowPeriod);
+// Receiver freeze (product defect), arbiter unfreeze (dispute resolution),
+// linked to the 14-day escrow period.
+const freeze = await freezeFactory.deploy(
+  RECEIVER_CONDITION,           // freezeCondition
+  arbiterCondition.address,     // unfreezeCondition
+  5 * 24 * 60 * 60,             // freezeDuration: 5 days
+  escrowPeriod                  // escrowPeriodContract
+);
 
-// Receiver OR Arbiter can release (after escrow + not frozen)
-const releaseCondition = await new AndCondition([
+// Receiver OR Arbiter can capture (after escrow + not frozen)
+const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   await new AndCondition([escrowPeriod, freeze])
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,         // Arbiter earns fees
+  feeReceiver: arbiterAddress,         // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,  // Operator fee calculator
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriod,      // Same address for recording auth time
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriod,      // Same address for recording auth time
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -246,14 +241,14 @@ sequenceDiagram
     Arbiter->>Arbiter: Investigates
 
     Note over Buyer,Escrow: Day 16 - Resolution
-    Arbiter->>Operator: refundInEscrow(paymentId)
-    Operator->>Escrow: void(paymentId)
+    Arbiter->>Operator: void(paymentInfo, data)
+    Operator->>Escrow: void(paymentInfo)
     Escrow->>Buyer: Full refund
 ```
 
 ---
 
-## Example 4: Service-Based Payments (Milestone Release)
+## Example 4: Service-Based Payments (Milestone Capture)
 
 **Use Case:** Freelance work with milestone-based releases. Receiver can trigger partial releases.
 
@@ -269,25 +264,25 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
   zeroHash              // bytes32(0) = operator-only
 );
 
-// Receiver can release after short escrow
-const releaseCondition = await new AndCondition([
+// Receiver can capture after short escrow
+const capturePreActionCondition = await new AndCondition([
   RECEIVER_CONDITION,    // Only receiver
   escrowPeriod           // Escrow period passed
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Only payer authorizes
-  authorizeRecorder: escrowPeriod,            // Record auth time
-  chargeCondition: RECEIVER_CONDITION,        // Receiver can charge partials
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address,
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: PAYER_CONDITION,        // Only payer authorizes
+  authorizePostActionHook: escrowPeriod,            // Record auth time
+  chargePreActionCondition: RECEIVER_CONDITION,        // Receiver can charge partials
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: arbiterCondition.address,
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -319,8 +314,8 @@ sequenceDiagram
     Note over Escrow: 300 USDC remaining
 
     Note over Client,Escrow: Day 15 - Final Milestone
-    Freelancer->>Operator: release(paymentId)
-    Operator->>Escrow: release remaining
+    Freelancer->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture remaining
     Escrow->>Freelancer: 300 USDC
     Note over Escrow: Payment complete
 ```
@@ -338,18 +333,18 @@ sequenceDiagram
 const arbiterCondition = await new StaticAddressCondition(arbiterAddress);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns all fees
+  feeReceiver: arbiterAddress,               // Arbiter earns all fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: arbiterCondition.address,      // Arbiter creates payments
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: arbiterCondition.address,         // Arbiter charges
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: arbiterCondition.address,        // Arbiter releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: arbiterCondition.address, // Arbiter refunds
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: arbiterCondition.address,
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: arbiterCondition.address,      // Arbiter creates payments
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: arbiterCondition.address,         // Arbiter charges
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: arbiterCondition.address,        // Arbiter releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: arbiterCondition.address, // Arbiter refunds
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: arbiterCondition.address,
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -368,7 +363,7 @@ Factory-level fees still apply (MAX_TOTAL_FEE_RATE and PROTOCOL_FEE_PERCENTAGE).
 
 ## Example 6: Receiver-Initiated Refunds
 
-**Use Case:** Receiver can voluntarily offer refunds (e.g., return policy).
+**Use Case:** Receiver can offer refunds (for example, a return policy).
 
 ### Configuration
 
@@ -382,8 +377,8 @@ const escrowPeriod = await escrowPeriodFactory.deploy(
   zeroHash              // bytes32(0) = operator-only
 );
 
-// Receiver OR Arbiter can release
-const releaseCondition = await new AndCondition([
+// Receiver OR Arbiter can capture
+const capturePreActionCondition = await new AndCondition([
   await new OrCondition([RECEIVER_CONDITION, arbiterCondition.address]),
   escrowPeriod          // Escrow period passed
 ]);
@@ -395,18 +390,18 @@ const refundCondition = await new OrCondition([
 ]);
 
 const config = {
-  feeRecipient: arbiterAddress,               // Arbiter earns fees
+  feeReceiver: arbiterAddress,               // Arbiter earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: ALWAYS_TRUE_CONDITION,
-  authorizeRecorder: escrowPeriod,            // Record auth time
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: releaseCondition,
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: refundCondition,    // Receiver OR Arbiter
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: RECEIVER_CONDITION, // Only receiver post-escrow
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: ALWAYS_TRUE_CONDITION,
+  authorizePostActionHook: escrowPeriod,            // Record auth time
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: capturePreActionCondition,
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: refundCondition,    // Receiver OR Arbiter
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: RECEIVER_CONDITION, // Only receiver after capture
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -432,8 +427,8 @@ sequenceDiagram
     Note over Buyer,Escrow: Day 5 - Return Request
     Buyer->>Seller: Requests return
     Note over Seller: Approves return
-    Seller->>Operator: refundInEscrow(paymentId)
-    Operator->>Escrow: void(paymentId)
+    Seller->>Operator: void(paymentInfo, data)
+    Operator->>Escrow: void(paymentInfo)
     Escrow->>Buyer: Full refund
     Note over Buyer,Escrow: Buyer returns product
 ```
@@ -452,18 +447,18 @@ const providerCondition = await new StaticAddressCondition(serviceProviderAddres
 
 // Receiver can charge immediately (no escrow)
 const config = {
-  feeRecipient: serviceProviderAddress,       // Service provider earns fees
+  feeReceiver: serviceProviderAddress,       // Service provider earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer sets up subscription
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: providerCondition.address, // Provider charges monthly
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: providerCondition.address,// Provider releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: '0x0000000000000000000000000000000000000000',        // No refunds (no arbiter)
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer sets up subscription
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: providerCondition.address, // Provider charges monthly
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: providerCondition.address,// Provider releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: '0x0000000000000000000000000000000000000000',        // Open-access: anyone can call void() (`address(0)` = default-allow)
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -501,8 +496,8 @@ sequenceDiagram
     Escrow->>Provider: 100 USDC
 
     Note over User,Escrow: Month 12 - Subscription Ends
-    Provider->>Operator: release(paymentId)
-    Operator->>Escrow: release remaining
+    Provider->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture remaining
     Escrow->>Provider: Remaining funds
 
     Note over User,Escrow: Alt: If cancelled early
@@ -515,7 +510,7 @@ sequenceDiagram
 
 ## Example 8: DAO Treasury Controlled
 
-**Use Case:** DAO manages grant releases via multisig governance. No arbiter needed - DAO is the authority.
+**Use Case:** DAO manages grant releases via multisig governance. No arbiter needed: the DAO is the authority.
 
 ### Configuration
 
@@ -524,18 +519,18 @@ sequenceDiagram
 const daoCondition = await new StaticAddressCondition(DAO_MULTISIG_ADDRESS);
 
 const config = {
-  feeRecipient: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
+  feeReceiver: DAO_MULTISIG_ADDRESS,         // DAO treasury earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: daoCondition.address,   // DAO authorizes grants
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: '0x0000000000000000000000000000000000000000',
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: daoCondition.address,     // DAO must approve releases
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: daoCondition.address,  // DAO can refund if needed
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-escrow refunds
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: daoCondition.address,   // DAO authorizes grants
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: '0x0000000000000000000000000000000000000000',
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: daoCondition.address,     // DAO must approve releases
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: daoCondition.address,  // DAO can refund if needed
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -563,9 +558,9 @@ sequenceDiagram
     Note over DAO: Review and vote
     DAO->>DAO: Multisig approval
 
-    Note over Grantee,Escrow: Release
-    DAO->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    Note over Grantee,Escrow: Capture
+    DAO->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>Grantee: 50000 USDC
     Note over Grantee: Grant complete
 ```
@@ -588,26 +583,26 @@ sequenceDiagram
 // Deploy condition for platform address
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
-// Time-proportional charge condition (custom — not provided out of the box,
+// Time-proportional charge condition (custom, not provided shipped with the SDK,
 // this is a hypothetical custom condition you would implement yourself)
 const timeProportionalCondition = await new TimeProportionalCondition();
 
 const config = {
-  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeReceiver: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer authorizes stream
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: new AndCondition([
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer authorizes stream
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: new AndCondition([
     RECEIVER_CONDITION,
     timeProportionalCondition                 // Can only charge proportional to time
   ]),
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Receiver releases remaining
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: PAYER_CONDITION,   // Payer can cancel stream
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No refunds after charged
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Receiver releases remaining
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: PAYER_CONDITION,   // Payer can cancel stream
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -661,22 +656,22 @@ sequenceDiagram
 ### Configuration
 
 ```typescript
-// No arbiter - receiver controls release, platform earns fees
+// No arbiter - receiver controls capture, platform earns fees
 const platformCondition = await new StaticAddressCondition(PLATFORM_ADDRESS);
 
 const config = {
-  feeRecipient: PLATFORM_ADDRESS,             // Platform earns fees
+  feeReceiver: PLATFORM_ADDRESS,             // Platform earns fees
   feeCalculator: feeCalculatorAddress,        // Operator fee calculator
-  authorizeCondition: PAYER_CONDITION,        // Payer creates invoice payment
-  authorizeRecorder: '0x0000000000000000000000000000000000000000',
-  chargeCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
-  chargeRecorder: '0x0000000000000000000000000000000000000000',
-  releaseCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
-  releaseRecorder: '0x0000000000000000000000000000000000000000',
-  refundInEscrowCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
-  refundInEscrowRecorder: '0x0000000000000000000000000000000000000000',
-  refundPostEscrowCondition: '0x0000000000000000000000000000000000000000',      // No post-delivery refunds
-  refundPostEscrowRecorder: '0x0000000000000000000000000000000000000000'
+  authorizePreActionCondition: PAYER_CONDITION,        // Payer creates invoice payment
+  authorizePostActionHook: '0x0000000000000000000000000000000000000000',
+  chargePreActionCondition: RECEIVER_CONDITION,        // Receiver charges on delivery
+  chargePostActionHook: '0x0000000000000000000000000000000000000000',
+  capturePreActionCondition: RECEIVER_CONDITION,       // Receiver releases on payment terms
+  capturePostActionHook: '0x0000000000000000000000000000000000000000',
+  voidPreActionCondition: RECEIVER_CONDITION,// Receiver can refund (invoice error)
+  voidPostActionHook: '0x0000000000000000000000000000000000000000',
+  refundPreActionCondition: '0x0000000000000000000000000000000000000000',      // Open-access: anyone can call refund() (`address(0)` = default-allow)
+  refundPostActionHook: '0x0000000000000000000000000000000000000000'
 };
 
 const operator = await operatorFactory.deployOperator(config);
@@ -701,8 +696,8 @@ sequenceDiagram
     Note over CompanyA: Receives goods
 
     Note over CompanyA,Platform: Day 30 - Settlement
-    CompanyB->>Operator: release(paymentId)
-    Operator->>Escrow: release funds
+    CompanyB->>Operator: capture(paymentInfo, amount)
+    Operator->>Escrow: capture funds
     Escrow->>CompanyB: 99900 USDC
     Escrow->>Platform: 100 USDC
     Note over CompanyB: Invoice settled
@@ -739,13 +734,13 @@ Before deploying, verify:
 
 - [ ] Freeze policy suits your use case
 - [ ] Escrow period is appropriate for delivery time
-- [ ] Release condition prevents premature releases
+- [ ] Capture condition prevents premature captures
 - [ ] Refund conditions allow arbiter intervention
 - [ ] Fee rates are competitive and sustainable
 - [ ] Protocol fee percentage is reasonable
 - [ ] Tested on testnet with same configuration
-- [ ] Arbiter address is controlled (preferably multisig)
-- [ ] Condition contracts are verified on block explorer
+- [ ] A trusted party controls the arbiter address (preferably multisig)
+- [ ] Verify condition contracts on the block explorer
 
 ---
 
@@ -754,7 +749,7 @@ Before deploying, verify:
 ```typescript
 import { createTestClient, http, parseUnits, keccak256, toHex } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { PaymentOperatorABI } from '@x402r/core/abis';
+import { paymentOperatorAbi } from '@x402r/core';
 
 // Deploy on Base Sepolia first
 const operatorAddress = await factory.write.deployOperator([config]);
@@ -768,18 +763,18 @@ const testClient = createTestClient({
 // 1. Authorize
 await walletClient.writeContract({
   address: operatorAddress,
-  abi: PaymentOperatorABI,
+  abi: paymentOperatorAbi,
   functionName: 'authorize',
   args: [paymentInfo, parseUnits('100', 6), tokenCollectorAddress, collectorData],
 });
 
-// 2. Try to release immediately (should fail if escrow configured)
+// 2. Try to capture immediately (should fail if escrow configured)
 // Expect revert with ConditionNotMet
 try {
   await walletClient.writeContract({
     address: operatorAddress,
-    abi: PaymentOperatorABI,
-    functionName: 'release',
+    abi: paymentOperatorAbi,
+    functionName: 'capture',
     args: [paymentInfo, parseUnits('100', 6)],
   });
 } catch (e) {
@@ -790,11 +785,11 @@ try {
 await testClient.increaseTime({ seconds: 7 * 24 * 60 * 60 });
 await testClient.mine({ blocks: 1 });
 
-// 4. Release after escrow
+// 4. Capture after escrow
 await walletClient.writeContract({
   address: operatorAddress,
-  abi: PaymentOperatorABI,
-  functionName: 'release',
+  abi: paymentOperatorAbi,
+  functionName: 'capture',
   args: [paymentInfo, parseUnits('100', 6)],
 });
 
@@ -822,12 +817,12 @@ Research competitors' escrow periods and fees:
 
 <Accordion title="Test Edge Cases">
 Test your configuration handles:
-- Immediate release attempts
+- Immediate capture attempts
 - Freeze during escrow
 - Freeze expiry
 - Refunds in both states
 - Fee distribution
-- Multiple partial charges
+- Partial charges followed by capture
 </Accordion>
 
 <Accordion title="Document Your Config">

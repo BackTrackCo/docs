@@ -8,39 +8,37 @@ icon: "user"
 
 PayerCondition is a singleton condition that restricts an action to the payment's payer address.
 
-**Type:** Singleton (deployed once, reused by all operators)
+**Type:** Singleton, CREATE2 (deployed once, reused by all operators)
 
-**Address (Base Sepolia):** `0xBAF68176FF94CAdD403EF7FbB776bbca548AC09D`
-
-**Address (Base Mainnet):** `0xb33D6502EdBbC47201cd1E53C49d703EC0a660b8`
+**Address (all supported chains):** `0x586486394C38A2a7d36B16a3FDaF366cd202d823`
 
 ## Logic
 
 ```solidity
-function check(PaymentInfo calldata payment, uint256, address caller)
+function check(PaymentInfo calldata payment, uint256, address caller, bytes calldata)
     external pure returns (bool)
 {
     return caller == payment.payer;
 }
 ```
 
-The condition compares `caller` against `payment.payer` — pure computation with no storage reads.
+The condition compares `caller` against `payment.payer`, pure computation with no storage reads.
 
 ## When to Use
 
 | Slot | Use Case |
 |------|----------|
-| `AUTHORIZE_CONDITION` | Let payer create payments (subscriptions, invoices) |
-| `REFUND_IN_ESCROW_CONDITION` | Let payer request refunds during escrow |
-| `REFUND_POST_ESCROW_CONDITION` | Let payer cancel streams |
+| `AUTHORIZE_PRE_ACTION_CONDITION` | Let payer create payments (subscriptions, invoices) |
+| `VOID_PRE_ACTION_CONDITION` | Let payer request refunds during escrow |
+| `REFUND_PRE_ACTION_CONDITION` | Let payer cancel streams |
 
 <Note>
-Typically paired with [ReceiverCondition](/contracts/conditions/receiver) for release, since payers shouldn't release their own funds in most configurations.
+Typically paired with [ReceiverCondition](/contracts/conditions/receiver) for capture, since payers shouldn't capture their own funds in most configurations.
 </Note>
 
 ## Gas
 
-**Cost:** Minimal — `pure` function with no storage reads.
+**Cost:** Minimal, `pure` function with no storage reads.
 
 ## Next Steps
 

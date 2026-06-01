@@ -4,19 +4,20 @@ description: "Automated quality verification for every transaction."
 icon: "shield-check"
 ---
 
-In the delivery protection model, the arbiter evaluates every transaction automatically. Only the arbiter can release funds. If the arbiter does not release, funds auto-refund to the payer after escrow expires.
+In the delivery protection model, the arbiter evaluates every transaction. The arbiter or a satisfied payer can capture funds. If the arbiter issues a FAIL verdict, it can trigger an immediate refund without waiting for escrow expiry. If nobody acts, funds return to the payer once escrow expires.
 
-This is different from the [marketplace model](/sdk/overview) where the merchant releases funds and the arbiter only gets involved when a payer files a dispute.
+This differs from the [marketplace model](/sdk/overview) where the merchant releases funds and the arbiter only gets involved when a payer files a dispute.
 
 | | Marketplace | Delivery Protection |
 |---|---|---|
-| Who releases funds | Merchant (after escrow) | Arbiter only |
+| Who releases funds | Merchant (after escrow) | Arbiter or payer |
+| Refund during escrow | Receiver or arbiter | Escrow expiry, receiver, or arbiter |
 | Dispute process | Payer files refund request | No disputes needed |
 | Arbiter involvement | Only on disputes | Every transaction |
-| Contracts needed | Operator + EscrowPeriod + RefundRequest + Evidence + Freeze | Operator + EscrowPeriod + StaticAddressCondition |
+| Contracts deployed | ~8 (Operator, EscrowPeriod, RefundRequest, Evidence, Freeze, etc.) | 6 (Operator, EscrowPeriod, SAC, 2x OrCondition, HookCombinator) |
 | Deploy preset | `deployMarketplaceOperator()` | `deployDeliveryProtectionOperator()` |
 
-Use this when every response needs automated quality checks: AI content verification, garbage detection, schema validation.
+Use this when every response needs programmatic quality checks: AI content verification, garbage detection, schema validation.
 
 <CardGroup cols={2}>
   <Card title="Merchant Setup" icon="store" href="/sdk/delivery-merchant">
