@@ -202,13 +202,7 @@ mapping(bytes32 paymentInfoHash => uint256 frozenUntil) public frozenUntil;
 
 ### Fee Distribution (Additive Model)
 
-Fees are **additive**: `totalFee = protocolFee + operatorFee`
-
-For a 1000 USDC payment with 3 bps protocol fee + 2 bps operator fee:
-- **Protocol Fee:** 0.30 USDC (3 bps) → `protocolFeeRecipient` on ProtocolFeeConfig
-- **Operator Fee:** 0.20 USDC (2 bps) → `FEE_RECEIVER` on operator
-- **Total Fee:** 0.50 USDC (5 bps)
-- **Receiver Gets:** 999.50 USDC
+Fees are **additive**: `totalFee = protocolFee + operatorFee`. They are split between the protocol fee recipient (on ProtocolFeeConfig) and the operator's `FEE_RECEIVER`. For a worked example with concrete amounts, see the [Fee System](/contracts/fees#example-calculation).
 
 Fees accumulate in the operator. Anyone can call `distributeFees(token)` to disburse them.
 
@@ -247,29 +241,7 @@ All state-changing functions use `ReentrancyGuardTransient` (EIP-1153):
 
 ### Timelock Protection
 
-Protocol fee calculator changes require 7-day delay on `ProtocolFeeConfig`:
-
-```typescript
-// Step 1: Queue new calculator
-await protocolFeeConfig.queueCalculator(newCalculatorAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-await protocolFeeConfig.executeCalculator();
-```
-
-Protocol fee recipient changes also require 7-day timelock:
-
-```typescript
-// Step 1: Queue new recipient
-await protocolFeeConfig.queueRecipient(newRecipientAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-await protocolFeeConfig.executeRecipient();
-```
+Protocol fee calculator and recipient changes require a 7-day delay on `ProtocolFeeConfig` (queue, wait, execute). See [Fee System: 7-day timelock](/contracts/fees#calculator-changes-7-day-timelock) for the full workflow with events and the cancel path.
 
 <Note>
 Operator fees are **immutable**: set at deploy time via `IFeeCalculator`. Only protocol fees can change, and only after a 7-day timelock.

@@ -244,13 +244,7 @@ address public immutable FEE_RECEIVER;  // Operator fee recipient
 mapping(address token => uint256) public accumulatedProtocolFees;
 ```
 
-**Example Fee Calculation (Additive):**
-
-For a 1000 USDC payment:
-- **Protocol Fee:** 3 bps (0.03%) = 0.30 USDC -> goes to `protocolFeeRecipient`
-- **Operator Fee:** 2 bps (0.02%) = 0.20 USDC -> goes to `FEE_RECEIVER`
-- **Total Fee:** 5 bps (0.05%) = 0.50 USDC
-- **Receiver Gets:** 999.50 USDC
+Fees are additive: `totalFee = protocolFee + operatorFee`, split between `protocolFeeRecipient` and the operator's `FEE_RECEIVER`. For a worked example with concrete amounts, see the [Fee System](/contracts/fees#example-calculation).
 
 **Fee Locking:**
 The operator calculates fees at `authorize()` time and stores them in `authorizedFees[hash]`. This stops later protocol fee changes from breaking capture of already-authorized payments.
@@ -282,17 +276,7 @@ operator.distributeFees(usdcAddress);
 
 ### Protocol Fee Changes (7-day Timelock)
 
-Protocol fee calculator changes require a 7-day timelock on `ProtocolFeeConfig`:
-
-```solidity
-// Step 1: Queue new calculator
-protocolFeeConfig.queueCalculator(newCalculatorAddress);
-
-// Step 2: Wait 7 days
-
-// Step 3: Execute
-protocolFeeConfig.executeCalculator();
-```
+Protocol fee calculator and recipient changes require a 7-day timelock on `ProtocolFeeConfig`. See [Fee System: 7-day timelock](/contracts/fees#calculator-changes-7-day-timelock) for the full queue, wait, execute workflow.
 
 <Warning>
 Protocol fee changes require 7-day timelock. Operator fees are immutable (set at deploy time).

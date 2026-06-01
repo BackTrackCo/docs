@@ -113,28 +113,7 @@ x402r provides the **auth-capture scheme implementation** for x402:
 
 ## Payment Flow
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
-    participant Facilitator
-    participant Operator
-    participant Escrow
-
-    Client->>Server: GET /resource
-    Server-->>Client: 402 Payment Required
-    Note over Client: Signs ERC-3009 authorization
-    Client->>Server: Payment payload
-    Server->>Facilitator: Verify & settle
-    Facilitator->>Operator: authorize(paymentInfo, amount, tokenCollector, signature)
-    Operator->>Escrow: Lock funds in escrow
-    Facilitator-->>Server: Settlement confirmed
-    Server-->>Client: 200 OK + resource
-
-    Note over Operator,Escrow: Later: capture or void
-    Operator->>Escrow: capture(paymentInfo, amount)
-    Note over Escrow: Funds released to receiver (minus fees)
-```
+The auth-capture scheme is two-phase: the facilitator first authorizes (locks the client's signed funds in escrow at the 402 settlement), then later captures to the receiver or voids back to the payer per policy. For the full HTTP and on-chain sequence diagrams, see the [auth-capture flow](/x402-integration/auth-capture) and the [on-chain payment sequence](/contracts/architecture#payment-flow-sequence).
 
 ## Use Cases
 

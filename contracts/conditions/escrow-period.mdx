@@ -77,13 +77,7 @@ const config = {
 
 ## Composition with Freeze
 
-For freeze functionality, deploy a separate [Freeze](/contracts/conditions/freeze) condition and compose via [AndCondition](/contracts/conditions/combinators):
-
-```solidity
-// Escrow period only:  capturePreActionCondition = escrowPeriod
-// Freeze only:         capturePreActionCondition = freeze
-// Both:                capturePreActionCondition = AndCondition([escrowPeriod, freeze])
-```
+Compose this condition with a separate [Freeze](/contracts/conditions/freeze) condition via [AndCondition](/contracts/conditions/combinators) to gate capture on both escrow elapsed **and** not frozen. See [Composition Patterns](/contracts/conditions/freeze#composition-patterns) for the wiring.
 
 ## Use Cases
 

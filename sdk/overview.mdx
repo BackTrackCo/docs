@@ -20,6 +20,8 @@ Three roles interact with the protocol:
 
 **Delivery Protection** (`deployDeliveryProtectionOperator`): The arbiter evaluates every transaction. The arbiter or a satisfied payer can capture funds. On a FAIL verdict, the arbiter can trigger an immediate refund. If nobody acts, funds return to the payer once escrow expires. Use this for AI content verification, schema validation, or quality checks.
 
+See [Deploy an operator](/sdk/deploy-operator) for the full preset feature comparison, slot configurations, and deployment code.
+
 ### Packages
 
 <CodeGroup>
